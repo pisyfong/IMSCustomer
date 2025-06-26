@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-
 import 'dart:ui';
+import 'services/auth_service.dart';
+import 'models/user.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
@@ -10,8 +11,8 @@ class GlassCard extends StatelessWidget {
   const GlassCard({
     Key? key,
     required this.child,
-    this.borderRadius = 24,
-    this.blur = 18,
+    this.borderRadius = 20,
+    this.blur = 16,
     this.opacity = 0.35,
   }) : super(key: key);
 
@@ -56,8 +57,43 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   String? _error;
 
-  void _login() {
-    Navigator.of(context).pushReplacementNamed('/company');
+  Future<void> _login() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+    
+    if (username.isEmpty || password.isEmpty) {
+      setState(() {
+        _error = 'Please enter both username and password';
+      });
+      return;
+    }
+    
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    
+    try {
+      final authService = AuthService();
+      final user = await authService.login(username, password);
+      
+      if (mounted) {
+        // Login successful, navigate to company selection page
+        Navigator.of(context).pushReplacementNamed('/company');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -83,42 +119,42 @@ class _LoginPageState extends State<LoginPage> {
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Card(
                 elevation: 7,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 color: Colors.white.withOpacity(0.95),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 30.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
                         'assets/images/ims.png',
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 18),
                       Text('IMS Customer',
                         style: TextStyle(
-                          fontSize: 28,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.grey[900],
                           letterSpacing: 1.1,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text('Sign in to continue',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13,
                           color: Colors.grey[600],
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 20),
                       TextField(
                         controller: _usernameController,
                         decoration: InputDecoration(
                           labelText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline, color: Colors.redAccent.shade100),
+                          prefixIcon: Icon(Icons.person_outline, color: Colors.redAccent.shade100, size: 20),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(color: Colors.redAccent, width: 2),
                             borderRadius: BorderRadius.circular(12),
@@ -133,9 +169,9 @@ class _LoginPageState extends State<LoginPage> {
                         obscureText: _obscureText,
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline, color: Colors.redAccent.shade100),
+                          prefixIcon: Icon(Icons.lock_outline, color: Colors.redAccent.shade100, size: 20),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off, color: Colors.redAccent),
+                            icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off, color: Colors.redAccent, size: 20),
                             onPressed: () {
                               setState(() {
                                 _obscureText = !_obscureText;
@@ -150,11 +186,11 @@ class _LoginPageState extends State<LoginPage> {
                           contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                       if (_error != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Text(_error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                          child: Text(_error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 13)),
                         ),
                       SizedBox(
                         width: double.infinity,
@@ -163,10 +199,10 @@ class _LoginPageState extends State<LoginPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.redAccent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             elevation: 2,
-                            textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                           child: _loading
                               ? const SizedBox(

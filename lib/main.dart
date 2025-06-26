@@ -4,7 +4,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'login_page.dart';
 import 'company_selection_page.dart';
+import 'menu_page.dart';
 import 'company.dart';
+import 'sync_info.dart';
+import 'current_login.dart';
+import 'selected_company.dart';
+import 'services/auth_service.dart';
 import 'dart:convert';
 
 part 'main.g.dart';
@@ -16,14 +21,72 @@ class DummyItem {
 }
 
 
-void main() {
+// Global Isar instance
+late Isar isar;
+
+// Initialize Isar and open the database
+Future<void> initIsar() async {
+  final dir = await getApplicationDocumentsDirectory();
+  isar = await Isar.open(
+    [DummyItemSchema, CompanySchema, SyncInfoSchema, CurrentLoginSchema, SelectedCompanySchema],
+    directory: dir.path,
+  );
+  
+  // Initialize SyncInfo if it doesn't exist
+  final syncInfo = await isar.syncInfos.where().idEqualTo(SyncInfo.singletonId).findFirst();
+  if (syncInfo == null) {
+    final initialSyncInfo = SyncInfo.create();
+    initialSyncInfo.lastSyncTime = DateTime.now();
+    initialSyncInfo.isOnline = false;
+    
+    await isar.writeTxn(() async {
+      await isar.syncInfos.put(initialSyncInfo);
+    });
+  }
+}
+
+void main() async {
+  // Ensure Flutter is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Isar
+  await initIsar();
+  
+  // Run the app
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _initialized = false;
+  bool _hasExistingLogin = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _checkForExistingLogin();
+  }
+  
+  Future<void> _checkForExistingLogin() async {
+    final authService = AuthService();
+    final hasLogin = await authService.hasSavedLogin();
+    
+    if (hasLogin) {
+      await authService.loadSavedLogin();
+    }
+    
+    setState(() {
+      _hasExistingLogin = hasLogin;
+      _initialized = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -48,11 +111,19 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      initialRoute: '/',
+      home: _initialized
+          ? (_hasExistingLogin ? const CompanySelectionPage() : const LoginPage())
+          : const Scaffold(body: Center(child: CircularProgressIndicator())),
       routes: {
-        '/': (context) => const LoginPage(),
+        '/login': (context) => const LoginPage(),
         '/company': (context) => const CompanySelectionPage(),
+        '/menu': (context) => const MenuPage(),
         '/home': (context) => const MyHomePage(title: 'IMS Customer'),
+        '/sales_quotation': (context) => const Scaffold(body: Center(child: Text('Sales Quotation - Coming Soon'))),
+        '/sales_order': (context) => const Scaffold(body: Center(child: Text('Sales Order - Coming Soon'))),
+        '/sales_invoice': (context) => const Scaffold(body: Center(child: Text('Sales Invoice - Coming Soon'))),
+        '/inventory': (context) => const Scaffold(body: Center(child: Text('Inventory - Coming Soon'))),
+        '/reports': (context) => const Scaffold(body: Center(child: Text('Reports - Coming Soon'))),
       },
     );
   }
