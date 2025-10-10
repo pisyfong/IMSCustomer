@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'services/auth_service.dart';
+import 'services/activation_service.dart';
 import 'models/user.dart';
 
 class GlassCard extends StatelessWidget {
@@ -126,11 +127,22 @@ class _LoginPageState extends State<LoginPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset(
-                        'assets/images/ims.png',
-                        width: 56,
-                        height: 56,
-                        fit: BoxFit.contain,
+                      GestureDetector(
+                        onLongPress: () async {
+                          // DEV/Support: reset activation and navigate to ActivationPage
+                          try {
+                            await ActivationService().resetActivation();
+                            if (mounted) {
+                              Navigator.of(context).pushReplacementNamed('/activate');
+                            }
+                          } catch (_) {}
+                        },
+                        child: Image.asset(
+                          'assets/images/ims.png',
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                       const SizedBox(height: 18),
                       Text('IMS Customer',

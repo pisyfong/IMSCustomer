@@ -1,49 +1,87 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:isar/isar.dart';
 import '../models/user.dart';
 import '../current_login.dart';
 import '../selected_company.dart';
-import '../main.dart'; // For the global Isar instance
+import '../main.dart'; // For the global Isar and signalRService instances
+import 'signalr_service.dart';
+import 'offline_first_service.dart'; // For the global Isar and signalRService instances
+import 'cart_service.dart';
+import '../config/app_config.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://plusintralinkapps.dyndns.org:1194/api';
+  static String get baseUrl => '${AppConfig.baseUrl}/api';
   
   // Singleton pattern
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
   
-  // Store the current user
+  // Store the current user and customer
   User? _currentUser;
   User? get currentUser => _currentUser;
   
-  // Login method
+  // Store the currently selected customer
+  Map<String, dynamic>? _currentCustomer;
+  Map<String, dynamic>? get currentCustomer => _currentCustomer;
+  
+  // Login method using offline-first pattern
   Future<User?> login(String username, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': username,
-          'password': password,
-        }),
+      print('\n=== AuthService Login Started (Offline-First) ===');
+      print('Username: $username');
+      print('Password: ${password.isNotEmpty ? '[PRESENT]' : '[MISSING]'}');
+      
+      // Use offline-first login pattern
+      final result = await OfflineFirstService.loginOfflineFirst(
+        username: username,
+        password: password,
       );
       
-      final data = jsonDecode(response.body);
+      print('Login result received: $result');
       
-      if (response.statusCode == 200 && data['success'] == true) {
-        _currentUser = User.fromJson(data['user']);
+      if (result != null && result['success'] == true) {
+        final isOfflineLogin = result['offline'] == true;
+        print('✅ AuthService: Login successful (${isOfflineLogin ? "Offline" : "Online"})');
         
-        // Save login to Isar database
-        await _saveCurrentLogin(data['user']);
+        final userData = result['user'];
+        _currentUser = User.fromJson(userData);
         
+        // Log the roleId from the server
+        print('📋 AuthService: User roleId from server = ${userData['Role_ID']}');
+        print('📋 AuthService: Mapped to User object with roleId = ${_currentUser?.roleId}');
+        
+        // Save login to Isar database (always update current login)
+        await _saveCurrentLogin(userData);
+        
+        // Establish SignalR connection if we're online
+        if (!isOfflineLogin) {
+          try {
+            print('Establishing SignalR connection for online login...');
+            await signalRService.connect();
+            print('✅ SignalR connection established');
+          } catch (signalRError) {
+            print('⚠️ SignalR connection failed after login: $signalRError');
+            // Don't fail login just because SignalR connection failed
+          }
+        } else {
+          print('📱 Offline login - SignalR connection deferred');
+        }
+        
+        print('User saved to Isar database');
+        print('=== AuthService Login Completed Successfully ===\n');
         return _currentUser;
       } else {
         // Login failed
-        final message = data['message'] ?? 'Login failed';
+        final message = result?['message'] ?? 'Authentication failed';
+        print('❌ AuthService: Login failed - $message');
+        print('=== AuthService Login Failed ===\n');
         throw Exception(message);
       }
     } catch (e) {
+      print('❌ AuthService: Login exception - ${e.toString()}');
+      print('Exception type: ${e.runtimeType}');
+      print('=== AuthService Login Exception ===\n');
       throw Exception('Login failed: ${e.toString()}');
     }
   }
@@ -98,6 +136,19 @@ class AuthService {
       final savedLogin = await isar.collection<CurrentLogin>().get(CurrentLogin.singletonId);
       
       if (savedLogin != null) {
+        print('\n=== Loading Saved Login ===');
+        print('Found saved login for: ${savedLogin.username}');
+        
+        // CRITICAL: Establish SignalR connection when loading saved login
+        print('Establishing SignalR connection for saved login...');
+        try {
+          await signalRService.connect();
+          print('✅ SignalR connection established for saved login');
+        } catch (e) {
+          print('⚠️ SignalR connection failed during saved login: $e');
+          // Continue anyway - app should work offline
+        }
+        
         _currentUser = User(
           userId: savedLogin.userId,
           loginName: savedLogin.username,
@@ -106,7 +157,12 @@ class AuthService {
           designation: savedLogin.designation,
           email: savedLogin.email,
           userPhoto: savedLogin.userPhoto,
+          roleId: savedLogin.roleId ?? 0, // Default to 0 if null
         );
+        
+        print('📋 AuthService: Loaded user with roleId = ${_currentUser?.roleId}');
+        print('Saved login loaded successfully');
+        print('=== Saved Login Loading Completed ===\n');
         return _currentUser;
       }
     } catch (e) {
@@ -157,6 +213,66 @@ class AuthService {
       });
     } catch (e) {
       print('Error clearing selected company: $e');
+    }
+  }
+  
+  // Set the currently selected customer
+  Future<void> setCurrentCustomer(Map<String, dynamic>? customer) async {
+    final previousCustomer = _currentCustomer;
+    _currentCustomer = customer;
+    
+    // If customer changed, clear the cart
+    if (previousCustomer != null && customer != null) {
+      final previousId = previousCustomer['customerId'] ?? previousCustomer['id'];
+      final currentId = customer['customerId'] ?? customer['id'];
+      
+      if (previousId != currentId) {
+        print('🔄 Customer changed from $previousId to $currentId - clearing cart');
+        // Import and use CartService to clear cart
+        final cartService = CartService();
+        await cartService.clearCart();
+      }
+    } else if (previousCustomer != null && customer == null) {
+      // Customer was deselected, clear cart
+      print('🔄 Customer deselected - clearing cart');
+      final cartService = CartService();
+      await cartService.clearCart();
+    }
+  }
+  
+  // Get the currently selected customer
+  Future<Map<String, dynamic>?> getCurrentCustomer() async {
+    return _currentCustomer;
+  }
+
+  // Update the current user's role and persist to CurrentLogin
+  Future<void> updateCurrentUserRole(int roleId) async {
+    if (_currentUser == null) return;
+    final u = _currentUser!;
+    _currentUser = User(
+      userId: u.userId,
+      userPhoto: u.userPhoto,
+      loginName: u.loginName,
+      fullName: u.fullName,
+      status: u.status,
+      accessLevel: u.accessLevel,
+      designation: u.designation,
+      email: u.email,
+      phoneNo: u.phoneNo,
+      roleId: roleId,
+    );
+
+    try {
+      await isar.writeTxn(() async {
+        final saved = await isar.collection<CurrentLogin>().get(CurrentLogin.singletonId);
+        if (saved != null) {
+          saved.roleId = roleId;
+          await isar.collection<CurrentLogin>().put(saved);
+        }
+      });
+      print('💾 AuthService: Updated current user roleId to $roleId and persisted to CurrentLogin');
+    } catch (e) {
+      print('⚠️ AuthService: Failed to persist updated roleId - $e');
     }
   }
 }

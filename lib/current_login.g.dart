@@ -37,18 +37,23 @@ const CurrentLoginSchema = CollectionSchema(
       name: r'loginTime',
       type: IsarType.dateTime,
     ),
-    r'userId': PropertySchema(
+    r'roleId': PropertySchema(
       id: 4,
+      name: r'roleId',
+      type: IsarType.long,
+    ),
+    r'userId': PropertySchema(
+      id: 5,
       name: r'userId',
       type: IsarType.long,
     ),
     r'userPhoto': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'userPhoto',
       type: IsarType.string,
     ),
     r'username': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'username',
       type: IsarType.string,
     )
@@ -96,9 +101,10 @@ void _currentLoginSerialize(
   writer.writeString(offsets[1], object.email);
   writer.writeString(offsets[2], object.fullName);
   writer.writeDateTime(offsets[3], object.loginTime);
-  writer.writeLong(offsets[4], object.userId);
-  writer.writeString(offsets[5], object.userPhoto);
-  writer.writeString(offsets[6], object.username);
+  writer.writeLong(offsets[4], object.roleId);
+  writer.writeLong(offsets[5], object.userId);
+  writer.writeString(offsets[6], object.userPhoto);
+  writer.writeString(offsets[7], object.username);
 }
 
 CurrentLogin _currentLoginDeserialize(
@@ -112,9 +118,10 @@ CurrentLogin _currentLoginDeserialize(
     email: reader.readString(offsets[1]),
     fullName: reader.readString(offsets[2]),
     loginTime: reader.readDateTime(offsets[3]),
-    userId: reader.readLong(offsets[4]),
-    userPhoto: reader.readStringOrNull(offsets[5]),
-    username: reader.readString(offsets[6]),
+    roleId: reader.readLongOrNull(offsets[4]),
+    userId: reader.readLong(offsets[5]),
+    userPhoto: reader.readStringOrNull(offsets[6]),
+    username: reader.readString(offsets[7]),
   );
   object.id = id;
   return object;
@@ -136,10 +143,12 @@ P _currentLoginDeserializeProp<P>(
     case 3:
       return (reader.readDateTime(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 5:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 6:
+      return (reader.readStringOrNull(offset)) as P;
+    case 7:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -755,6 +764,79 @@ extension CurrentLoginQueryFilter
     });
   }
 
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition>
+      roleIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'roleId',
+      ));
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition>
+      roleIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'roleId',
+      ));
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition> roleIdEqualTo(
+      int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'roleId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition>
+      roleIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'roleId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition>
+      roleIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'roleId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition> roleIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'roleId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<CurrentLogin, CurrentLogin, QAfterFilterCondition> userIdEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -1158,6 +1240,18 @@ extension CurrentLoginQuerySortBy
     });
   }
 
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterSortBy> sortByRoleId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'roleId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterSortBy> sortByRoleIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'roleId', Sort.desc);
+    });
+  }
+
   QueryBuilder<CurrentLogin, CurrentLogin, QAfterSortBy> sortByUserId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'userId', Sort.asc);
@@ -1258,6 +1352,18 @@ extension CurrentLoginQuerySortThenBy
     });
   }
 
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterSortBy> thenByRoleId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'roleId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CurrentLogin, CurrentLogin, QAfterSortBy> thenByRoleIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'roleId', Sort.desc);
+    });
+  }
+
   QueryBuilder<CurrentLogin, CurrentLogin, QAfterSortBy> thenByUserId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'userId', Sort.asc);
@@ -1324,6 +1430,12 @@ extension CurrentLoginQueryWhereDistinct
     });
   }
 
+  QueryBuilder<CurrentLogin, CurrentLogin, QDistinct> distinctByRoleId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'roleId');
+    });
+  }
+
   QueryBuilder<CurrentLogin, CurrentLogin, QDistinct> distinctByUserId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'userId');
@@ -1374,6 +1486,12 @@ extension CurrentLoginQueryProperty
   QueryBuilder<CurrentLogin, DateTime, QQueryOperations> loginTimeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'loginTime');
+    });
+  }
+
+  QueryBuilder<CurrentLogin, int?, QQueryOperations> roleIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'roleId');
     });
   }
 

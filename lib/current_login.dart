@@ -17,6 +17,7 @@ class CurrentLogin {
   String email;
   String? userPhoto;
   String designation;
+  int? roleId; // Persist user's Role_ID for role-based filtering
   
   // Login timestamp
   DateTime loginTime;
@@ -29,18 +30,42 @@ class CurrentLogin {
     required this.email,
     this.userPhoto,
     required this.designation,
+    this.roleId,
     required this.loginTime,
   });
   
   // Factory method to create from user model
   factory CurrentLogin.fromUser(Map<String, dynamic> user) {
+    // Safe conversion helpers
+    String toStringValue(dynamic value, String fallback) {
+      if (value == null) return fallback;
+      if (value is String) return value;
+      if (value is Map) return fallback; // Handle Map case
+      return value.toString();
+    }
+    
+    String? toStringOrNull(dynamic value) {
+      if (value == null) return null;
+      if (value is String) return value;
+      if (value is Map) return null; // Handle Map case
+      return value.toString();
+    }
+    
+    int toIntValue(dynamic value, int fallback) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? fallback;
+      return fallback;
+    }
+    
     return CurrentLogin(
-      userId: user['User_ID'],
-      username: user['Login_Name'],
-      fullName: user['Full_Name'],
-      email: user['Email'],
-      userPhoto: user['User_Photo'],
-      designation: user['Designation'],
+      userId: toIntValue(user['User_ID'], 0),
+      username: toStringValue(user['Login_Name'], 'Unknown'),
+      fullName: toStringValue(user['Full_Name'], 'Unknown'),
+      email: toStringValue(user['Email'], 'unknown@example.com'),
+      userPhoto: toStringOrNull(user['User_Photo']),
+      designation: toStringValue(user['Designation'], 'User'),
+      roleId: toIntValue(user['Role_ID'], 0),
       loginTime: DateTime.now(),
     );
   }

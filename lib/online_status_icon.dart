@@ -3,9 +3,9 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
+// HTTP removed - using SignalR-only architecture
 import 'sync_info.dart';
-import 'main.dart'; // Import main.dart to access the global Isar instance
+import 'main.dart'; // Import main.dart to access the global Isar instance and signalRService
 
 class OnlineStatusIcon extends StatefulWidget {
   final bool isOnline;
@@ -67,10 +67,9 @@ class _OnlineStatusIconState extends State<OnlineStatusIcon> {
       widget.onTap!();
     } else {
       // If no onTap callback is provided, implement a default connection check
-      const apiUrl = 'http://plusintralinkapps.dyndns.org:1194/api/customers?page=1&limit=1';
       try {
-        final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 3));
-        final isOnline = response.statusCode == 200;
+        // Check SignalR connection status instead of HTTP
+        final isOnline = signalRService.isConnected;
         
         // Only update if the status changed to avoid unnecessary updates
         if (isOnline != widget.isOnline && mounted) {
@@ -103,10 +102,9 @@ class _OnlineStatusIconState extends State<OnlineStatusIcon> {
         widget.onTap!();
       } else {
         // Otherwise implement our own connection check
-        const apiUrl = 'http://plusintralinkapps.dyndns.org:1194/api/customers?page=1&limit=1';
         try {
-          final response = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 3));
-          final isOnline = response.statusCode == 200;
+          // Check SignalR connection status instead of HTTP
+          final isOnline = signalRService.isConnected;
           
           // Update sync info with the new status
           await _updateSyncInfo(isOnline);
