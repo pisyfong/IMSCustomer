@@ -96,7 +96,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       
       // Fetch customer PLU from server
       final signalRService = SignalRService();
-      final customerPluData = await signalRService.invoke('getCustomerPlu', args: [
+      final customerPluData = await signalRService.invoke('getCustomerPlu', [
         companyCode,
         customerCode,
         skuNos,
