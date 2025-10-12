@@ -282,4 +282,64 @@ class QuotationService {
 
     await updateQuotation(quotation);
   }
+
+  /// Save quotation items to server
+  Future<bool> saveQuotationItems({
+    required int companyCode,
+    required String quotePreLabel,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      print('📝 QUOTATION ITEMS: Saving ${items.length} items for $quotePreLabel');
+      
+      // Prepare items for server
+      final itemsToSend = items.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        
+        return {
+          'Company_Code': companyCode,
+          'Quote_PreLabel': quotePreLabel,
+          'Sequence_No': index + 1,
+          'Sku_No': item['skuNo'] ?? item['sku_no'] ?? 0,
+          'Uom': item['uom'] ?? 'PCS',
+          'Factor': item['factor'] ?? 1.0,
+          'Status': 'A',
+          'Quote_Quantity': item['quantity'] ?? 0.0,
+          'Quote_Quantity_Loose': 0.0,
+          'Quote_Foc': 0.0,
+          'Quote_Foc_Loose': 0.0,
+          'Unit_Price': item['unitPrice'] ?? item['price'] ?? 0.0,
+          'Unit_Price_Basic': item['unitPrice'] ?? item['price'] ?? 0.0,
+          'Unit_Discount_Rate': 0.0,
+          'Unit_Discount_Amount': 0.0,
+          'Tax_Rate': 0.0,
+          'Tax_Amount': 0.0,
+          'Net_Amount': item['amount'] ?? (item['quantity'] ?? 0.0) * (item['unitPrice'] ?? item['price'] ?? 0.0),
+          'Plu_No': item['pluNo'] ?? item['plu_no'],
+          'Remark': item['remark'],
+        };
+      }).toList();
+      
+      final apiUrl = '${AppConfig.apiBaseUrl}/api/quotation-items';
+      print('📤 Sending ${itemsToSend.length} items to: $apiUrl');
+      
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'items': itemsToSend}),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ QUOTATION ITEMS: Successfully saved ${items.length} items');
+        return true;
+      } else {
+        print('❌ QUOTATION ITEMS: Server returned ${response.statusCode}: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ QUOTATION ITEMS: Error saving items: $e');
+      return false;
+    }
+  }
 }

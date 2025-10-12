@@ -194,6 +194,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
       
       print('✅ Quotation created: ${quotation.quotePreLabel}, isSynced: ${quotation.isSynced}');
       
+      // Save quotation items to database
+      print('📝 Saving quotation items to database...');
+      final cartItemsData = widget.cartItems.map((item) => {
+        'skuNo': item.skuNo,
+        'uom': item.uom,
+        'quantity': item.quantity,
+        'unitPrice': item.price,
+        'amount': item.quantity * item.price,
+        'pluNo': item.pluNo,
+        'remark': null,
+      }).toList();
+      
+      final itemsSaved = await _quotationService.saveQuotationItems(
+        companyCode: companyCode,
+        quotePreLabel: quoteNo,
+        items: cartItemsData,
+      );
+      
+      if (itemsSaved) {
+        print('✅ Quotation items saved successfully');
+      } else {
+        print('⚠️ Warning: Quotation items may not have been saved to database');
+      }
+      
       final pdf = pw.Document();
       
       pdf.addPage(

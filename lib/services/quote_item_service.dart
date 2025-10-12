@@ -16,13 +16,16 @@ class QuoteItemService {
     bool forceSync = false,
   }) async {
     try {
-      // Getting quote items for $quotePreLabel
+      print('\n🔍 QUOTE ITEM SERVICE: Getting quote items for $quotePreLabel (Company: $companyCode)');
+      print('🔍 QUOTE ITEM SERVICE: Force sync: $forceSync');
 
       // Always try local data first (offline-first pattern)
       final localItems = await getLocalQuoteItems(
         quotePreLabel: quotePreLabel,
         companyCode: companyCode,
       );
+      
+      print('📱 QUOTE ITEM SERVICE: Found ${localItems.length} local items');
 
       // If we have local data and not forcing sync, return it
       if (localItems.isNotEmpty && !forceSync) {
@@ -33,16 +36,18 @@ class QuoteItemService {
       // Try to sync from server if we have connectivity
       if (await OfflineFirstService.isServerReachable()) {
         try {
-          // Syncing quote items from server
+          print('🌐 QUOTE ITEM SERVICE: Server reachable, fetching from server...');
           final serverItems = await fetchQuoteItemsFromServer(
             quotePreLabel: quotePreLabel,
             companyCode: companyCode,
           );
 
+          print('📦 QUOTE ITEM SERVICE: Received ${serverItems.length} items from server');
+          
           // Save to local database
           await saveQuoteItemsToLocal(serverItems);
           
-          print('✅ Synced ${serverItems.length} quote items for $quotePreLabel');
+          print('✅ QUOTE ITEM SERVICE: Synced ${serverItems.length} quote items for $quotePreLabel');
           return serverItems;
         } catch (e) {
           print('❌ QUOTE ITEM SERVICE: Server sync failed: $e');
