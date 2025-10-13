@@ -885,7 +885,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   Text(
                     item.description ?? '',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
@@ -2289,7 +2289,7 @@ class _InventoryPageState extends State<InventoryPage> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
-                      childAspectRatio: 0.78,
+                      childAspectRatio: 0.72,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -2825,19 +2825,23 @@ class _InventoryPageState extends State<InventoryPage> {
                             const SizedBox(width: 8),
                             ElevatedButton.icon(
                               onPressed: () {
-                                // commit local qty and add with custom price if changed
+                                // Get the current price BEFORE clearing selections
+                                final currentPrice = _priceSelections[sku] ?? item.gstPrice ?? 0.0;
+                                
+                                // commit local qty and clear selections
                                 setState(() { 
                                   _qtySelections[sku] = localQty;
                                   // Clear price selection after adding to cart
                                   _priceSelections.remove(sku);
                                 });
                                 Navigator.of(context).pop();
-                                final customPrice = double.tryParse(priceCtrl.text);
+                                
+                                // Add to cart with the correct price for selected UOM
                                 _addToCart(
                                   item, 
                                   remark: remarkCtrl.text, 
                                   uom: selectedUom.isEmpty ? null : selectedUom,
-                                  customGstPrice: (customPrice != null && customPrice != item.gstPrice) ? customPrice : null,
+                                  customGstPrice: currentPrice,
                                 );
                               },
                               style: ElevatedButton.styleFrom(
@@ -2855,7 +2859,19 @@ class _InventoryPageState extends State<InventoryPage> {
                         // Price row with qty input
                         Row(
                           children: [
-                            _buildPriceTag(item),
+                            // Dynamic price tag that updates with UOM selection
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.amber.shade200),
+                              ),
+                              child: Text(
+                                'RM ${_priceSelections[sku]!.toStringAsFixed(2)} / ${selectedUom.isEmpty ? (item.uom ?? 'PCS') : selectedUom}',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+                              ),
+                            ),
                             const SizedBox(width: 8),
                             // Price display with edit icon (only if permission granted)
                             if (canEditPrice) ...[
@@ -3026,6 +3042,11 @@ class _InventoryPageState extends State<InventoryPage> {
                                       onSelected: (_) => setSheetState(() { 
                                         selectedUom = uomOption.uom ?? '';
                                         selectedUomData = uomOption;
+                                        // Update price when UOM changes
+                                        final newPrice = uomOption.gstPrice ?? uomOption.price ?? 0.0;
+                                        _priceSelections[sku] = newPrice;
+                                        priceCtrl.text = newPrice.toStringAsFixed(2);
+                                        print('🔄 UOM changed to ${uomOption.uom}, price updated to RM ${newPrice.toStringAsFixed(2)}');
                                       }),
                                       selectedColor: Colors.orange.shade200,
                                     ),
@@ -3050,7 +3071,8 @@ class _InventoryPageState extends State<InventoryPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: FutureBuilder<List<Map<String, dynamic>>>(
-                                future: _loadPreviousOrdersForItem(item),
+                                key: ValueKey('prev_orders_${item.skuNo}_$selectedUom'), // Rebuild when UOM changes
+                                future: _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
                                     return const Padding(
@@ -3183,7 +3205,7 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Future<List<Map<String, dynamic>>> _loadPreviousOrdersForItem(InventoryItem item) async {
+  Future<List<Map<String, dynamic>>> _loadPreviousOrdersForItem(InventoryItem item, {String? filterUom}) async {
     try {
       final selectedCustomer = CustomerStateService().selectedCustomer;
       final companyCodeRaw = _selectedCompany?['companyCode'];
@@ -3212,11 +3234,18 @@ class _InventoryPageState extends State<InventoryPage> {
       }
 
       // Fetch all quote items for this SKU within the company (local only)
-      final items = await isar.quoteItems
+      var itemsQuery = isar.quoteItems
           .filter()
           .companyCodeEqualTo(companyCode)
-          .skuNoEqualTo(item.skuNo)
-          .findAll();
+          .skuNoEqualTo(item.skuNo);
+      
+      // Filter by UOM if specified
+      if (filterUom != null && filterUom.isNotEmpty) {
+        itemsQuery = itemsQuery.and().uomEqualTo(filterUom);
+        print('🔎 PreviousOrders: Filtering by UOM: $filterUom');
+      }
+      
+      final items = await itemsQuery.findAll();
 
       if (items.isEmpty) {
         print('🔎 PreviousOrders: No quote items found locally for SKU ${item.skuNo}');

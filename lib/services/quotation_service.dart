@@ -297,6 +297,9 @@ class QuotationService {
         final index = entry.key;
         final item = entry.value;
         
+        final quantity = item['quantity'] ?? 0.0;
+        final unitPrice = item['unitPrice'] ?? item['price'] ?? 0.0;
+        
         return {
           'Company_Code': companyCode,
           'Quote_PreLabel': quotePreLabel,
@@ -305,19 +308,23 @@ class QuotationService {
           'Uom': item['uom'] ?? 'PCS',
           'Factor': item['factor'] ?? 1.0,
           'Status': 'A',
-          'Quote_Quantity': item['quantity'] ?? 0.0,
+          'Quote_Quantity': quantity,
           'Quote_Quantity_Loose': 0.0,
           'Quote_Foc': 0.0,
           'Quote_Foc_Loose': 0.0,
-          'Unit_Price': item['unitPrice'] ?? item['price'] ?? 0.0,
-          'Unit_Price_Basic': item['unitPrice'] ?? item['price'] ?? 0.0,
+          'Unit_Price': unitPrice,
+          'Unit_Price_Basic': unitPrice,
           'Unit_Discount_Rate': 0.0,
           'Unit_Discount_Amount': 0.0,
           'Tax_Rate': 0.0,
           'Tax_Amount': 0.0,
-          'Net_Amount': item['amount'] ?? (item['quantity'] ?? 0.0) * (item['unitPrice'] ?? item['price'] ?? 0.0),
+          'Net_Amount': item['amount'] ?? (quantity * unitPrice),
           'Plu_No': item['pluNo'] ?? item['plu_no'],
           'Remark': item['remark'],
+          'Location_Code': 'FST',
+          'Quote_Quantity_Ori': quantity,
+          'Unit_Price_Ori': unitPrice,
+          'Quantity_Original': quantity,
         };
       }).toList();
       

@@ -74,7 +74,7 @@ class _SalesQuotationMenuPageState extends State<SalesQuotationMenuPage> {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(60, 0, 16, 16), // Increased left padding to avoid back button
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.end,

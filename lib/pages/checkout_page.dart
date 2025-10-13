@@ -16,6 +16,8 @@ import '../services/auth_service.dart';
 import '../services/signalr_service.dart';
 import '../services/quote_number_service.dart';
 import '../services/quotation_service.dart';
+import '../services/credit_term_service.dart';
+import '../models/credit_term.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -29,6 +31,7 @@ class CheckoutPage extends StatefulWidget {
 class _CheckoutPageState extends State<CheckoutPage> {
   late final CustomerService _customerService;
   late final QuotationService _quotationService;
+  late final CreditTermService _creditTermService;
   final CartService _cartService = CartService();
   final AuthService _authService = AuthService();
   
@@ -38,6 +41,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
   final TextEditingController _remarksController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   bool _useCustomerPlu = false; // Toggle for customer-specific PLU
+  
+  List<CreditTerm> _creditTerms = [];
+  CreditTerm? _selectedCreditTerm;
+  bool _isLoadingCreditTerms = true;
   
   double _totalAmount = 0.0;
   double _gstAmount = 0.0;
@@ -49,7 +56,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final signalRService = SignalRService();
     _customerService = CustomerService(signalRService);
     _quotationService = QuotationService(signalRService);
+    _creditTermService = CreditTermService(signalRService);
     _loadSelectedCustomer();
+    _loadCreditTerms();
     _calculateTotals();
   }
 
@@ -64,6 +73,67 @@ class _CheckoutPageState extends State<CheckoutPage> {
       print('Error loading selected customer: $e');
       setState(() {
         _selectedCustomer = null; // Will be handled gracefully in PDF generation
+      });
+    }
+  }
+
+  Future<void> _loadCreditTerms() async {
+    try {
+      final selectedCompany = await _authService.getSelectedCompany();
+      final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+      
+      // OFFLINE FIRST: Load cached terms immediately
+      print('📋 CREDIT TERMS: Loading from cache first...');
+      final cachedTerms = await _creditTermService.getCreditTerms(companyCode: companyCode);
+      
+      setState(() {
+        _creditTerms = cachedTerms;
+        _isLoadingCreditTerms = false;
+        // Set default term (first one or find 30 days term)
+        if (cachedTerms.isNotEmpty) {
+          // Try to find 30-day term by days field
+          final index = cachedTerms.indexWhere((term) => term.days == 30);
+          _selectedCreditTerm = index >= 0 ? cachedTerms[index] : cachedTerms.first;
+          print('✅ CREDIT TERMS: Loaded ${cachedTerms.length} cached terms, selected: ${_selectedCreditTerm?.displayFull}');
+        } else {
+          _selectedCreditTerm = null;
+          print('⚠️ CREDIT TERMS: No cached terms available');
+        }
+      });
+      
+      // BACKGROUND SYNC: Fetch from server to update cache (don't wait)
+      _creditTermService.fetchCreditTerms(companyCode: companyCode).then((serverTerms) {
+        if (serverTerms.isNotEmpty && mounted) {
+          print('🔄 CREDIT TERMS: Updated cache with ${serverTerms.length} terms from server');
+          setState(() {
+            _creditTerms = serverTerms;
+            // Re-select default if current selection is null or not in new list
+            if (_selectedCreditTerm == null) {
+              final index = serverTerms.indexWhere((term) => term.days == 30);
+              _selectedCreditTerm = index >= 0 ? serverTerms[index] : serverTerms.first;
+            } else {
+              // Ensure selected term is from the new list (by finding matching term)
+              final matchIndex = serverTerms.indexWhere(
+                (term) => term.companyCode == _selectedCreditTerm!.companyCode && 
+                         term.term == _selectedCreditTerm!.term
+              );
+              if (matchIndex >= 0) {
+                _selectedCreditTerm = serverTerms[matchIndex];
+              }
+            }
+          });
+        }
+      }).catchError((e) {
+        print('⚠️ CREDIT TERMS: Background sync failed (using cached data): $e');
+      });
+      
+    } catch (e) {
+      print('❌ Error loading credit terms: $e');
+      setState(() {
+        _isLoadingCreditTerms = false;
+        _creditTerms = [];
+        _selectedCreditTerm = null;
       });
     }
   }
@@ -169,14 +239,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
       // Generate quote number
       final quoteNo = await QuoteNumberService().nextQuoteNumber();
       print('📝 Creating quotation in database: $quoteNo');
+      print('💳 Selected credit term: ${_selectedCreditTerm?.displayFull}');
+      print('💳 Term code: "${_selectedCreditTerm?.term}", Days: ${_selectedCreditTerm?.days}');
+      
       final quotation = await _quotationService.createQuotation(
         companyCode: companyCode,
         quotePreLabel: quoteNo,
         customer: _selectedCustomer!['code'] ?? '',
         quoteDate: DateTime.now(),
         status: 'P', // P = Pending
-        term: '30', // Default 30 days
-        quoteExpiry: DateTime.now().add(const Duration(days: 30)),
+        term: _selectedCreditTerm?.term ?? '30', // Use selected credit term
+        quoteExpiry: DateTime.now().add(Duration(days: _selectedCreditTerm?.days ?? 30)),
         additionalData: {
           'remark1': _remarksController.text,
           'currency': 'MYR',
@@ -199,11 +272,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final cartItemsData = widget.cartItems.map((item) => {
         'skuNo': item.skuNo,
         'uom': item.uom,
-        'quantity': item.quantity,
-        'unitPrice': item.price,
-        'amount': item.quantity * item.price,
+        'quantity': item.quantity.toDouble(),
+        'unitPrice': item.unitPrice ?? 0.0,
+        'amount': (item.unitPrice ?? 0.0) * item.quantity,
         'pluNo': item.pluNo,
-        'remark': null,
+        'remark': item.remarks,
       }).toList();
       
       final itemsSaved = await _quotationService.saveQuotationItems(
@@ -318,7 +391,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
                               pw.Text('Term', style: const pw.TextStyle(fontSize: 8)),
-                              pw.Text(': 30 DAYS', style: const pw.TextStyle(fontSize: 8)),
+                              pw.Text(': ${_selectedCreditTerm?.displayDescription ?? "30 DAYS"}', style: const pw.TextStyle(fontSize: 8)),
                             ],
                           ),
                           pw.Row(
@@ -575,6 +648,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   _buildOrderSummary(),
                   const SizedBox(height: 20),
                   
+                  // Credit Term
+                  _buildCreditTermSection(),
+                  const SizedBox(height: 20),
+                  
                   // Remarks
                   _buildRemarksSection(),
                 ],
@@ -783,6 +860,67 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreditTermSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Payment Terms',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (_isLoadingCreditTerms)
+              const Center(child: CircularProgressIndicator())
+            else if (_creditTerms.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Credit terms unavailable offline. Using default: 30 days',
+                        style: TextStyle(color: Colors.orange.shade900),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              DropdownButtonFormField<CreditTerm>(
+                value: _selectedCreditTerm,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Select Payment Term',
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                items: _creditTerms.map((term) {
+                  return DropdownMenuItem<CreditTerm>(
+                    value: term,
+                    child: Text(term.displayFull),
+                  );
+                }).toList(),
+                onChanged: (CreditTerm? newValue) {
+                  setState(() {
+                    _selectedCreditTerm = newValue;
+                  });
+                },
+              ),
           ],
         ),
       ),

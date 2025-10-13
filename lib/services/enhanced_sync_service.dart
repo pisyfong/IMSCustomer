@@ -26,6 +26,8 @@ import '../main.dart'; // For global isar instance
 import '../config/app_config.dart'; // For sync timing configuration
 import 'plu_service.dart';
 import 'quotation_service.dart';
+import 'credit_term_service.dart';
+import '../models/credit_term.dart';
 
 /// Enhanced sync service that combines your existing sync with SignalR real-time updates
 class EnhancedSyncService {
@@ -38,6 +40,7 @@ class EnhancedSyncService {
   late final PluService _pluService;
   late final RoleCustomerService _roleCustomerService;
   late final QuotationService _quotationService;
+  late final CreditTermService _creditTermService;
   
   Timer? _periodicSyncTimer;
   StreamSubscription? _connectivitySubscription;
@@ -70,6 +73,7 @@ class EnhancedSyncService {
     _pluService = PluService(_isar);
     _roleCustomerService = RoleCustomerService();
     _quotationService = QuotationService(_signalRService);
+    _creditTermService = CreditTermService(_signalRService);
     _initializeService();
   }
   
@@ -261,6 +265,11 @@ class EnhancedSyncService {
     }
     
     try {
+      // FIRST: Sync credit terms (needed for checkout)
+      print('🔄 ENHANCED SYNC: Step 1 - Syncing credit terms...');
+      await _syncCreditTerms();
+      print('✅ ENHANCED SYNC: Credit terms sync completed');
+      
       await syncCompaniesForUser();
       
       // Sync user roles and customer mappings for role-based filtering
@@ -1004,6 +1013,41 @@ class EnhancedSyncService {
     _customerChangedSubscription?.cancel();
     _syncStatusController.close();
     _syncStatsController.close();
+  }
+
+  /// Sync credit terms from server to local database
+  Future<void> _syncCreditTerms() async {
+    try {
+      print('💳 CREDIT TERMS SYNC: Starting sync...');
+      
+      // Get current user's company
+      final currentUser = await AuthService().loadSavedLogin();
+      if (currentUser == null) {
+        print('⚠️ CREDIT TERMS SYNC: No logged-in user, skipping');
+        return;
+      }
+      
+      final selectedCompany = await AuthService().getSelectedCompany();
+      if (selectedCompany == null) {
+        print('⚠️ CREDIT TERMS SYNC: No selected company, skipping');
+        return;
+      }
+      
+      final companyCodeRaw = selectedCompany['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+      
+      print('💳 CREDIT TERMS SYNC: Fetching for company $companyCode...');
+      final terms = await _creditTermService.fetchCreditTerms(companyCode: companyCode);
+      
+      if (terms.isNotEmpty) {
+        print('✅ CREDIT TERMS SYNC: Successfully synced ${terms.length} credit terms');
+      } else {
+        print('⚠️ CREDIT TERMS SYNC: No credit terms found for company $companyCode');
+      }
+    } catch (e) {
+      print('❌ CREDIT TERMS SYNC: Error syncing credit terms: $e');
+      // Don't throw - allow other sync operations to continue
+    }
   }
 
   /// Sync unsynced quotations to server (offline-first approach)

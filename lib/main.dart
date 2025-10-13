@@ -22,6 +22,7 @@ import 'models/user_role.dart';
 import 'models/user_customer.dart';
 import 'models/user_app_settings.dart';
 import 'models/quotation.dart';
+import 'models/credit_term.dart';
 import 'services/auth_service.dart';
 import 'services/signalr_service.dart';
 import 'services/enhanced_sync_service.dart';
@@ -75,6 +76,7 @@ Future<void> initIsar() async {
       UserCustomerSchema,
       UserAppSettingsSchema,
       QuotationSchema,
+      CreditTermSchema,
     ], directory: dir.path);
     print('Isar database opened successfully');
     
