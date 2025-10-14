@@ -2735,6 +2735,10 @@ class _InventoryPageState extends State<InventoryPage> {
         InStockUom? selectedUomData;
         bool canEditPrice = false;
         bool isCheckingPermission = true;
+        
+        // Secret tap counter for showing cost
+        int priceTapCount = 0;
+        bool showCost = false;
         return DraggableScrollableSheet(
           initialChildSize: 0.45,
           maxChildSize: 0.9,
@@ -2859,17 +2863,28 @@ class _InventoryPageState extends State<InventoryPage> {
                         // Price row with qty input
                         Row(
                           children: [
-                            // Dynamic price tag that updates with UOM selection
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.amber.shade200),
-                              ),
-                              child: Text(
-                                'RM ${_priceSelections[sku]!.toStringAsFixed(2)} / ${selectedUom.isEmpty ? (item.uom ?? 'PCS') : selectedUom}',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+                            // Dynamic price tag that updates with UOM selection - SECRET TAP TO SHOW COST
+                            GestureDetector(
+                              onTap: () {
+                                setSheetState(() {
+                                  priceTapCount++;
+                                  if (priceTapCount >= 5) {
+                                    showCost = !showCost; // Toggle cost visibility
+                                    priceTapCount = 0; // Reset counter
+                                  }
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.amber.shade200),
+                                ),
+                                child: Text(
+                                  'RM ${_priceSelections[sku]!.toStringAsFixed(2)} / ${selectedUom.isEmpty ? (item.uom ?? 'PCS') : selectedUom}',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -3193,6 +3208,89 @@ class _InventoryPageState extends State<InventoryPage> {
                             ),
                           ],
                         ),
+                        // SECRET COST DISPLAY - Only visible after tapping yellow price tag 5 times
+                        if (showCost) ...[
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.lock_open, size: 16, color: Colors.orange.shade700),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Cost Information',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Average Cost:', style: TextStyle(fontSize: 13)),
+                                    Text(
+                                      'RM ${(item.averageCost ?? 0).toStringAsFixed(2)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Last Cost:', style: TextStyle(fontSize: 13)),
+                                    Text(
+                                      'RM ${(item.lastCost ?? 0).toStringAsFixed(2)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Standard Cost:', style: TextStyle(fontSize: 13)),
+                                    Text(
+                                      'RM ${(item.standardCost ?? 0).toStringAsFixed(2)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Divider(),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Profit Margin:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      'RM ${(_priceSelections[sku]! - (item.averageCost ?? 0)).toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: (_priceSelections[sku]! - (item.averageCost ?? 0)) > 0 
+                                            ? Colors.green.shade700 
+                                            : Colors.red.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -139,18 +139,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   void _calculateTotals() {
+    // GST is INCLUSIVE - prices already include GST
     double total = 0.0;
     for (var item in widget.cartItems) {
-      total += item.gstSubtotal;
+      total += item.gstSubtotal;  // Already includes GST
     }
     
-    final net = total / 1.06; // Remove GST to get net amount
-    final gst = total - net;
-    
     setState(() {
-      _totalAmount = total;
-      _gstAmount = gst;
-      _netAmount = net;
+      _totalAmount = total;       // Total (GST inclusive)
+      _netAmount = total;         // Same as total since GST is inclusive
+      _gstAmount = 0.0;           // No separate GST (it's included)
     });
   }
 
@@ -222,13 +220,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _generatePdfQuotation() async {
+    print('🚀 Starting PDF generation...');
     try {
+      print('📋 Step 1: Loading user and company info...');
       final currentUser = await _authService.loadSavedLogin();
       final userId = currentUser?.userId ?? 0;
       final selectedCompany = await _authService.getSelectedCompany();
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
       final companyName = selectedCompany?['companyName'] ?? 'Company';
+      print('✅ User ID: $userId, Company: $companyName ($companyCode)');
       
       // Fetch customer PLU if toggle is ON
       List<CartItem> cartItemsWithPlu = widget.cartItems;
@@ -252,7 +253,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         quoteExpiry: DateTime.now().add(Duration(days: _selectedCreditTerm?.days ?? 30)),
         additionalData: {
           'remark1': _remarksController.text,
-          'currency': 'MYR',
+          'currency': 'RM',
           'rate': 1.0,
           'totalQuoteQuantity': widget.cartItems.fold<double>(0, (sum, item) => sum + item.quantity),
           'totalQuoteItem': widget.cartItems.length,
@@ -512,25 +513,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             child: pw.Column(
                               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                               children: [
-                                _buildTotalRow('Grand Total', ':', _netAmount.toStringAsFixed(2)),
-                                _buildTotalRow('Other Charges', ':', ''),
-                                _buildTotalRow('Disc.', ':', ''),
-                                _buildTotalRow('Tax', ':', _gstAmount.toStringAsFixed(2)),
-                                _buildTotalRow('Rounding', ':', ''),
                                 pw.Container(
                                   decoration: const pw.BoxDecoration(
                                     border: pw.Border(top: pw.BorderSide(width: 1)),
                                   ),
-                                  padding: const pw.EdgeInsets.symmetric(vertical: 3),
-                                  child: pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('Net Total', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                                      pw.Text(': RM', style: const pw.TextStyle(fontSize: 9)),
-                                      pw.Text(_totalAmount.toStringAsFixed(2), 
-                                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                                    ],
-                                  ),
+                                  padding: const pw.EdgeInsets.only(top: 4),
+                                  child: _buildTotalRow('Total (GST Inc.)', 'RM', _totalAmount.toStringAsFixed(2), isBold: true),
                                 ),
                               ],
                             ),
@@ -547,41 +535,141 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
 
       // Generate PDF for mobile platforms
+      print('📄 Step 3: Generating PDF bytes...');
       final Uint8List pdfBytes = await pdf.save();
-      final String fileName = 'Quote_${_selectedCustomer?['code'] ?? 'N/A'}_${DateTime.now().toString().split(' ')[0]}_$quoteNo.pdf';
       
-      // Use printing package for mobile-optimized PDF handling
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdfBytes,
-        name: fileName,
-      );
+      // Sanitize filename - replace slashes and special characters
+      final sanitizedQuoteNo = quoteNo.replaceAll('/', '_').replaceAll('\\', '_');
+      final sanitizedCustomerCode = (_selectedCustomer?['code'] ?? 'N/A').replaceAll('/', '_').replaceAll('\\', '_');
+      final String fileName = 'Quote_${sanitizedCustomerCode}_${DateTime.now().toString().split(' ')[0]}_$sanitizedQuoteNo.pdf';
+      print('✅ PDF bytes generated: ${pdfBytes.length} bytes, filename: $fileName');
+      
+      // Save PDF to device storage
+      print('💾 Step 4: Saving PDF to device...');
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = path.join(directory.path, fileName);
+      final file = File(filePath);
+      await file.writeAsBytes(pdfBytes);
+      print('✅ PDF saved to: $filePath');
       
       // Show success message with sync status
       final syncStatus = quotation.isSynced 
           ? '✅ Synced to server' 
           : '📱 Will sync when online';
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('PDF generated: $fileName\nQuotation: $quoteNo ($syncStatus)'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Share',
-            onPressed: () async {
-              await Printing.sharePdf(
-                bytes: pdfBytes,
-                filename: fileName,
-              );
-            },
-          ),
-        ),
+      // Show PDF with built-in zoom and share capabilities
+      print('📱 Step 5: Opening PDF viewer...');
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async {
+          print('📄 PDF viewer requesting layout...');
+          return pdfBytes;
+        },
+        name: fileName,
       );
+      print('✅ PDF viewer closed');
       
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating PDF: $e')),
-      );
+      // Show action dialog after PDF viewer closes
+      if (mounted) {
+        final action = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Quotation Created'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Quotation: $quoteNo'),
+                Text('Status: $syncStatus'),
+                const SizedBox(height: 8),
+                const Text('PDF has been saved successfully!'),
+                const SizedBox(height: 4),
+                Text(
+                  'Location: ${directory.path}',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'close'),
+                child: const Text('Close'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, 'open'),
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('Open PDF'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, 'share'),
+                icon: const Icon(Icons.share),
+                label: const Text('Share'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        );
+        
+        // Handle user action
+        if (action == 'share') {
+          try {
+            print('📤 Attempting to share PDF...');
+            await Printing.sharePdf(
+              bytes: pdfBytes,
+              filename: fileName,
+            );
+            print('✅ Share dialog opened');
+          } catch (e) {
+            print('❌ Error sharing PDF: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error sharing PDF: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } else if (action == 'open') {
+          // Open the saved PDF file using Printing package viewer
+          try {
+            print('📂 Opening PDF from: $filePath');
+            await Printing.layoutPdf(
+              onLayout: (PdfPageFormat format) async => pdfBytes,
+              name: fileName,
+            );
+          } catch (e) {
+            print('❌ Error opening PDF: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error opening PDF: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      }
+      
+    } catch (e, stackTrace) {
+      print('❌ ERROR in PDF generation: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
     }
   }
 
@@ -827,37 +915,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
             
             const Divider(),
             
+            // Grand Total (GST Inclusive)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Net Amount:'),
-                Text('RM ${_netAmount.toStringAsFixed(2)}'),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('GST (6%):'),
-                Text('RM ${_gstAmount.toStringAsFixed(2)}'),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Amount:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  'RM ${_totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.green,
-                  ),
-                ),
+                const Text('Total (GST Inclusive):', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('RM ${_totalAmount.toStringAsFixed(2)}', 
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
               ],
             ),
           ],
@@ -1024,15 +1088,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  static pw.Widget _buildTotalRow(String label, String colon, String value) {
+  static pw.Widget _buildTotalRow(String label, String colon, String value, {bool isBold = false}) {
+    final textStyle = isBold 
+        ? pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)
+        : const pw.TextStyle(fontSize: 9);
+    
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: const pw.TextStyle(fontSize: 9)),
-          pw.Text(colon, style: const pw.TextStyle(fontSize: 9)),
-          pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
+          pw.Text(label, style: textStyle),
+          pw.Text(colon, style: textStyle),
+          pw.Text(value, style: textStyle),
         ],
       ),
     );

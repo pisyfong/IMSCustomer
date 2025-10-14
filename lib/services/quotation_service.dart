@@ -253,6 +253,19 @@ class QuotationService {
     if (data.containsKey('attentionRemark')) quotation.attentionRemark = data['attentionRemark'];
     if (data.containsKey('latitude')) quotation.latitude = data['latitude'];
     if (data.containsKey('longitude')) quotation.longitude = data['longitude'];
+    
+    // Add total fields
+    if (data.containsKey('totalQuoteQuantity')) quotation.totalQuoteQuantity = data['totalQuoteQuantity'];
+    if (data.containsKey('totalQuoteItem')) quotation.totalQuoteItem = data['totalQuoteItem'];
+    if (data.containsKey('grossAmount')) quotation.grossAmount = data['grossAmount'];
+    if (data.containsKey('totalDiscountAmount')) quotation.totalDiscountAmount = data['totalDiscountAmount'] ?? 0.0;
+    if (data.containsKey('totalTaxAmount')) quotation.totalTaxAmount = data['totalTaxAmount'] ?? 0.0;
+    if (data.containsKey('gstAmount')) quotation.gstAmount = data['gstAmount'];
+    if (data.containsKey('totalAmountB4Gst')) quotation.totalAmountB4Gst = data['totalAmountB4Gst'];
+    if (data.containsKey('netAmount')) quotation.netAmount = data['netAmount'];
+    if (data.containsKey('otherCharges')) quotation.otherCharges = data['otherCharges'] ?? 0.0;
+    if (data.containsKey('roundingDiscount')) quotation.roundingDiscount = data['roundingDiscount'] ?? 0.0;
+    if (data.containsKey('addedBy')) quotation.addedBy = data['addedBy'];
   }
 
   /// Calculate totals for a quotation based on its items
