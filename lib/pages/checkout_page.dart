@@ -162,13 +162,42 @@ class _CheckoutPageState extends State<CheckoutPage> {
       // Get SKU numbers from cart items
       final skuNos = widget.cartItems.map((item) => item.skuNo).toList();
       
-      // Fetch customer PLU from server
+      // Fetch customer PLU from server (with offline fallback)
       final signalRService = SignalRService();
+      
+      // Check if online before attempting server call
+      if (!signalRService.isConnected) {
+        print('📱 Offline mode: Skipping customer PLU fetch');
+        // Return items with empty PLU when offline
+        return widget.cartItems.map((item) {
+          final updatedItem = CartItem()
+            ..id = item.id
+            ..companyCode = item.companyCode
+            ..skuNo = item.skuNo
+            ..pluNo = '' // Empty string when offline
+            ..description = item.description
+            ..uom = item.uom
+            ..unitPrice = item.unitPrice
+            ..gstPrice = item.gstPrice
+            ..factor = item.factor
+            ..quantity = item.quantity
+            ..remarks = item.remarks
+            ..addedDate = item.addedDate;
+          return updatedItem;
+        }).toList();
+      }
+      
       final customerPluData = await signalRService.invoke('getCustomerPlu', [
         companyCode,
         customerCode,
         skuNos,
-      ]) as List<dynamic>;
+      ]).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          print('⏱️ Customer PLU fetch timed out - continuing without PLU');
+          return [];
+        },
+      ) as List<dynamic>;
       
       print('📦 Fetched ${customerPluData.length} customer PLU records');
       
