@@ -4,6 +4,7 @@ import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_service.dart';
 import '../main.dart';
+import '../company.dart';
 import '../models/quote.dart';
 import '../models/quote_item.dart';
 import '../models/invoice.dart';
@@ -125,10 +126,10 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     
     try {
-      final inventoryService = InventoryService(_signalRService);
+      final inventoryService = InventoryService();
       
       // Get all companies
-      final companies = await isar.companys.where().findAll();
+      final companies = await isar.collection<Company>().where().findAll();
       int totalGroups = 0;
       int totalDepartments = 0;
       
@@ -142,11 +143,11 @@ class _SettingsPageState extends State<SettingsPage> {
         
         // Fetch and cache groups
         final groups = await inventoryService.getGroupMap(companyCode: companyCode);
-        totalGroups += groups.length;
+        totalGroups += groups.length as int;
         
         // Fetch and cache departments
         final departments = await inventoryService.getDepartmentMap(companyCode: companyCode);
-        totalDepartments += departments.length;
+        totalDepartments += departments.length as int;
       }
       
       setState(() {
