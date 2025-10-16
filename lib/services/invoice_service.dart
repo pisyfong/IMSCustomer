@@ -367,4 +367,79 @@ class InvoiceService {
       return [];
     }
   }
+  
+  /// Get invoice items for a specific SKU across all invoices (OPTIMIZED)
+  /// This is much faster than loading all items per invoice then filtering
+  Future<List<Map<String, dynamic>>> getInvoiceItemsBySku({
+    required int companyCode,
+    required String customerCode,
+    required int skuNo,
+    String? filterUom,
+    int limit = 10,
+  }) async {
+    try {
+      print('🔍 INVOICE SERVICE: Optimized query - Getting items for SKU $skuNo');
+      
+      // Load all invoice items from local database
+      var allItems = await isar.invoiceItems.where().findAll();
+      
+      // Filter by company code and SKU in memory
+      var filteredItems = allItems.where((item) =>
+        item.companyCode == companyCode &&
+        item.skuNo == skuNo
+      ).toList();
+      
+      // Apply UOM filter if specified
+      if (filterUom != null && filterUom.isNotEmpty) {
+        filteredItems = filteredItems.where((item) => item.uom == filterUom).toList();
+      }
+      
+      print('📊 INVOICE SERVICE: Found ${filteredItems.length} matching items for SKU $skuNo');
+      
+      // Get corresponding invoices to include invoice date and customer info
+      final invoicePreLabels = filteredItems.map((item) => item.invoicePreLabel).toSet();
+      var allInvoices = await isar.invoices.where().findAll();
+      
+      // Filter invoices by customer and get only those with matching items
+      final invoiceMap = <String, Invoice>{};
+      for (final invoice in allInvoices) {
+        if (invoice.companyCode == companyCode &&
+            invoice.customer == customerCode &&
+            invoicePreLabels.contains(invoice.invoicePreLabel)) {
+          invoiceMap[invoice.invoicePreLabel] = invoice;
+        }
+      }
+      
+      // Build result list with invoice date
+      final List<Map<String, dynamic>> results = [];
+      for (final item in filteredItems) {
+        final invoice = invoiceMap[item.invoicePreLabel];
+        if (invoice != null) {
+          results.add({
+            'invoiceNo': item.invoicePreLabel,
+            'date': invoice.invoiceDate,
+            'qty': item.quantity ?? 0,
+            'uom': item.uom,
+            'price': item.unitPrice ?? 0,
+          });
+        }
+      }
+      
+      // Sort by date (newest first)
+      results.sort((a, b) {
+        final dateA = a['date'] as DateTime? ?? DateTime(1970);
+        final dateB = b['date'] as DateTime? ?? DateTime(1970);
+        return dateB.compareTo(dateA);
+      });
+      
+      // Return limited results
+      final limitedResults = results.take(limit).toList();
+      print('✅ INVOICE SERVICE: Returning ${limitedResults.length} optimized results');
+      
+      return limitedResults;
+    } catch (e) {
+      print('❌ INVOICE SERVICE: Error in optimized SKU query: $e');
+      return [];
+    }
+  }
 }

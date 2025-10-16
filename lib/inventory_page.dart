@@ -3559,68 +3559,20 @@ class _InventoryPageState extends State<InventoryPage> {
         return [];
       }
 
-      print('🔎 PreviousInvoices: Fetching invoices from server for customer ${selectedCustomer.code}');
+      print('🔎 PreviousInvoices: Using OPTIMIZED query for SKU ${item.skuNo}');
       
-      // Fetch invoices from server via SignalR
+      // Use optimized single-query method instead of loading all invoice items
       final invoiceService = InvoiceService(signalRService);
-      final invoices = await invoiceService.getInvoices(
+      final matchedItems = await invoiceService.getInvoiceItemsBySku(
         companyCode: companyCode,
         customerCode: selectedCustomer.code,
+        skuNo: item.skuNo,
+        filterUom: filterUom,
+        limit: 10,
       );
 
-      if (invoices.isEmpty) {
-        print('🔎 PreviousInvoices: No invoices found for customer ${selectedCustomer.code}');
-        return [];
-      }
-
-      print('🔎 PreviousInvoices: Found ${invoices.length} invoices, fetching items for SKU ${item.skuNo}');
-
-      // Fetch invoice items for each invoice and filter by SKU
-      final List<Map<String, dynamic>> matchedItems = [];
-      
-      for (final invoice in invoices) {
-        try {
-          final items = await invoiceService.getInvoiceItems(
-            companyCode: companyCode,
-            invoicePreLabel: invoice.invoicePreLabel,
-          );
-
-          // Filter items by SKU and optionally by UOM
-          var filteredItems = items.where((invItem) => invItem.skuNo == item.skuNo);
-          
-          if (filterUom != null && filterUom.isNotEmpty) {
-            filteredItems = filteredItems.where((item) => item.uom == filterUom);
-          }
-
-          for (final invItem in filteredItems) {
-            matchedItems.add({
-              'invoiceNo': invoice.invoicePreLabel,
-              'date': invoice.invoiceDate,
-              'qty': invItem.quantity ?? 0,
-              'uom': invItem.uom,
-              'price': invItem.unitPrice ?? 0,
-            });
-          }
-        } catch (e) {
-          print('❌ PreviousInvoices: Error fetching items for invoice ${invoice.invoicePreLabel}: $e');
-          continue;
-        }
-      }
-
-      if (matchedItems.isEmpty) {
-        print('🔎 PreviousInvoices: No invoice items found for SKU ${item.skuNo}');
-        return [];
-      }
-
-      // Sort by date (newest first) and take latest 10
-      matchedItems.sort((a, b) {
-        final dateA = a['date'] as DateTime? ?? DateTime(1970);
-        final dateB = b['date'] as DateTime? ?? DateTime(1970);
-        return dateB.compareTo(dateA);
-      });
-
-      print('🔎 PreviousInvoices: Returning ${matchedItems.take(10).length} invoice items');
-      return matchedItems.take(10).toList();
+      print('🔎 PreviousInvoices: Optimized query returned ${matchedItems.length} items');
+      return matchedItems;
     } catch (e) {
       print('❌ InventoryPage: _loadPreviousInvoicesForItem error: $e');
       return [];
