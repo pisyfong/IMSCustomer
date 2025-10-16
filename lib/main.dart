@@ -17,6 +17,7 @@ import 'models/cart_item.dart';
 import 'models/customer.dart';
 import 'models/quote.dart';
 import 'models/quote_item.dart';
+import 'models/invoice.dart';
 import 'models/plu.dart';
 import 'models/user_role.dart';
 import 'models/user_customer.dart';
@@ -71,6 +72,8 @@ Future<void> initIsar() async {
       CustomerSchema,
       QuoteSchema,
       QuoteItemSchema,
+      InvoiceSchema,
+      InvoiceItemSchema,
       PluSchema,
       UserRoleSchema,
       UserCustomerSchema,

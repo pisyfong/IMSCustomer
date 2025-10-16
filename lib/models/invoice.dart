@@ -1,6 +1,14 @@
+import 'package:isar/isar.dart';
+
+part 'invoice.g.dart';
+
+@collection
 class Invoice {
+  Id id = Isar.autoIncrement;
+  
   final int? batchNo;
   final int companyCode;
+  @Index(composite: [CompositeIndex('companyCode')])
   final String invoicePreLabel;
   final DateTime? invoiceDate;
   final DateTime? dueDate;
@@ -175,14 +183,14 @@ class Invoice {
 
   factory Invoice.fromJson(Map<String, dynamic> json) {
     return Invoice(
-      batchNo: json['Batch_No'] as int?,
-      companyCode: json['Company_Code'] as int,
+      batchNo: _parseInt(json['Batch_No']),
+      companyCode: _parseInt(json['Company_Code']) ?? 0,
       invoicePreLabel: json['Invoice_PreLabel'] as String,
       invoiceDate: json['Invoice_Date'] != null ? DateTime.parse(json['Invoice_Date']) : null,
       dueDate: json['Due_Date'] != null ? DateTime.parse(json['Due_Date']) : null,
       customer: json['Customer'] as String?,
-      shipTo: json['Ship_To'] as int?,
-      representativeId: json['Representative_ID'] as int?,
+      shipTo: _parseInt(json['Ship_To']),
+      representativeId: _parseInt(json['Representative_ID']),
       recurInvoice: json['Recur_Invoice'] as String?,
       recurDeposit: (json['Recur_Deposit'] as num?)?.toDouble(),
       terms: json['Terms'] as String?,
@@ -197,7 +205,7 @@ class Invoice {
       rate: (json['Rate'] as num?)?.toDouble(),
       remark1: json['Remark1'] as String?,
       remark2: json['Remark2'] as String?,
-      totalInvoiceEntry: json['Total_Invoice_Entry'] as int?,
+      totalInvoiceEntry: _parseInt(json['Total_Invoice_Entry']),
       totalInvoiceQuantity: (json['Total_Invoice_Quantity'] as num?)?.toDouble(),
       grossAmount: (json['Gross_Amount'] as num?)?.toDouble(),
       invoiceDiscountRate: (json['Invoice_Discount_Rate'] as num?)?.toDouble(),
@@ -206,16 +214,16 @@ class Invoice {
       invoiceTaxAmount: (json['Invoice_Tax_Amount'] as num?)?.toDouble(),
       otherCharges: (json['Other_Charges'] as num?)?.toDouble(),
       netAmount: (json['Net_Amount'] as num?)?.toDouble(),
-      addedBy: json['Added_By'] as int?,
+      addedBy: _parseInt(json['Added_By']),
       addedDate: json['Added_Date'] != null ? DateTime.parse(json['Added_Date']) : null,
-      voidedBy: json['Voided_By'] as int?,
+      voidedBy: _parseInt(json['Voided_By']),
       voidedDate: json['Voided_Date'] != null ? DateTime.parse(json['Voided_Date']) : null,
-      lastModifiedBy: json['Last_Modified_By'] as int?,
+      lastModifiedBy: _parseInt(json['Last_Modified_By']),
       lastWriteTimeStamp: json['LastWriteTimeStamp'] != null ? DateTime.parse(json['LastWriteTimeStamp']) : null,
       transfer: json['Transfer'] as String?,
       linkAccount: json['Link_Account'] as String?,
       wayBillNo: json['Way_Bill_No'] as String?,
-      deliveredBy: json['Delivered_By'] as int?,
+      deliveredBy: _parseInt(json['Delivered_By']),
       deliveredDate: json['Delivered_Date'] != null ? DateTime.parse(json['Delivered_Date']) : null,
       ppDiscountByRate: json['PP_DiscountByRate'] as String?,
       ppDiscountRate: (json['PP_Discount_Rate'] as num?)?.toDouble(),
@@ -240,13 +248,13 @@ class Invoice {
       roundingDiscount: (json['ROUNDING_DISCOUNT'] as num?)?.toDouble(),
       webLinkPrelabel: json['Web_Link_Prelabel'] as String?,
       lastModifiedDate: json['Last_Modified_Date'] != null ? DateTime.parse(json['Last_Modified_Date']) : null,
-      totalEdit: json['Total_Edit'] as int?,
-      totalPrint: json['Total_Print'] as int?,
+      totalEdit: _parseInt(json['Total_Edit']),
+      totalPrint: _parseInt(json['Total_Print']),
       appDLPrelabel: json['App_DL_Prelabel'] as String?,
       webStatus: json['Web_Status'] as String?,
-      verifyBy: json['Verify_By'] as int?,
+      verifyBy: _parseInt(json['Verify_By']),
       verifyDate: json['Verify_Date'] != null ? DateTime.parse(json['Verify_Date']) : null,
-      packBy: json['Pack_By'] as int?,
+      packBy: _parseInt(json['Pack_By']),
       packDate: json['Pack_Date'] != null ? DateTime.parse(json['Pack_Date']) : null,
       attachmentPath1: json['Attachment_Path1'] as String?,
       attachmentPath2: json['Attachment_Path2'] as String?,
@@ -254,13 +262,20 @@ class Invoice {
       attachmentDate2: json['Attachment_Date2'] != null ? DateTime.parse(json['Attachment_Date2']) : null,
       latitude: json['latitude'] as String?,
       longitude: json['longitude'] as String?,
-      pickNo: json['Pick_No'] as int?,
+      pickNo: _parseInt(json['Pick_No']),
       accEntryReference: json['ACC_Entry_Reference'] as String?,
-      imsPostedBy: json['IMS_Posted_By'] as int?,
+      imsPostedBy: _parseInt(json['IMS_Posted_By']),
       imsPostedDate: json['IMS_Posted_Date'] != null ? DateTime.parse(json['IMS_Posted_Date']) : null,
-      accPostedBy: json['ACC_Posted_By'] as int?,
+      accPostedBy: _parseInt(json['ACC_Posted_By']),
       accPostedDate: json['ACC_Posted_Date'] != null ? DateTime.parse(json['ACC_Posted_Date']) : null,
     );
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -354,8 +369,12 @@ class Invoice {
   }
 }
 
+@collection
 class InvoiceItem {
+  Id id = Isar.autoIncrement;
+  
   final int companyCode;
+  @Index(composite: [CompositeIndex('companyCode')])
   final String invoicePreLabel;
   final int sequenceNo;
   final DateTime? dueDate;
@@ -503,12 +522,12 @@ class InvoiceItem {
 
   factory InvoiceItem.fromJson(Map<String, dynamic> json) {
     return InvoiceItem(
-      companyCode: json['Company_Code'] as int,
+      companyCode: _parseInt(json['Company_Code']) ?? 0,
       invoicePreLabel: json['Invoice_PreLabel'] as String,
-      sequenceNo: json['Sequence_No'] as int,
+      sequenceNo: _parseInt(json['Sequence_No']) ?? 0,
       dueDate: json['Due_Date'] != null ? DateTime.parse(json['Due_Date']) : null,
       doPreLabel: json['DO_PreLabel'] as String,
-      skuNo: json['Sku_No'] as int,
+      skuNo: _parseInt(json['Sku_No']) ?? 0,
       uom: json['Uom'] as String,
       factor: (json['Factor'] as num?)?.toDouble(),
       status: json['Status'] as String?,
@@ -531,7 +550,7 @@ class InvoiceItem {
       standardCost: (json['Standard_Cost'] as num?)?.toDouble(),
       fifoCost: (json['Fifo_Cost'] as num?)?.toDouble(),
       lastCost: (json['Last_Cost'] as num?)?.toDouble(),
-      cancelledBy: json['Cancelled_By'] as int?,
+      cancelledBy: _parseInt(json['Cancelled_By']),
       cancelledDate: json['Cancelled_Date'] != null ? DateTime.parse(json['Cancelled_Date']) : null,
       locationCode: json['Location_Code'] as String?,
       batchNo: json['Batch_No'] as String?,
@@ -561,9 +580,9 @@ class InvoiceItem {
       pts3AfStandardCost: (json['PTS3_AF_Standard_Cost'] as num?)?.toDouble(),
       pts3AfLastCost: (json['PTS3_AF_Last_Cost'] as num?)?.toDouble(),
       pts3AfFifoCost: (json['PTS3_AF_Fifo_Cost'] as num?)?.toDouble(),
-      nameNo: json['Name_No'] as int?,
+      nameNo: _parseInt(json['Name_No']),
       alternateDescription: json['Alternate_Description'] as String?,
-      itemSequence: json['Item_Sequence'] as int?,
+      itemSequence: _parseInt(json['Item_Sequence']),
       gstCode: json['GST_Code'] as String?,
       gstPrice: (json['GST_Price'] as num?)?.toDouble(),
       oldStandardCost: (json['Old_Standard_Cost'] as num?)?.toDouble(),
@@ -575,5 +594,12 @@ class InvoiceItem {
       quantityOriginal: (json['Quantity_Original'] as num?)?.toDouble(),
       nos: (json['Nos'] as num?)?.toDouble(),
     );
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }
