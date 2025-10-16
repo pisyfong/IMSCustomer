@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import '../services/enhanced_sync_service.dart';
 import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
@@ -128,8 +129,9 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       final inventoryService = InventoryService();
       
-      // Get all companies
-      final companies = await isar.collection<Company>().where().findAll();
+      // Get all companies using collection accessor
+      final IsarCollection<Company> companyCollection = isar.collection<Company>();
+      final companies = await companyCollection.where().findAll();
       int totalGroups = 0;
       int totalDepartments = 0;
       
