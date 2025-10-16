@@ -600,6 +600,9 @@ class EnhancedSyncService {
       // 6. Preload all quote items (for all quotes)
       await _preloadAllQuoteItems();
       
+      // 7. Preload group and department lookups (for inventory filters)
+      await _preloadGroupAndDepartmentLookups();
+      
       _isFullDataPreloaded = true;
       print('✅ FULL PRELOAD: Successfully completed full data preload');
       
@@ -1079,6 +1082,47 @@ class EnhancedSyncService {
     } catch (e) {
       print('❌ QUOTATION SYNC: Error syncing quotations: $e');
       // Don't throw - allow other sync operations to continue
+    }
+  }
+  
+  /// Preload group and department lookups for all companies
+  Future<void> _preloadGroupAndDepartmentLookups() async {
+    try {
+      print('🏷️ PRELOAD: Loading group and department lookups...');
+      
+      // Get all companies
+      final companies = await _isar.companys.where().findAll();
+      int totalGroups = 0;
+      int totalDepartments = 0;
+      
+      for (final company in companies) {
+        try {
+          final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+          if (companyCode <= 0) continue;
+          
+          print('🏷️ PRELOAD: Loading lookups for company $companyCode...');
+          
+          // Load groups (this will fetch from server and cache locally)
+          final groups = await _inventoryService.getGroupMap(companyCode: companyCode);
+          totalGroups += groups.length;
+          
+          // Load departments (this will fetch from server and cache locally)
+          final departments = await _inventoryService.getDepartmentMap(companyCode: companyCode);
+          totalDepartments += departments.length;
+          
+          if (groups.isNotEmpty || departments.isNotEmpty) {
+            print('✅ PRELOAD: Loaded ${groups.length} groups, ${departments.length} departments for company $companyCode');
+          }
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error loading lookups for company ${company.companyCode}: $e');
+        }
+      }
+      
+      print('✅ PRELOAD: Total lookups loaded - $totalGroups groups, $totalDepartments departments');
+      
+    } catch (e) {
+      print('❌ PRELOAD LOOKUPS ERROR: $e');
     }
   }
 }
