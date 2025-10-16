@@ -167,6 +167,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final localPluRecords = await isar.customerPlus
           .filter()
           .companyCodeEqualTo(companyCode)
+          .and()
           .customerCodeEqualTo(customerCode)
           .findAll();
       
