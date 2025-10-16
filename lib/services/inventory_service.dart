@@ -1,9 +1,12 @@
 import 'package:isar/isar.dart';
 import '../models/inventory_item.dart';
 import '../models/in_stock_uom.dart';
+import '../models/group_lookup.dart';
+import '../models/department_lookup.dart';
 import '../main.dart';
 import 'signalr_service.dart';
 import 'auth_service.dart';
+import 'offline_first_service.dart';
 
 enum StockStatus { inStock, outOfStock, lowStock, all }
 
@@ -285,9 +288,8 @@ class InventoryService {
     }
   }
 
-  /// Get group (GRP) code -> description map for a company.
-  /// Tries server via SignalR first with multiple possible method names,
-  /// falls back to empty map if unavailable. Results cached in-memory per run.
+  /// Get group (GRP) code -> description map for a company (OFFLINE-FIRST).
+  /// Tries local database first, then syncs from server if online.
   Future<Map<String, String>> getGroupMap({int? companyCode}) async {
     try {
       // Resolve effective company code
@@ -302,9 +304,47 @@ class InventoryService {
         effectiveCompanyCode = 0;
       }
 
-      // Serve from cache if present
+      // Serve from in-memory cache if present
       final cached = _groupDescriptionCache[effectiveCompanyCode];
       if (cached != null && cached.isNotEmpty) return cached;
+
+      // OFFLINE-FIRST: Load from local database first
+      final map = <String, String>{};
+      try {
+        final localGroups = await isar.groupLookups
+            .filter()
+            .companyCodeEqualTo(effectiveCompanyCode)
+            .findAll();
+        
+        for (final group in localGroups) {
+          if (group.grp.isNotEmpty && group.description.isNotEmpty) {
+            final k1 = group.grp;
+            final k2 = group.grp.trim();
+            final k3 = k2.toUpperCase();
+            map[k1] = group.description;
+            map[k2] = group.description;
+            map[k3] = group.description;
+          }
+        }
+        
+        if (map.isNotEmpty) {
+          print('📱 InventoryService.getGroupMap: Loaded ${map.length} groups from local database');
+          _groupDescriptionCache[effectiveCompanyCode] = map;
+          
+          // Try to sync from server in background (non-blocking)
+          _syncGroupsInBackground(effectiveCompanyCode);
+          
+          return map;
+        }
+      } catch (e) {
+        print('❌ InventoryService.getGroupMap: Error loading from local: $e');
+      }
+
+      // No local data, try server if online
+      if (!await OfflineFirstService.isServerReachable()) {
+        print('📱 InventoryService.getGroupMap: Offline and no local data');
+        return {};
+      }
 
       // Ensure SignalR connection (best-effort)
       if (!_signalRService.isConnected) {
@@ -312,7 +352,7 @@ class InventoryService {
       }
 
       if (!_signalRService.isConnected) {
-        // Offline or cannot connect: return empty (UI should fallback to codes)
+        print('📱 InventoryService.getGroupMap: Cannot connect to server');
         return {};
       }
 
@@ -396,6 +436,38 @@ class InventoryService {
         });
       }
 
+      // Save to local database for offline use
+      if (map.isNotEmpty && result is List) {
+        try {
+          await isar.writeTxn(() async {
+            // Clear old groups for this company
+            await isar.groupLookups
+                .filter()
+                .companyCodeEqualTo(effectiveCompanyCode)
+                .deleteAll();
+            
+            // Save new groups
+            final groups = <GroupLookup>[];
+            for (final row in result) {
+              if (row is Map<String, dynamic>) {
+                try {
+                  final group = GroupLookup.fromJson(row, effectiveCompanyCode);
+                  if (group.grp.isNotEmpty && group.description.isNotEmpty) {
+                    groups.add(group);
+                  }
+                } catch (e) {
+                  print('❌ Error parsing group: $e');
+                }
+              }
+            }
+            await isar.groupLookups.putAll(groups);
+            print('💾 InventoryService.getGroupMap: Saved ${groups.length} groups to local database');
+          });
+        } catch (e) {
+          print('❌ InventoryService.getGroupMap: Error saving to local: $e');
+        }
+      }
+      
       // Cache and return
       _groupDescriptionCache[effectiveCompanyCode] = map;
       if (map.isEmpty) {
@@ -410,9 +482,8 @@ class InventoryService {
     }
   }
 
-  /// Get department code -> description map for a company.
-  /// Tries server via SignalR first with multiple possible method names,
-  /// falls back to empty map if unavailable. Results cached in-memory per run.
+  /// Get department code -> description map for a company (OFFLINE-FIRST).
+  /// Tries local database first, then syncs from server if online.
   Future<Map<String, String>> getDepartmentMap({int? companyCode}) async {
     try {
       // Resolve effective company code
@@ -427,9 +498,47 @@ class InventoryService {
         effectiveCompanyCode = 0;
       }
 
-      // Serve from cache if present
+      // Serve from in-memory cache if present
       final cached = _deptDescriptionCache[effectiveCompanyCode];
       if (cached != null && cached.isNotEmpty) return cached;
+
+      // OFFLINE-FIRST: Load from local database first
+      final map = <String, String>{};
+      try {
+        final localDepts = await isar.departmentLookups
+            .filter()
+            .companyCodeEqualTo(effectiveCompanyCode)
+            .findAll();
+        
+        for (final dept in localDepts) {
+          if (dept.departmentCode.isNotEmpty && dept.description.isNotEmpty) {
+            final k1 = dept.departmentCode;
+            final k2 = dept.departmentCode.trim();
+            final k3 = k2.toUpperCase();
+            map[k1] = dept.description;
+            map[k2] = dept.description;
+            map[k3] = dept.description;
+          }
+        }
+        
+        if (map.isNotEmpty) {
+          print('📱 InventoryService.getDepartmentMap: Loaded ${map.length} departments from local database');
+          _deptDescriptionCache[effectiveCompanyCode] = map;
+          
+          // Try to sync from server in background (non-blocking)
+          _syncDepartmentsInBackground(effectiveCompanyCode);
+          
+          return map;
+        }
+      } catch (e) {
+        print('❌ InventoryService.getDepartmentMap: Error loading from local: $e');
+      }
+
+      // No local data, try server if online
+      if (!await OfflineFirstService.isServerReachable()) {
+        print('📱 InventoryService.getDepartmentMap: Offline and no local data');
+        return {};
+      }
 
       // Ensure SignalR connection (best-effort)
       if (!_signalRService.isConnected) {
@@ -437,7 +546,7 @@ class InventoryService {
       }
 
       if (!_signalRService.isConnected) {
-        // Offline or cannot connect: return empty (UI should fallback to codes)
+        print('📱 InventoryService.getDepartmentMap: Cannot connect to server');
         return {};
       }
 
@@ -519,6 +628,38 @@ class InventoryService {
         });
       }
 
+      // Save to local database for offline use
+      if (map.isNotEmpty && result is List) {
+        try {
+          await isar.writeTxn(() async {
+            // Clear old departments for this company
+            await isar.departmentLookups
+                .filter()
+                .companyCodeEqualTo(effectiveCompanyCode)
+                .deleteAll();
+            
+            // Save new departments
+            final departments = <DepartmentLookup>[];
+            for (final row in result) {
+              if (row is Map<String, dynamic>) {
+                try {
+                  final dept = DepartmentLookup.fromJson(row, effectiveCompanyCode);
+                  if (dept.departmentCode.isNotEmpty && dept.description.isNotEmpty) {
+                    departments.add(dept);
+                  }
+                } catch (e) {
+                  print('❌ Error parsing department: $e');
+                }
+              }
+            }
+            await isar.departmentLookups.putAll(departments);
+            print('💾 InventoryService.getDepartmentMap: Saved ${departments.length} departments to local database');
+          });
+        } catch (e) {
+          print('❌ InventoryService.getDepartmentMap: Error saving to local: $e');
+        }
+      }
+      
       // Cache and return
       _deptDescriptionCache[effectiveCompanyCode] = map;
       if (map.isEmpty) {
@@ -1047,5 +1188,131 @@ class InventoryService {
         'error': e.toString(),
       };
     }
+  }
+  
+  /// Background sync for groups (non-blocking)
+  void _syncGroupsInBackground(int companyCode) {
+    Future.microtask(() async {
+      try {
+        if (!await OfflineFirstService.isServerReachable()) return;
+        if (!_signalRService.isConnected) {
+          try { await _signalRService.connect(); } catch (_) { return; }
+        }
+        if (!_signalRService.isConnected) return;
+        
+        // Try to fetch from server
+        dynamic result;
+        final List<String> methodCandidates = [
+          'getGroupLookup', 'getGroups', 'GetGroups', 'getPiGroups', 'GetPI_Group',
+        ];
+        
+        for (final method in methodCandidates) {
+          try {
+            result = await _signalRService.invoke(method, [companyCode]);
+            if (result != null) break;
+          } catch (_) {}
+        }
+        
+        if (result == null || result is! List) return;
+        
+        // Save to database
+        await isar.writeTxn(() async {
+          await isar.groupLookups.filter().companyCodeEqualTo(companyCode).deleteAll();
+          final groups = <GroupLookup>[];
+          for (final row in result) {
+            if (row is Map<String, dynamic>) {
+              try {
+                final group = GroupLookup.fromJson(row, companyCode);
+                if (group.grp.isNotEmpty && group.description.isNotEmpty) {
+                  groups.add(group);
+                }
+              } catch (_) {}
+            }
+          }
+          await isar.groupLookups.putAll(groups);
+          print('🔄 Background sync: Saved ${groups.length} groups for company $companyCode');
+        });
+        
+        // Update in-memory cache
+        final map = <String, String>{};
+        for (final row in result) {
+          if (row is Map) {
+            final code = (row['grp'] ?? row['Grp'] ?? row['code'])?.toString();
+            final desc = (row['description'] ?? row['Description'] ?? row['desc'])?.toString();
+            if (code != null && desc != null && code.isNotEmpty && desc.isNotEmpty) {
+              map[code] = desc;
+              map[code.trim()] = desc;
+              map[code.trim().toUpperCase()] = desc;
+            }
+          }
+        }
+        _groupDescriptionCache[companyCode] = map;
+      } catch (e) {
+        print('❌ Background group sync failed: $e');
+      }
+    });
+  }
+  
+  /// Background sync for departments (non-blocking)
+  void _syncDepartmentsInBackground(int companyCode) {
+    Future.microtask(() async {
+      try {
+        if (!await OfflineFirstService.isServerReachable()) return;
+        if (!_signalRService.isConnected) {
+          try { await _signalRService.connect(); } catch (_) { return; }
+        }
+        if (!_signalRService.isConnected) return;
+        
+        // Try to fetch from server
+        dynamic result;
+        final List<String> methodCandidates = [
+          'getDepartmentLookup', 'getDepartments', 'GetDepartments', 'getPiDepartments',
+        ];
+        
+        for (final method in methodCandidates) {
+          try {
+            result = await _signalRService.invoke(method, [companyCode]);
+            if (result != null) break;
+          } catch (_) {}
+        }
+        
+        if (result == null || result is! List) return;
+        
+        // Save to database
+        await isar.writeTxn(() async {
+          await isar.departmentLookups.filter().companyCodeEqualTo(companyCode).deleteAll();
+          final departments = <DepartmentLookup>[];
+          for (final row in result) {
+            if (row is Map<String, dynamic>) {
+              try {
+                final dept = DepartmentLookup.fromJson(row, companyCode);
+                if (dept.departmentCode.isNotEmpty && dept.description.isNotEmpty) {
+                  departments.add(dept);
+                }
+              } catch (_) {}
+            }
+          }
+          await isar.departmentLookups.putAll(departments);
+          print('🔄 Background sync: Saved ${departments.length} departments for company $companyCode');
+        });
+        
+        // Update in-memory cache
+        final map = <String, String>{};
+        for (final row in result) {
+          if (row is Map) {
+            final code = (row['dept'] ?? row['Dept'] ?? row['departmentCode'] ?? row['code'])?.toString();
+            final desc = (row['description'] ?? row['Description'] ?? row['desc'])?.toString();
+            if (code != null && desc != null && code.isNotEmpty && desc.isNotEmpty) {
+              map[code] = desc;
+              map[code.trim()] = desc;
+              map[code.trim().toUpperCase()] = desc;
+            }
+          }
+        }
+        _deptDescriptionCache[companyCode] = map;
+      } catch (e) {
+        print('❌ Background department sync failed: $e');
+      }
+    });
   }
 }
