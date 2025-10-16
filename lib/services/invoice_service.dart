@@ -8,25 +8,48 @@ class InvoiceService {
 
   InvoiceService(this._signalRService);
 
-  /// Get invoices with offline-first pattern
-  /// By default, only fetches invoices from the last 365 days
+  /// Get invoices with TRUE offline-first pattern
+  /// Returns cached data immediately, syncs in background
   Future<List<Invoice>> getInvoices({
     int? companyCode,
     String? customerCode,
     String? searchQuery,
-    int daysBack = 365,
+    bool forceRefresh = false,
   }) async {
     try {
       print('🔍 INVOICE SERVICE: Getting invoices (offline-first)...');
       
-      // Try to fetch from server first
+      // ALWAYS load from local cache first for instant response
+      final localInvoices = await getLocalInvoices(
+        companyCode: companyCode,
+        customerCode: customerCode,
+        searchQuery: searchQuery,
+      );
+      
+      // If we have cached data and not forcing refresh, return immediately
+      if (localInvoices.isNotEmpty && !forceRefresh) {
+        print('✅ INVOICE SERVICE: Returning ${localInvoices.length} cached invoices (instant)');
+        
+        // Sync in background without blocking
+        if (_signalRService.isConnected) {
+          _syncInvoicesInBackground(
+            companyCode: companyCode,
+            customerCode: customerCode,
+            searchQuery: searchQuery,
+          );
+        }
+        
+        return localInvoices;
+      }
+      
+      // If no cache or force refresh, fetch from server
       if (_signalRService.isConnected) {
         try {
+          print('📡 INVOICE SERVICE: No cache, fetching from server...');
           final serverInvoices = await fetchInvoicesFromServer(
             companyCode: companyCode,
             customerCode: customerCode,
             searchQuery: searchQuery,
-            daysBack: daysBack,
           );
           
           // Save to local database
@@ -36,37 +59,56 @@ class InvoiceService {
           
           return serverInvoices;
         } catch (e) {
-          print('⚠️ INVOICE SERVICE: Server fetch failed, falling back to local: $e');
+          print('⚠️ INVOICE SERVICE: Server fetch failed: $e');
+          // Return cached data even if empty
+          return localInvoices;
         }
       }
       
-      // Fallback to local database
-      print('📱 INVOICE SERVICE: Loading from local database...');
-      return await getLocalInvoices(
-        companyCode: companyCode,
-        customerCode: customerCode,
-        searchQuery: searchQuery,
-      );
+      // Offline and no cache
+      print('📱 INVOICE SERVICE: Offline, returning ${localInvoices.length} cached invoices');
+      return localInvoices;
     } catch (e) {
       print('❌ INVOICE SERVICE ERROR: $e');
       rethrow;
     }
   }
+  
+  /// Sync invoices in background without blocking UI
+  Future<void> _syncInvoicesInBackground({
+    int? companyCode,
+    String? customerCode,
+    String? searchQuery,
+  }) async {
+    try {
+      print('🔄 INVOICE SERVICE: Background sync started...');
+      final serverInvoices = await fetchInvoicesFromServer(
+        companyCode: companyCode,
+        customerCode: customerCode,
+        searchQuery: searchQuery,
+      );
+      
+      if (serverInvoices.isNotEmpty) {
+        await saveInvoicesToLocal(serverInvoices);
+        print('✅ INVOICE SERVICE: Background sync completed (${serverInvoices.length} invoices)');
+      }
+    } catch (e) {
+      print('⚠️ INVOICE SERVICE: Background sync failed: $e');
+      // Silently fail - user already has cached data
+    }
+  }
 
   /// Fetch invoices from server via SignalR
-  /// Only fetches invoices from the last [daysBack] days (default: 365)
   Future<List<Invoice>> fetchInvoicesFromServer({
     int? companyCode,
     String? customerCode,
     String? searchQuery,
-    int daysBack = 365,
   }) async {
     try {
       print('🔍 INVOICE SERVICE: Fetching invoices from server...');
       print('  - companyCode: $companyCode');
       print('  - customerCode: "$customerCode"');
       print('  - searchQuery: "${searchQuery ?? ''}"');
-      print('  - daysBack: $daysBack (from ${DateTime.now().subtract(Duration(days: daysBack)).toIso8601String()})');
 
       if (companyCode == null) {
         throw Exception('Company code is required');
@@ -83,15 +125,11 @@ class InvoiceService {
       }
 
       final effectiveCustomerCode = (customerCode?.isEmpty ?? true) ? '' : customerCode;
-      
-      // Calculate the start date (daysBack from now)
-      final startDate = DateTime.now().subtract(Duration(days: daysBack));
 
       final response = await _signalRService.invoke('getInvoices', [
         companyCode,
         effectiveCustomerCode,
         searchQuery ?? '',
-        startDate.toIso8601String(),  // Pass start date to server
       ]);
 
       print('📦 INVOICE SERVICE: Received response from server');
