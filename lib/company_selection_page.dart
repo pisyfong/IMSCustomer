@@ -11,6 +11,7 @@ import 'services/offline_first_service.dart';
 import 'config/app_config.dart';
 import 'dart:math' as math;
 import 'pages/customer_selection_page.dart';
+import 'pages/settings_page.dart';
 
 class CompanySelectionPage extends StatefulWidget {
   const CompanySelectionPage({Key? key}) : super(key: key);
@@ -574,6 +575,16 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
           OnlineStatusIcon(
             isOnline: _isOnline,
             onTap: checkOnlineStatus,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
+            },
+            tooltip: 'Sync Settings',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
