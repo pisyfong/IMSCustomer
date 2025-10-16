@@ -6,12 +6,8 @@ part 'customer_plu.g.dart';
 class CustomerPlu {
   Id id = Isar.autoIncrement;
   
-  @Index(composite: [CompositeIndex('skuNo')])
   late int companyCode;
-  
-  @Index(composite: [CompositeIndex('companyCode')])
   late String customerCode;
-  
   late String skuNo;
   late String pluNo;
   
