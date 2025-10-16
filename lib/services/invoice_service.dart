@@ -144,31 +144,39 @@ class InvoiceService {
     String? searchQuery,
   }) async {
     try {
-      var query = isar.invoices.filter();
+      var query = isar.invoices.where();
       
+      // Build the query with filters
+      var results = await query.findAll();
+      
+      // Apply filters in memory
       if (companyCode != null) {
-        query = query.companyCodeEqualTo(companyCode);
+        results = results.where((inv) => inv.companyCode == companyCode).toList();
       }
       
       if (customerCode != null && customerCode.isNotEmpty) {
-        query = query.and().customerEqualTo(customerCode);
+        results = results.where((inv) => inv.customer == customerCode).toList();
       }
       
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        query = query.and().group((q) => q
-          .invoicePreLabelContains(searchQuery, caseSensitive: false)
-          .or()
-          .customerContains(searchQuery, caseSensitive: false)
-          .or()
-          .ref1Contains(searchQuery, caseSensitive: false)
-          .or()
-          .remark1Contains(searchQuery, caseSensitive: false)
-        );
+        final searchLower = searchQuery.toLowerCase();
+        results = results.where((inv) =>
+          (inv.invoicePreLabel.toLowerCase().contains(searchLower)) ||
+          (inv.customer?.toLowerCase().contains(searchLower) ?? false) ||
+          (inv.ref1?.toLowerCase().contains(searchLower) ?? false) ||
+          (inv.remark1?.toLowerCase().contains(searchLower) ?? false)
+        ).toList();
       }
       
-      final invoices = await query.sortByInvoiceDateDesc().findAll();
-      print('📱 INVOICE SERVICE: Loaded ${invoices.length} invoices from local database');
-      return invoices;
+      // Sort by date descending
+      results.sort((a, b) {
+        final dateA = a.invoiceDate ?? DateTime(1970);
+        final dateB = b.invoiceDate ?? DateTime(1970);
+        return dateB.compareTo(dateA);
+      });
+      
+      print('📱 INVOICE SERVICE: Loaded ${results.length} invoices from local database');
+      return results;
     } catch (e) {
       print('❌ INVOICE SERVICE: Error loading from local: $e');
       return [];
@@ -293,16 +301,19 @@ class InvoiceService {
     required String invoicePreLabel,
   }) async {
     try {
-      final items = await isar.invoiceItems
-          .filter()
-          .companyCodeEqualTo(companyCode)
-          .and()
-          .invoicePreLabelEqualTo(invoicePreLabel)
-          .sortBySequenceNo()
-          .findAll();
+      var results = await isar.invoiceItems.where().findAll();
       
-      print('📱 INVOICE SERVICE: Loaded ${items.length} invoice items from local database');
-      return items;
+      // Filter in memory
+      results = results.where((item) =>
+        item.companyCode == companyCode &&
+        item.invoicePreLabel == invoicePreLabel
+      ).toList();
+      
+      // Sort by sequence number
+      results.sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
+      
+      print('📱 INVOICE SERVICE: Loaded ${results.length} invoice items from local database');
+      return results;
     } catch (e) {
       print('❌ INVOICE SERVICE: Error loading items from local: $e');
       return [];
