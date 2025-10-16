@@ -18,6 +18,8 @@ import '../services/quote_number_service.dart';
 import '../services/quotation_service.dart';
 import '../services/credit_term_service.dart';
 import '../models/credit_term.dart';
+import '../models/customer_plu.dart';
+import '../main.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -159,22 +161,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
       final customerCode = _selectedCustomer!['code'];
       
-      // Get SKU numbers from cart items
-      final skuNos = widget.cartItems.map((item) => item.skuNo).toList();
+      print('📦 OFFLINE-FIRST: Loading customer PLU from local database...');
       
-      // Fetch customer PLU from server (with offline fallback)
-      final signalRService = SignalRService();
+      // OFFLINE-FIRST: Load from local database first
+      final localPluRecords = await isar.customerPlus
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .customerCodeEqualTo(customerCode)
+          .findAll();
       
-      // Check if online before attempting server call
-      if (!signalRService.isConnected) {
-        print('📱 Offline mode: Skipping customer PLU fetch');
-        // Return items with empty PLU when offline
+      if (localPluRecords.isNotEmpty) {
+        print('📱 Found ${localPluRecords.length} customer PLU records in local database');
+        
+        // Create map for quick lookup
+        final pluMap = <String, String>{};
+        for (final record in localPluRecords) {
+          pluMap[record.skuNo] = record.pluNo;
+        }
+        
+        // Return items with PLU from local database
         return widget.cartItems.map((item) {
+          final pluNo = pluMap[item.skuNo] ?? '';
           final updatedItem = CartItem()
             ..id = item.id
             ..companyCode = item.companyCode
             ..skuNo = item.skuNo
-            ..pluNo = '' // Empty string when offline
+            ..pluNo = pluNo
             ..description = item.description
             ..uom = item.uom
             ..unitPrice = item.unitPrice
@@ -187,6 +199,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
         }).toList();
       }
       
+      print('📱 No local PLU data, checking if online...');
+      
+      // No local data, try to fetch from server if online
+      final signalRService = SignalRService();
+      if (!signalRService.isConnected) {
+        print('📱 Offline mode: Using empty PLU');
+        return widget.cartItems.map((item) {
+          final updatedItem = CartItem()
+            ..id = item.id
+            ..companyCode = item.companyCode
+            ..skuNo = item.skuNo
+            ..pluNo = ''
+            ..description = item.description
+            ..uom = item.uom
+            ..unitPrice = item.unitPrice
+            ..gstPrice = item.gstPrice
+            ..factor = item.factor
+            ..quantity = item.quantity
+            ..remarks = item.remarks
+            ..addedDate = item.addedDate;
+          return updatedItem;
+        }).toList();
+      }
+      
+      // Get SKU numbers from cart items
+      final skuNos = widget.cartItems.map((item) => item.skuNo).toList();
+      
+      print('🌐 Fetching customer PLU from server...');
       final customerPluData = await signalRService.invoke('getCustomerPlu', [
         companyCode,
         customerCode,
@@ -194,27 +234,46 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ]).timeout(
         const Duration(seconds: 2),
         onTimeout: () {
-          print('⏱️ Customer PLU fetch timed out - continuing without PLU');
+          print('⏱️ Customer PLU fetch timed out - using empty PLU');
           return [];
         },
       ) as List<dynamic>;
       
-      print('📦 Fetched ${customerPluData.length} customer PLU records');
+      print('📦 Fetched ${customerPluData.length} customer PLU records from server');
+      
+      // Save to local database for future offline use
+      if (customerPluData.isNotEmpty) {
+        try {
+          await isar.writeTxn(() async {
+            final pluRecords = <CustomerPlu>[];
+            for (final pluData in customerPluData) {
+              if (pluData is Map<String, dynamic>) {
+                final plu = CustomerPlu.fromJson(pluData, companyCode, customerCode);
+                if (plu.skuNo.isNotEmpty && plu.pluNo.isNotEmpty) {
+                  pluRecords.add(plu);
+                }
+              }
+            }
+            await isar.customerPlus.putAll(pluRecords);
+            print('💾 Saved ${pluRecords.length} PLU records to local database');
+          });
+        } catch (e) {
+          print('❌ Error saving PLU to local database: $e');
+        }
+      }
       
       // Create new list with updated PLU
       return widget.cartItems.map((item) {
-        // Find matching customer PLU
         final customerPlu = customerPluData.firstWhere(
           (plu) => plu['Sku_No'] == item.skuNo,
           orElse: () => null,
         );
         
-        // Create a copy of the item with updated PLU
         final updatedItem = CartItem()
           ..id = item.id
           ..companyCode = item.companyCode
           ..skuNo = item.skuNo
-          ..pluNo = customerPlu != null ? customerPlu['Plu_No'] : '' // Empty string if not found
+          ..pluNo = customerPlu != null ? customerPlu['Plu_No'] : ''
           ..description = item.description
           ..uom = item.uom
           ..unitPrice = item.unitPrice
@@ -234,7 +293,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ..id = item.id
           ..companyCode = item.companyCode
           ..skuNo = item.skuNo
-          ..pluNo = '' // Empty string on error
+          ..pluNo = ''
           ..description = item.description
           ..uom = item.uom
           ..unitPrice = item.unitPrice

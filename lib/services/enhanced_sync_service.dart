@@ -31,6 +31,7 @@ import 'invoice_service.dart';
 import 'offline_first_service.dart';
 import '../models/credit_term.dart';
 import '../models/invoice.dart';
+import '../models/customer_plu.dart';
 
 /// Enhanced sync service that combines your existing sync with SignalR real-time updates
 class EnhancedSyncService {
@@ -604,6 +605,7 @@ class EnhancedSyncService {
       await _preloadAllQuoteItems();
       await _preloadAllInvoices();
       await _preloadGroupAndDepartmentLookups();
+      await _preloadCustomerPlu();
       
       _isFullDataPreloaded = true;
       print('✅ FULL PRELOAD: Successfully completed full data preload');
@@ -1179,7 +1181,106 @@ class EnhancedSyncService {
       print('❌ PRELOAD LOOKUPS ERROR: $e');
     }
   }
-}
+  
+  /// Preload customer PLU for all customers
+  Future<void> _preloadCustomerPlu() async {
+    try {
+      print('🏷️ PRELOAD: Loading customer PLU...');
+      
+      // Quick offline check - skip if we know we're offline
+      if (!OfflineFirstService.isLikelyOnline()) {
+        print('🏷️ PRELOAD: Skipping customer PLU sync (offline)');
+        return;
+      }
+      
+      // Get all customers
+      final customers = await _isar.customers.where().findAll();
+      int totalPluRecords = 0;
+      
+      for (final customer in customers) {
+        try {
+          if (customer.code.isEmpty || customer.companyCode == null) continue;
+          
+          print('🏷️ PRELOAD: Loading PLU for customer ${customer.code}...');
+          
+          // Get all inventory items for this company
+          final inventoryItems = await _isar.inventoryItems
+              .filter()
+              .companyCodeEqualTo(customer.companyCode!)
+              .findAll();
+          
+          if (inventoryItems.isEmpty) {
+            print('🏷️ PRELOAD: No inventory items for company ${customer.companyCode}, skipping');
+            continue;
+          }
+          
+          // Get SKU numbers
+          final skuNos = inventoryItems.map((item) => item.skuNo).toList();
+          
+          // Fetch customer PLU from server
+          try {
+            final customerPluData = await _signalRService.invoke('getCustomerPlu', [
+              customer.companyCode,
+              customer.code,
+              skuNos,
+            ]).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {
+                print('⏱️ Customer PLU fetch timed out for ${customer.code}');
+                return [];
+              },
+            ) as List<dynamic>;
+            
+            if (customerPluData.isNotEmpty) {
+              // Save to local database
+              await _isar.writeTxn(() async {
+                // Clear old PLU for this customer
+                await _isar.customerPlus
+                    .filter()
+                    .companyCodeEqualTo(customer.companyCode!)
+                    .customerCodeEqualTo(customer.code)
+                    .deleteAll();
+                
+                // Save new PLU
+                final pluRecords = <CustomerPlu>[];
+                for (final pluData in customerPluData) {
+                  if (pluData is Map<String, dynamic>) {
+                    try {
+                      final plu = CustomerPlu.fromJson(
+                        pluData,
+                        customer.companyCode!,
+                        customer.code,
+                      );
+                      if (plu.skuNo.isNotEmpty && plu.pluNo.isNotEmpty) {
+                        pluRecords.add(plu);
+                      }
+                    } catch (e) {
+                      print('❌ Error parsing customer PLU: $e');
+                    }
+                  }
+                }
+                
+                await _isar.customerPlus.putAll(pluRecords);
+                totalPluRecords += pluRecords.length;
+                print('💾 PRELOAD: Saved ${pluRecords.length} PLU records for customer ${customer.code}');
+              });
+            }
+          } catch (e) {
+            print('❌ PRELOAD: Error fetching PLU for customer ${customer.code}: $e');
+            break; // Stop trying other customers if one fails
+          }
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error processing customer ${customer.code}: $e');
+        }
+      }
+      
+      print('✅ PRELOAD: Total customer PLU records loaded: $totalPluRecords');
+      
+    } catch (e) {
+      print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
+    }
+  }
 
 /// Sync statistics data class
 class SyncStats {
