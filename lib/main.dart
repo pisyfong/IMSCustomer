@@ -220,22 +220,15 @@ class _MyAppState extends State<MyApp> {
   }
   
   /// Start full data preload in background (non-blocking)
+  /// OFFLINE-FIRST: Never blocks the UI, runs silently in background
   void _startFullDataPreload() {
-    print('🔍 DEBUG: _startFullDataPreload method called');
-    // Run preload in background without blocking UI
-    Future.delayed(Duration.zero, () async {
-      try {
-        print('🚀 APP STARTUP: Starting background data preload...');
-        print('🔍 DEBUG: About to call enhancedSyncService.preloadAllDataAtStartup()');
-        await enhancedSyncService.preloadAllDataAtStartup();
-        print('✅ APP STARTUP: Background data preload completed');
-      } catch (e) {
-        print('❌ APP STARTUP: Background data preload failed: $e');
-        print('📱 APP STARTUP: App will work in offline mode with cached data');
-        // Don't break the app if preload fails - offline-first approach
-      }
-    });
-    print('🔍 DEBUG: Future.delayed scheduled for preload');
+    print('🚀 APP STARTUP: Scheduling background data preload...');
+    
+    // Fire and forget - don't await, don't block
+    // The preload method itself handles all errors and offline scenarios
+    enhancedSyncService.preloadAllDataAtStartup();
+    
+    print('✅ APP STARTUP: Background preload scheduled (non-blocking)');
   }
 
   @override

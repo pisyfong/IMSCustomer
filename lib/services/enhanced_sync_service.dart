@@ -556,20 +556,20 @@ class EnhancedSyncService {
   }
 
   /// Full data preload at app startup
-  /// Preloads all related tables (companies, inventory, customers, quotes, quote items) if online
   Future<void> preloadAllDataAtStartup() async {
-    print('🔥🔥🔥 PRELOADER CALLED - STARTING FULL DATA PRELOAD 🔥🔥🔥');
-    
     if (_isFullDataPreloaded) {
       print('🚀 FULL PRELOAD: Already completed, skipping');
       return;
     }
-    
-    // Reset the flag to allow re-preload on app restart
-    _isFullDataPreloaded = false;
 
+    // Run in background - don't await, don't block
+    _runBackgroundPreload();
+  }
+  
+  /// Internal method that runs the actual preload in background
+  Future<void> _runBackgroundPreload() async {
     try {
-      print('🚀 FULL PRELOAD: Starting full data preload at startup...');
+      print('🚀 FULL PRELOAD: Starting background data preload...');
       
       // Get user info for context
       final authService = AuthService();
@@ -579,35 +579,29 @@ class EnhancedSyncService {
         return;
       }
 
-      // Only proceed if server is reachable (online and SignalR connected or connectable quickly)
-      final reachable = await _isServerReachableForPreload();
+      // Check server reachability in background (with short timeout)
+      // Don't wait - if it fails, individual methods will handle offline mode
+      final reachable = await _isServerReachableForPreload().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          print('🚀 FULL PRELOAD: Server check timed out, continuing anyway');
+          return false;
+        },
+      );
+      
       if (!reachable) {
-        print('🚀 FULL PRELOAD: Server not reachable, skipping full preload');
-        return;
+        print('🚀 FULL PRELOAD: Server not reachable, but continuing with cached data');
       }
 
-      // 1. Preload all companies
+      // Run all preloads - each handles its own offline fallback
+      // These run sequentially but don't block the UI
       await _preloadCompanies();
-      
-      // 2. Preload all inventory (for all companies)
       await _preloadAllInventory();
-      
-      // 3. Preload all customers (for all companies)
       await _preloadAllCustomers();
-
-      // 4. Preload all PLUs (for all companies)
       await _preloadAllPlus();
-      
-      // 5. Preload all quotes (for all companies)
       await _preloadAllQuotes();
-      
-      // 6. Preload all quote items (for all quotes)
       await _preloadAllQuoteItems();
-      
-      // 7. Preload invoices (for previous orders)
       await _preloadAllInvoices();
-      
-      // 8. Preload group and department lookups (for inventory filters)
       await _preloadGroupAndDepartmentLookups();
       
       _isFullDataPreloaded = true;
