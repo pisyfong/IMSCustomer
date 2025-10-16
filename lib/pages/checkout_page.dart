@@ -164,12 +164,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
       print('📦 OFFLINE-FIRST: Loading customer PLU from local database...');
       
       // OFFLINE-FIRST: Load from local database first
-      final localPluRecords = await isar.customerPlus
+      // Get all records for this company, then filter by customer in memory
+      final allPluForCompany = await isar.customerPlus
           .filter()
           .companyCodeEqualTo(companyCode)
-          .and()
-          .customerCodeEqualTo(customerCode)
           .findAll();
+      
+      // Filter by customer code in memory
+      final localPluRecords = allPluForCompany
+          .where((plu) => plu.customerCode == customerCode)
+          .toList();
       
       if (localPluRecords.isNotEmpty) {
         print('📱 Found ${localPluRecords.length} customer PLU records in local database');
