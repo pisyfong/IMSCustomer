@@ -165,7 +165,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       
       // OFFLINE-FIRST: Load from local database first
       final localPluRecords = await isar.customerPlus
-          .where()
           .filter()
           .companyCodeEqualTo(companyCode)
           .customerCodeEqualTo(customerCode)
