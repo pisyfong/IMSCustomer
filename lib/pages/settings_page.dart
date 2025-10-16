@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/enhanced_sync_service.dart';
 import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
+import '../services/inventory_service.dart';
 import '../main.dart';
 import '../models/quote.dart';
 import '../models/quote_item.dart';
@@ -9,6 +10,8 @@ import '../models/invoice.dart';
 import '../models/customer.dart';
 import '../models/inventory_item.dart';
 import '../models/in_stock_uom.dart';
+import '../models/group_lookup.dart';
+import '../models/department_lookup.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -91,6 +94,69 @@ class _SettingsPageState extends State<SettingsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Full sync completed successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _syncStatus = 'Sync failed: $e';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+      });
+    }
+  }
+  
+  Future<void> _syncGroupsAndDepartments() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing group & department descriptions...';
+    });
+    
+    try {
+      final inventoryService = InventoryService(_signalRService);
+      
+      // Get all companies
+      final companies = await isar.companys.where().findAll();
+      int totalGroups = 0;
+      int totalDepartments = 0;
+      
+      for (final company in companies) {
+        final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+        if (companyCode <= 0) continue;
+        
+        setState(() {
+          _syncStatus = 'Syncing lookups for ${company.companyName}...';
+        });
+        
+        // Fetch and cache groups
+        final groups = await inventoryService.getGroupMap(companyCode: companyCode);
+        totalGroups += groups.length;
+        
+        // Fetch and cache departments
+        final departments = await inventoryService.getDepartmentMap(companyCode: companyCode);
+        totalDepartments += departments.length;
+      }
+      
+      setState(() {
+        _syncStatus = 'Sync completed! $totalGroups groups, $totalDepartments departments';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced $totalGroups groups, $totalDepartments departments'),
             backgroundColor: Colors.green,
           ),
         );
@@ -291,6 +357,19 @@ class _SettingsPageState extends State<SettingsPage> {
               label: const Text('Full Sync'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            ElevatedButton.icon(
+              onPressed: _isSyncing ? null : _syncGroupsAndDepartments,
+              icon: const Icon(Icons.label),
+              label: const Text('Sync Group & Department Descriptions'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade700,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),

@@ -27,7 +27,9 @@ import '../config/app_config.dart'; // For sync timing configuration
 import 'plu_service.dart';
 import 'quotation_service.dart';
 import 'credit_term_service.dart';
+import 'invoice_service.dart';
 import '../models/credit_term.dart';
+import '../models/invoice.dart';
 
 /// Enhanced sync service that combines your existing sync with SignalR real-time updates
 class EnhancedSyncService {
@@ -41,6 +43,7 @@ class EnhancedSyncService {
   late final RoleCustomerService _roleCustomerService;
   late final QuotationService _quotationService;
   late final CreditTermService _creditTermService;
+  late final InvoiceService _invoiceService;
   
   Timer? _periodicSyncTimer;
   StreamSubscription? _connectivitySubscription;
@@ -74,6 +77,7 @@ class EnhancedSyncService {
     _roleCustomerService = RoleCustomerService();
     _quotationService = QuotationService(_signalRService);
     _creditTermService = CreditTermService(_signalRService);
+    _invoiceService = InvoiceService(_signalRService);
     _initializeService();
   }
   
@@ -600,7 +604,10 @@ class EnhancedSyncService {
       // 6. Preload all quote items (for all quotes)
       await _preloadAllQuoteItems();
       
-      // 7. Preload group and department lookups (for inventory filters)
+      // 7. Preload invoices (for previous orders)
+      await _preloadAllInvoices();
+      
+      // 8. Preload group and department lookups (for inventory filters)
       await _preloadGroupAndDepartmentLookups();
       
       _isFullDataPreloaded = true;
@@ -1082,6 +1089,45 @@ class EnhancedSyncService {
     } catch (e) {
       print('❌ QUOTATION SYNC: Error syncing quotations: $e');
       // Don't throw - allow other sync operations to continue
+    }
+  }
+  
+  /// Preload all invoices for all customers
+  Future<void> _preloadAllInvoices() async {
+    try {
+      print('🧾 PRELOAD: Loading all invoices...');
+      
+      // Get all customers
+      final customers = await _isar.customers.where().findAll();
+      int totalInvoices = 0;
+      
+      for (final customer in customers) {
+        try {
+          if (customer.code.isEmpty || customer.companyCode == null) continue;
+          
+          print('🧾 PRELOAD: Loading invoices for customer ${customer.code}...');
+          
+          // Fetch invoices for this customer
+          final invoices = await _invoiceService.getInvoices(
+            companyCode: customer.companyCode,
+            customerCode: customer.code,
+          );
+          
+          totalInvoices += invoices.length;
+          
+          if (invoices.isNotEmpty) {
+            print('✅ PRELOAD: Loaded ${invoices.length} invoices for customer ${customer.code}');
+          }
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error loading invoices for customer ${customer.code}: $e');
+        }
+      }
+      
+      print('✅ PRELOAD: Total invoices loaded: $totalInvoices');
+      
+    } catch (e) {
+      print('❌ PRELOAD INVOICES ERROR: $e');
     }
   }
   
