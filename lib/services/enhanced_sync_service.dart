@@ -683,7 +683,7 @@ class EnhancedSyncService {
           
           print('👥 PRELOAD: Loading customers for company $companyCode...');
           
-          final customers = await _customerService.getCustomers(companyCode, forceSync: true);
+          final customers = await _customerService.getCustomers(companyCode, forceSync: false);
           
           if (customers.isNotEmpty) {
             // Customers are already saved by the service
@@ -755,7 +755,7 @@ class EnhancedSyncService {
               final customerQuotes = await _quoteService.getQuotes(
                 companyCode: companyCode,
                 customerCode: customer.code,
-                forceSync: true,
+                forceSync: false,
               );
               allQuotes.addAll(customerQuotes);
               if (customerQuotes.isNotEmpty) {
@@ -805,7 +805,7 @@ class EnhancedSyncService {
           final quoteItems = await _quoteItemService.getQuoteItems(
             quotePreLabel: quote.quotePreLabel!,
             companyCode: quote.companyCode!,
-            forceSync: true,
+            forceSync: false,
           );
           
           if (quoteItems.isNotEmpty) {
