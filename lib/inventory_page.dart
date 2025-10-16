@@ -19,6 +19,8 @@ import 'pages/barcode_scanner_page.dart';
 import 'services/customer_state_service.dart';
 import '../models/quote.dart';
 import '../models/quote_item.dart';
+import '../models/invoice.dart';
+import '../services/invoice_service.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({Key? key}) : super(key: key);
@@ -3072,7 +3074,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // Previous orders
+                        // Previous Quotations
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -3081,12 +3083,12 @@ class _InventoryPageState extends State<InventoryPage> {
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               color: Colors.blue.shade600,
-                              child: const Text('Previous Orders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              child: const Text('Quotations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: FutureBuilder<List<Map<String, dynamic>>>(
-                                key: ValueKey('prev_orders_${item.skuNo}_$selectedUom'), // Rebuild when UOM changes
+                                key: ValueKey('prev_quotes_${item.skuNo}_$selectedUom'), // Rebuild when UOM changes
                                 future: _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -3108,9 +3110,9 @@ class _InventoryPageState extends State<InventoryPage> {
                                       padding: const EdgeInsets.symmetric(vertical: 8),
                                       child: Text(
                                         isOnline
-                                          ? 'No previous orders found for this item.'
-                                          : 'No cached previous orders available offline. Connect to internet to sync order history.',
-                                        style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic),
+                                          ? 'No previous quotations found.'
+                                          : 'No cached quotations available offline.',
+                                        style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
                                       ),
                                     );
                                   }
@@ -3190,6 +3192,143 @@ class _InventoryPageState extends State<InventoryPage> {
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                       decoration: BoxDecoration(
                                                         color: Colors.green.shade50,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: Text('RM $price', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Previous Invoices
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 60,
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              color: Colors.green.shade600,
+                              child: const Text('Invoices', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FutureBuilder<List<Map<String, dynamic>>>(
+                                key: ValueKey('prev_invoices_${item.skuNo}_$selectedUom'),
+                                future: _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 8),
+                                      child: Center(child: SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+                                    );
+                                  }
+                                  if (snapshot.hasError) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      child: Text('Failed to load invoices: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
+                                    );
+                                  }
+                                  final data = snapshot.data ?? const [];
+                                  if (data.isEmpty) {
+                                    final isOnline = signalRService.isConnected;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      child: Text(
+                                        isOnline
+                                          ? 'No previous invoices found.'
+                                          : 'No cached invoices available offline.',
+                                        style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                                      ),
+                                    );
+                                  }
+                                  // Render as grid
+                                  return LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final width = constraints.maxWidth;
+                                      final int crossAxisCount = width >= 600
+                                          ? 3
+                                          : width >= 360
+                                              ? 2
+                                              : 1;
+                                      return GridView.builder(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: crossAxisCount,
+                                          crossAxisSpacing: 8,
+                                          mainAxisSpacing: 8,
+                                          childAspectRatio: 2.8,
+                                        ),
+                                        itemCount: data.length,
+                                        itemBuilder: (context, index) {
+                                          final invoice = data[index];
+                                          final DateTime? dt = invoice['date'] as DateTime?;
+                                          final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+                                          final qty = invoice['qty'];
+                                          final uom = invoice['uom'] ?? '';
+                                          final price = (invoice['price'] ?? 0).toStringAsFixed(2);
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(color: const Color(0xFFE0E0E0)),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.03),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            padding: const EdgeInsets.all(10),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        '#${invoice['invoiceNo']}',
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      dateStr,
+                                                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.green.shade50,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: Text('Qty: $qty $uom', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.orange.shade50,
                                                         borderRadius: BorderRadius.circular(8),
                                                       ),
                                                       child: Text('RM $price', style: const TextStyle(fontSize: 12, color: Colors.black87)),
@@ -3388,7 +3527,7 @@ class _InventoryPageState extends State<InventoryPage> {
         return qb.compareTo(qa);
       });
 
-      return matched.take(5).map((qi) {
+      return matched.take(10).map((qi) {
         final q = quoteByLabel[qi.quotePreLabel];
         return {
           'quoteNo': qi.quotePreLabel,
@@ -3400,6 +3539,90 @@ class _InventoryPageState extends State<InventoryPage> {
       }).toList();
     } catch (e) {
       print('❌ InventoryPage: _loadPreviousOrdersForItem error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadPreviousInvoicesForItem(InventoryItem item, {String? filterUom}) async {
+    try {
+      final selectedCustomer = CustomerStateService().selectedCustomer;
+      final companyCodeRaw = _selectedCompany?['companyCode'];
+      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 0 : (companyCodeRaw as int?) ?? 0;
+      if (companyCode == 0) {
+        print('🔎 PreviousInvoices: companyCode is 0 or null; skipping');
+        return [];
+      }
+
+      // If no customer selected, return empty (invoices are customer-specific)
+      if (selectedCustomer == null) {
+        print('🔎 PreviousInvoices: No selected customer; skipping invoice lookup');
+        return [];
+      }
+
+      print('🔎 PreviousInvoices: Fetching invoices from server for customer ${selectedCustomer.code}');
+      
+      // Fetch invoices from server via SignalR
+      final invoiceService = InvoiceService(signalRService);
+      final invoices = await invoiceService.getInvoices(
+        companyCode: companyCode,
+        customerCode: selectedCustomer.code,
+      );
+
+      if (invoices.isEmpty) {
+        print('🔎 PreviousInvoices: No invoices found for customer ${selectedCustomer.code}');
+        return [];
+      }
+
+      print('🔎 PreviousInvoices: Found ${invoices.length} invoices, fetching items for SKU ${item.skuNo}');
+
+      // Fetch invoice items for each invoice and filter by SKU
+      final List<Map<String, dynamic>> matchedItems = [];
+      
+      for (final invoice in invoices) {
+        try {
+          final items = await invoiceService.getInvoiceItems(
+            companyCode: companyCode,
+            invoicePreLabel: invoice.invoicePreLabel,
+          );
+
+          // Filter items by SKU and optionally by UOM
+          var filteredItems = items.where((invItem) => invItem.skuNo == item.skuNo);
+          
+          if (filterUom != null && filterUom.isNotEmpty) {
+            filteredItems = filteredItems.where((item) => item.uom == filterUom);
+          }
+
+          for (final invItem in filteredItems) {
+            matchedItems.add({
+              'invoiceNo': invoice.invoicePreLabel,
+              'date': invoice.invoiceDate,
+              'qty': invItem.quantity ?? 0,
+              'uom': invItem.uom,
+              'price': invItem.unitPrice ?? 0,
+            });
+          }
+        } catch (e) {
+          print('❌ PreviousInvoices: Error fetching items for invoice ${invoice.invoicePreLabel}: $e');
+          continue;
+        }
+      }
+
+      if (matchedItems.isEmpty) {
+        print('🔎 PreviousInvoices: No invoice items found for SKU ${item.skuNo}');
+        return [];
+      }
+
+      // Sort by date (newest first) and take latest 10
+      matchedItems.sort((a, b) {
+        final dateA = a['date'] as DateTime? ?? DateTime(1970);
+        final dateB = b['date'] as DateTime? ?? DateTime(1970);
+        return dateB.compareTo(dateA);
+      });
+
+      print('🔎 PreviousInvoices: Returning ${matchedItems.take(10).length} invoice items');
+      return matchedItems.take(10).toList();
+    } catch (e) {
+      print('❌ InventoryPage: _loadPreviousInvoicesForItem error: $e');
       return [];
     }
   }
