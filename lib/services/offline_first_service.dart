@@ -13,19 +13,65 @@ class OfflineFirstService {
   // and ensure a shared connection state across the app.
   static SignalRService get _signalRService => signalRService;
   
-  /// Test if we can connect to the server
-  /// Returns true if server is reachable, false if offline
-  static Future<bool> isServerReachable() async {
-    try {
-      // Test SignalR connectivity
-      if (!_signalRService.isConnected) {
-        await _signalRService.connect();
+  // Cache the last known connectivity state to avoid repeated timeout attempts
+  static bool _lastKnownOnlineState = false;
+  static DateTime? _lastConnectivityCheck;
+  static const Duration _connectivityCacheDuration = Duration(seconds: 30);
+  
+  /// Quick check if server is likely reachable (uses cached state)
+  /// Returns true if we recently connected successfully
+  static bool isLikelyOnline() {
+    // If SignalR is currently connected, we're definitely online
+    if (_signalRService.isConnected) {
+      _lastKnownOnlineState = true;
+      _lastConnectivityCheck = DateTime.now();
+      return true;
+    }
+    
+    // If we recently checked and were offline, assume still offline
+    if (_lastConnectivityCheck != null) {
+      final timeSinceCheck = DateTime.now().difference(_lastConnectivityCheck!);
+      if (timeSinceCheck < _connectivityCacheDuration) {
+        return _lastKnownOnlineState;
       }
-      return _signalRService.isConnected;
+    }
+    
+    // Default to offline to avoid blocking
+    return false;
+  }
+  
+  /// Test if we can connect to the server (with timeout)
+  /// Returns true if server is reachable, false if offline
+  static Future<bool> isServerReachable({Duration timeout = const Duration(seconds: 2)}) async {
+    try {
+      // Quick check first
+      if (_signalRService.isConnected) {
+        _lastKnownOnlineState = true;
+        _lastConnectivityCheck = DateTime.now();
+        return true;
+      }
+      
+      // Try to connect with timeout
+      if (!_signalRService.isConnected) {
+        await _signalRService.connect().timeout(timeout);
+      }
+      
+      final isOnline = _signalRService.isConnected;
+      _lastKnownOnlineState = isOnline;
+      _lastConnectivityCheck = DateTime.now();
+      return isOnline;
     } catch (e) {
       print('🔍 OfflineFirst: Server unreachable - $e');
+      _lastKnownOnlineState = false;
+      _lastConnectivityCheck = DateTime.now();
       return false;
     }
+  }
+  
+  /// Reset connectivity cache (call when user manually triggers sync)
+  static void resetConnectivityCache() {
+    _lastConnectivityCheck = null;
+    _lastKnownOnlineState = false;
   }
   
   /// Execute an action with offline-first pattern

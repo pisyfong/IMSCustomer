@@ -28,6 +28,7 @@ import 'plu_service.dart';
 import 'quotation_service.dart';
 import 'credit_term_service.dart';
 import 'invoice_service.dart';
+import 'offline_first_service.dart';
 import '../models/credit_term.dart';
 import '../models/invoice.dart';
 
@@ -632,6 +633,12 @@ class EnhancedSyncService {
     try {
       print('📦 PRELOAD: Loading all inventory...');
       
+      // Quick offline check - skip if we know we're offline
+      if (!OfflineFirstService.isLikelyOnline()) {
+        print('📦 PRELOAD: Skipping inventory sync (offline)');
+        return;
+      }
+      
       // Get all companies first
       final companies = await _isar.companys.where().findAll();
       int totalItems = 0;
@@ -672,6 +679,7 @@ class EnhancedSyncService {
           
         } catch (e) {
           print('❌ PRELOAD: Error loading inventory for company ${company.companyCode}: $e');
+          break; // Stop trying other companies if one fails
         }
       }
       
@@ -748,6 +756,12 @@ class EnhancedSyncService {
   Future<void> _preloadAllQuotes() async {
     try {
       print('📝 PRELOAD: Loading all quotes...');
+      
+      // Quick offline check - skip if we know we're offline
+      if (!OfflineFirstService.isLikelyOnline()) {
+        print('📝 PRELOAD: Skipping quotes sync (offline)');
+        return;
+      }
       
       // Get all companies first
       final companies = await _isar.companys.where().findAll();
