@@ -393,7 +393,7 @@ class InventoryService {
         }
       }
 
-      final map = <String, String>{};
+      final serverMap = <String, String>{};
       if (result is List) {
         // Expect list of objects with fields like {'grp': 'XX', 'description': '...'}
         for (final row in result) {
@@ -413,9 +413,9 @@ class InventoryService {
                 final k1 = code;
                 final k2 = code.trim();
                 final k3 = k2.toUpperCase();
-                map[k1] = desc;
-                map[k2] = desc;
-                map[k3] = desc;
+                serverMap[k1] = desc;
+                serverMap[k2] = desc;
+                serverMap[k3] = desc;
               }
             }
           } catch (_) {}
@@ -429,15 +429,15 @@ class InventoryService {
             final k1 = code;
             final k2 = code.trim();
             final k3 = k2.toUpperCase();
-            map[k1] = desc;
-            map[k2] = desc;
-            map[k3] = desc;
+            serverMap[k1] = desc;
+            serverMap[k2] = desc;
+            serverMap[k3] = desc;
           }
         });
       }
 
       // Save to local database for offline use
-      if (map.isNotEmpty && result is List) {
+      if (serverMap.isNotEmpty && result is List) {
         try {
           await isar.writeTxn(() async {
             // Clear old groups for this company
@@ -469,13 +469,13 @@ class InventoryService {
       }
       
       // Cache and return
-      _groupDescriptionCache[effectiveCompanyCode] = map;
-      if (map.isEmpty) {
+      _groupDescriptionCache[effectiveCompanyCode] = serverMap;
+      if (serverMap.isEmpty) {
         print('🟨 InventoryService.getGroupMap: No group descriptions received for company $effectiveCompanyCode');
       } else {
-        print('🟩 InventoryService.getGroupMap: Cached ${map.length} group descriptions for company $effectiveCompanyCode');
+        print('🟩 InventoryService.getGroupMap: Cached ${serverMap.length} group descriptions for company $effectiveCompanyCode');
       }
-      return map;
+      return serverMap;
     } catch (e) {
       print('❌ INVENTORY SERVICE getGroupMap error: $e');
       return {};
@@ -585,7 +585,7 @@ class InventoryService {
         }
       }
 
-      final map = <String, String>{};
+      final serverMap = <String, String>{};
       if (result is List) {
         // Expect list of objects with fields like {'dept': 'XX', 'description': '...'}
         for (final row in result) {
@@ -605,9 +605,9 @@ class InventoryService {
                 final k1 = code;
                 final k2 = code.trim();
                 final k3 = k2.toUpperCase();
-                map[k1] = desc;
-                map[k2] = desc;
-                map[k3] = desc;
+                serverMap[k1] = desc;
+                serverMap[k2] = desc;
+                serverMap[k3] = desc;
               }
             }
           } catch (_) {}
@@ -621,15 +621,15 @@ class InventoryService {
             final k1 = code;
             final k2 = code.trim();
             final k3 = k2.toUpperCase();
-            map[k1] = desc;
-            map[k2] = desc;
-            map[k3] = desc;
+            serverMap[k1] = desc;
+            serverMap[k2] = desc;
+            serverMap[k3] = desc;
           }
         });
       }
 
       // Save to local database for offline use
-      if (map.isNotEmpty && result is List) {
+      if (serverMap.isNotEmpty && result is List) {
         try {
           await isar.writeTxn(() async {
             // Clear old departments for this company
@@ -661,13 +661,13 @@ class InventoryService {
       }
       
       // Cache and return
-      _deptDescriptionCache[effectiveCompanyCode] = map;
-      if (map.isEmpty) {
+      _deptDescriptionCache[effectiveCompanyCode] = serverMap;
+      if (serverMap.isEmpty) {
         print('🟨 InventoryService.getDepartmentMap: No dept descriptions received for company $effectiveCompanyCode');
       } else {
-        print('🟩 InventoryService.getDepartmentMap: Cached ${map.length} dept descriptions for company $effectiveCompanyCode');
+        print('🟩 InventoryService.getDepartmentMap: Cached ${serverMap.length} dept descriptions for company $effectiveCompanyCode');
       }
-      return map;
+      return serverMap;
     } catch (e) {
       print('❌ INVENTORY SERVICE getDepartmentMap error: $e');
       return {};
