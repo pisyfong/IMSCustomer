@@ -1281,6 +1281,7 @@ class EnhancedSyncService {
       print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
     }
   }
+}
 
 /// Sync statistics data class
 class SyncStats {
