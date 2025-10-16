@@ -249,9 +249,17 @@ class InvoiceService {
           .map((json) {
             try {
               return InvoiceItem.fromJson(json as Map<String, dynamic>);
-            } catch (e) {
+            } catch (e, stackTrace) {
               print('❌ INVOICE SERVICE: Error parsing invoice item: $e');
-              print('   JSON: $json');
+              print('   Stack trace: $stackTrace');
+              print('   JSON keys: ${(json as Map).keys.toList()}');
+              print('   Problematic fields:');
+              print('     Company_Code: ${json['Company_Code']} (${json['Company_Code'].runtimeType})');
+              print('     Invoice_PreLabel: ${json['Invoice_PreLabel']} (${json['Invoice_PreLabel'].runtimeType})');
+              print('     Sequence_No: ${json['Sequence_No']} (${json['Sequence_No'].runtimeType})');
+              print('     DO_PreLabel: ${json['DO_PreLabel']} (${json['DO_PreLabel'].runtimeType})');
+              print('     Sku_No: ${json['Sku_No']} (${json['Sku_No'].runtimeType})');
+              print('     Uom: ${json['Uom']} (${json['Uom'].runtimeType})');
               return null;
             }
           })
