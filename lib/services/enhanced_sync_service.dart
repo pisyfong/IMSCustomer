@@ -123,10 +123,17 @@ class EnhancedSyncService {
     // Update sync info in database
     _updateSyncInfo(isOnline: _isOnline);
     
-    // If we just came online, connect SignalR and sync
+    // If we just came online, connect SignalR and sync (non-blocking)
     if (!wasOnline && _isOnline) {
-      _signalRService.connect();
-      performSync();
+      // Run in background without blocking
+      Future.microtask(() async {
+        try {
+          await _signalRService.connect();
+          await performSync();
+        } catch (e) {
+          print('Enhanced Sync: Background sync failed (non-blocking): $e');
+        }
+      });
     } else if (wasOnline && !_isOnline) {
       _signalRService.disconnect();
     }
@@ -332,12 +339,19 @@ class EnhancedSyncService {
       
       print('🔍 ENHANCED SYNC: STEP 2 - Checking SignalR connection...');
       if (!_signalRService.isConnected) {
-        print('🔍 ENHANCED SYNC: SignalR not connected, connecting...');
-        await _signalRService.connect();
+        print('🔍 ENHANCED SYNC: SignalR not connected, attempting to connect...');
+        try {
+          await _signalRService.connect();
+        } catch (e) {
+          print('🔍 ENHANCED SYNC: STEP 2 - SignalR connection failed (offline mode): $e');
+          print('📱 ENHANCED SYNC: Continuing with cached data (offline-first)');
+          return; // Exit gracefully, app will use cached data
+        }
       }
       if (!_signalRService.isConnected) {
-        print('🔍 ENHANCED SYNC: STEP 2 FAILED - SignalR connection failed');
-        throw Exception('STEP 2 FAILED: SignalR connection failed');
+        print('🔍 ENHANCED SYNC: STEP 2 - SignalR not connected (offline mode)');
+        print('📱 ENHANCED SYNC: Continuing with cached data (offline-first)');
+        return; // Exit gracefully, app will use cached data
       }
       print('🔍 ENHANCED SYNC: STEP 2 SUCCESS - SignalR connected');
       
