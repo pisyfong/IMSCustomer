@@ -9,10 +9,12 @@ class InvoiceService {
   InvoiceService(this._signalRService);
 
   /// Get invoices with offline-first pattern
+  /// By default, only fetches invoices from the last 365 days
   Future<List<Invoice>> getInvoices({
     int? companyCode,
     String? customerCode,
     String? searchQuery,
+    int daysBack = 365,
   }) async {
     try {
       print('🔍 INVOICE SERVICE: Getting invoices (offline-first)...');
@@ -24,6 +26,7 @@ class InvoiceService {
             companyCode: companyCode,
             customerCode: customerCode,
             searchQuery: searchQuery,
+            daysBack: daysBack,
           );
           
           // Save to local database
@@ -51,16 +54,19 @@ class InvoiceService {
   }
 
   /// Fetch invoices from server via SignalR
+  /// Only fetches invoices from the last [daysBack] days (default: 365)
   Future<List<Invoice>> fetchInvoicesFromServer({
     int? companyCode,
     String? customerCode,
     String? searchQuery,
+    int daysBack = 365,
   }) async {
     try {
       print('🔍 INVOICE SERVICE: Fetching invoices from server...');
       print('  - companyCode: $companyCode');
       print('  - customerCode: "$customerCode"');
       print('  - searchQuery: "${searchQuery ?? ''}"');
+      print('  - daysBack: $daysBack (from ${DateTime.now().subtract(Duration(days: daysBack)).toIso8601String()})');
 
       if (companyCode == null) {
         throw Exception('Company code is required');
@@ -77,11 +83,15 @@ class InvoiceService {
       }
 
       final effectiveCustomerCode = (customerCode?.isEmpty ?? true) ? '' : customerCode;
+      
+      // Calculate the start date (daysBack from now)
+      final startDate = DateTime.now().subtract(Duration(days: daysBack));
 
       final response = await _signalRService.invoke('getInvoices', [
         companyCode,
         effectiveCustomerCode,
         searchQuery ?? '',
+        startDate.toIso8601String(),  // Pass start date to server
       ]);
 
       print('📦 INVOICE SERVICE: Received response from server');
