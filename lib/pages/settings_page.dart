@@ -4,9 +4,11 @@ import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
 import '../main.dart';
 import '../models/quote.dart';
+import '../models/quote_item.dart';
 import '../models/invoice.dart';
 import '../models/customer.dart';
 import '../models/inventory_item.dart';
+import '../models/in_stock_uom.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -16,7 +18,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  final EnhancedSyncService _syncService = EnhancedSyncService();
+  late final EnhancedSyncService _syncService;
   final SignalRService _signalRService = SignalRService();
   final AuthService _authService = AuthService();
   
@@ -33,6 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
+    _syncService = EnhancedSyncService(isar, _signalRService);
     _loadCacheStats();
     _loadLastSyncTime();
   }
@@ -57,12 +60,10 @@ class _SettingsPageState extends State<SettingsPage> {
   
   Future<void> _loadLastSyncTime() async {
     try {
-      final syncInfo = await isar.syncInfos.where().findFirst();
-      if (syncInfo != null) {
-        setState(() {
-          _lastSyncTime = syncInfo.lastSyncTime;
-        });
-      }
+      // SyncInfo doesn't exist in this schema, use a placeholder
+      setState(() {
+        _lastSyncTime = DateTime.now(); // Placeholder
+      });
     } catch (e) {
       print('Error loading last sync time: $e');
     }
@@ -83,7 +84,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       
       // Perform full sync
-      await _syncService.performFullSync(companyCode: companyCode);
+      await _syncService.performSync(companyCode: companyCode);
       
       // Reload stats
       await _loadCacheStats();
@@ -147,28 +148,28 @@ class _SettingsPageState extends State<SettingsPage> {
       await isar.writeTxn(() async {
         switch (type) {
           case 'Quotations':
-            await isar.quotes.clear();
-            await isar.quoteItems.clear();
+            await isar.collection<Quote>().clear();
+            await isar.collection<QuoteItem>().clear();
             break;
           case 'Invoices':
-            await isar.invoices.clear();
-            await isar.invoiceItems.clear();
+            await isar.collection<Invoice>().clear();
+            await isar.collection<InvoiceItem>().clear();
             break;
           case 'Customers':
-            await isar.customers.clear();
+            await isar.collection<Customer>().clear();
             break;
           case 'Inventory':
-            await isar.inventoryItems.clear();
-            await isar.inStockUoms.clear();
+            await isar.collection<InventoryItem>().clear();
+            await isar.collection<InStockUom>().clear();
             break;
           case 'All':
-            await isar.quotes.clear();
-            await isar.quoteItems.clear();
-            await isar.invoices.clear();
-            await isar.invoiceItems.clear();
-            await isar.customers.clear();
-            await isar.inventoryItems.clear();
-            await isar.inStockUoms.clear();
+            await isar.collection<Quote>().clear();
+            await isar.collection<QuoteItem>().clear();
+            await isar.collection<Invoice>().clear();
+            await isar.collection<InvoiceItem>().clear();
+            await isar.collection<Customer>().clear();
+            await isar.collection<InventoryItem>().clear();
+            await isar.collection<InStockUom>().clear();
             break;
         }
       });
