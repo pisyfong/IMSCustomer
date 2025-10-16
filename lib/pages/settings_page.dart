@@ -76,15 +76,8 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     
     try {
-      final company = await _authService.getSelectedCompany();
-      final companyCode = company?['companyCode'] as int?;
-      
-      if (companyCode == null) {
-        throw Exception('No company selected');
-      }
-      
-      // Perform full sync
-      await _syncService.performSync(companyCode: companyCode);
+      // Perform full sync (no parameters needed)
+      await _syncService.performSync();
       
       // Reload stats
       await _loadCacheStats();
