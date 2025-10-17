@@ -18,8 +18,6 @@ import '../services/quote_number_service.dart';
 import '../services/quotation_service.dart';
 import '../services/credit_term_service.dart';
 import '../models/credit_term.dart';
-import '../models/customer_plu.dart';
-import '../main.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -47,6 +45,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   List<CreditTerm> _creditTerms = [];
   CreditTerm? _selectedCreditTerm;
   bool _isLoadingCreditTerms = true;
+  bool _isCreatingQuotation = false;
   
   double _totalAmount = 0.0;
   double _gstAmount = 0.0;
@@ -161,77 +160,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
       final customerCode = _selectedCustomer!['code'];
       
-      print('📦 OFFLINE-FIRST: Loading customer PLU from local database...');
-      
-      // OFFLINE-FIRST: Load from local database first
-      // Get all records for this company, then filter by customer in memory
-      final allPluForCompany = await isar.customerPlus
-          .filter()
-          .companyCodeEqualTo(companyCode)
-          .findAll();
-      
-      // Filter by customer code in memory
-      final localPluRecords = allPluForCompany
-          .where((plu) => plu.customerCode == customerCode)
-          .toList();
-      
-      if (localPluRecords.isNotEmpty) {
-        print('📱 Found ${localPluRecords.length} customer PLU records in local database');
-        
-        // Create map for quick lookup
-        final pluMap = <String, String>{};
-        for (final record in localPluRecords) {
-          pluMap[record.skuNo] = record.pluNo;
-        }
-        
-        // Return items with PLU from local database
-        return widget.cartItems.map((item) {
-          final pluNo = pluMap[item.skuNo] ?? '';
-          final updatedItem = CartItem()
-            ..id = item.id
-            ..companyCode = item.companyCode
-            ..skuNo = item.skuNo
-            ..pluNo = pluNo
-            ..description = item.description
-            ..uom = item.uom
-            ..unitPrice = item.unitPrice
-            ..gstPrice = item.gstPrice
-            ..factor = item.factor
-            ..quantity = item.quantity
-            ..remarks = item.remarks
-            ..addedDate = item.addedDate;
-          return updatedItem;
-        }).toList();
-      }
-      
-      print('📱 No local PLU data, checking if online...');
-      
-      // No local data, try to fetch from server if online
-      final signalRService = SignalRService();
-      if (!signalRService.isConnected) {
-        print('📱 Offline mode: Using empty PLU');
-        return widget.cartItems.map((item) {
-          final updatedItem = CartItem()
-            ..id = item.id
-            ..companyCode = item.companyCode
-            ..skuNo = item.skuNo
-            ..pluNo = ''
-            ..description = item.description
-            ..uom = item.uom
-            ..unitPrice = item.unitPrice
-            ..gstPrice = item.gstPrice
-            ..factor = item.factor
-            ..quantity = item.quantity
-            ..remarks = item.remarks
-            ..addedDate = item.addedDate;
-          return updatedItem;
-        }).toList();
-      }
-      
       // Get SKU numbers from cart items
       final skuNos = widget.cartItems.map((item) => item.skuNo).toList();
       
-      print('🌐 Fetching customer PLU from server...');
+      // Fetch customer PLU from server (with offline fallback)
+      final signalRService = SignalRService();
+      
+      // Check if online before attempting server call
+      if (!signalRService.isConnected) {
+        print('📱 Offline mode: Skipping customer PLU fetch');
+        // Return items with empty PLU when offline
+        return widget.cartItems.map((item) {
+          final updatedItem = CartItem()
+            ..id = item.id
+            ..companyCode = item.companyCode
+            ..skuNo = item.skuNo
+            ..pluNo = '' // Empty string when offline
+            ..description = item.description
+            ..uom = item.uom
+            ..unitPrice = item.unitPrice
+            ..gstPrice = item.gstPrice
+            ..factor = item.factor
+            ..quantity = item.quantity
+            ..remarks = item.remarks
+            ..addedDate = item.addedDate;
+          return updatedItem;
+        }).toList();
+      }
+      
       final customerPluData = await signalRService.invoke('getCustomerPlu', [
         companyCode,
         customerCode,
@@ -239,46 +195,27 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ]).timeout(
         const Duration(seconds: 2),
         onTimeout: () {
-          print('⏱️ Customer PLU fetch timed out - using empty PLU');
+          print('⏱️ Customer PLU fetch timed out - continuing without PLU');
           return [];
         },
       ) as List<dynamic>;
       
-      print('📦 Fetched ${customerPluData.length} customer PLU records from server');
-      
-      // Save to local database for future offline use
-      if (customerPluData.isNotEmpty) {
-        try {
-          await isar.writeTxn(() async {
-            final pluRecords = <CustomerPlu>[];
-            for (final pluData in customerPluData) {
-              if (pluData is Map<String, dynamic>) {
-                final plu = CustomerPlu.fromJson(pluData, companyCode, customerCode);
-                if (plu.skuNo.isNotEmpty && plu.pluNo.isNotEmpty) {
-                  pluRecords.add(plu);
-                }
-              }
-            }
-            await isar.customerPlus.putAll(pluRecords);
-            print('💾 Saved ${pluRecords.length} PLU records to local database');
-          });
-        } catch (e) {
-          print('❌ Error saving PLU to local database: $e');
-        }
-      }
+      print('📦 Fetched ${customerPluData.length} customer PLU records');
       
       // Create new list with updated PLU
       return widget.cartItems.map((item) {
+        // Find matching customer PLU
         final customerPlu = customerPluData.firstWhere(
           (plu) => plu['Sku_No'] == item.skuNo,
           orElse: () => null,
         );
         
+        // Create a copy of the item with updated PLU
         final updatedItem = CartItem()
           ..id = item.id
           ..companyCode = item.companyCode
           ..skuNo = item.skuNo
-          ..pluNo = customerPlu != null ? customerPlu['Plu_No'] : ''
+          ..pluNo = customerPlu != null ? customerPlu['Plu_No'] : '' // Empty string if not found
           ..description = item.description
           ..uom = item.uom
           ..unitPrice = item.unitPrice
@@ -298,7 +235,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ..id = item.id
           ..companyCode = item.companyCode
           ..skuNo = item.skuNo
-          ..pluNo = ''
+          ..pluNo = '' // Empty string on error
           ..description = item.description
           ..uom = item.uom
           ..unitPrice = item.unitPrice
@@ -793,14 +730,64 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
 
     if (confirmed == true) {
-      await _generatePdfQuotation();
-      
-      // Clear cart after successful quotation creation
-      await _cartService.clearCart();
-      
-      // Navigate back to previous screen
+      setState(() {
+        _isCreatingQuotation = true;
+      });
+
+      // Show loading dialog
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => WillPopScope(
+            onWillPop: () async => false,
+            child: AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Creating quotation...'),
+                  SizedBox(height: 8),
+                  Text(
+                    'Please wait while we generate your quotation and PDF',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      try {
+        await _generatePdfQuotation();
+        
+        // Clear cart after successful quotation creation
+        await _cartService.clearCart();
+        
+        // Close loading dialog
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        
+        // Navigate back to previous screen
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      } catch (e) {
+        // Close loading dialog on error
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        print('❌ Error in complete checkout: $e');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isCreatingQuotation = false;
+          });
+        }
       }
     }
   }
@@ -1128,12 +1115,29 @@ class _CheckoutPageState extends State<CheckoutPage> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _completeCheckout,
+              onPressed: _isCreatingQuotation ? null : _completeCheckout,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey,
               ),
-              child: const Text('Create Quotation'),
+              child: _isCreatingQuotation
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text('Creating...'),
+                      ],
+                    )
+                  : const Text('Create Quotation'),
             ),
           ),
         ],
