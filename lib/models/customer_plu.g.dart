@@ -27,19 +27,19 @@ const CustomerPluSchema = CollectionSchema(
       name: r'customerCode',
       type: IsarType.string,
     ),
-    r'lastUpdated': PropertySchema(
-      id: 2,
-      name: r'lastUpdated',
-      type: IsarType.dateTime,
-    ),
     r'pluNo': PropertySchema(
-      id: 3,
+      id: 2,
       name: r'pluNo',
       type: IsarType.string,
     ),
     r'skuNo': PropertySchema(
-      id: 4,
+      id: 3,
       name: r'skuNo',
+      type: IsarType.long,
+    ),
+    r'uom': PropertySchema(
+      id: 4,
+      name: r'uom',
       type: IsarType.string,
     )
   },
@@ -48,7 +48,31 @@ const CustomerPluSchema = CollectionSchema(
   deserialize: _customerPluDeserialize,
   deserializeProp: _customerPluDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'companyCode_customerCode_skuNo': IndexSchema(
+      id: -2073739057907007980,
+      name: r'companyCode_customerCode_skuNo',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'companyCode',
+          type: IndexType.value,
+          caseSensitive: false,
+        ),
+        IndexPropertySchema(
+          name: r'customerCode',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+        IndexPropertySchema(
+          name: r'skuNo',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _customerPluGetId,
@@ -65,7 +89,12 @@ int _customerPluEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.customerCode.length * 3;
   bytesCount += 3 + object.pluNo.length * 3;
-  bytesCount += 3 + object.skuNo.length * 3;
+  {
+    final value = object.uom;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -77,9 +106,9 @@ void _customerPluSerialize(
 ) {
   writer.writeLong(offsets[0], object.companyCode);
   writer.writeString(offsets[1], object.customerCode);
-  writer.writeDateTime(offsets[2], object.lastUpdated);
-  writer.writeString(offsets[3], object.pluNo);
-  writer.writeString(offsets[4], object.skuNo);
+  writer.writeString(offsets[2], object.pluNo);
+  writer.writeLong(offsets[3], object.skuNo);
+  writer.writeString(offsets[4], object.uom);
 }
 
 CustomerPlu _customerPluDeserialize(
@@ -92,9 +121,9 @@ CustomerPlu _customerPluDeserialize(
   object.companyCode = reader.readLong(offsets[0]);
   object.customerCode = reader.readString(offsets[1]);
   object.id = id;
-  object.lastUpdated = reader.readDateTimeOrNull(offsets[2]);
-  object.pluNo = reader.readString(offsets[3]);
-  object.skuNo = reader.readString(offsets[4]);
+  object.pluNo = reader.readString(offsets[2]);
+  object.skuNo = reader.readLong(offsets[3]);
+  object.uom = reader.readStringOrNull(offsets[4]);
   return object;
 }
 
@@ -110,11 +139,11 @@ P _customerPluDeserializeProp<P>(
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -205,6 +234,247 @@ extension CustomerPluQueryWhere
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeEqualToAnyCustomerCodeSkuNo(int companyCode) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'companyCode_customerCode_skuNo',
+        value: [companyCode],
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeNotEqualToAnyCustomerCodeSkuNo(int companyCode) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [],
+              upper: [companyCode],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [],
+              upper: [companyCode],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeGreaterThanAnyCustomerCodeSkuNo(
+    int companyCode, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'companyCode_customerCode_skuNo',
+        lower: [companyCode],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeLessThanAnyCustomerCodeSkuNo(
+    int companyCode, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'companyCode_customerCode_skuNo',
+        lower: [],
+        upper: [companyCode],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeBetweenAnyCustomerCodeSkuNo(
+    int lowerCompanyCode,
+    int upperCompanyCode, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'companyCode_customerCode_skuNo',
+        lower: [lowerCompanyCode],
+        includeLower: includeLower,
+        upper: [upperCompanyCode],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeCustomerCodeEqualToAnySkuNo(
+          int companyCode, String customerCode) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'companyCode_customerCode_skuNo',
+        value: [companyCode, customerCode],
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeEqualToCustomerCodeNotEqualToAnySkuNo(
+          int companyCode, String customerCode) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode],
+              upper: [companyCode, customerCode],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode, customerCode],
+              includeLower: false,
+              upper: [companyCode],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode, customerCode],
+              includeLower: false,
+              upper: [companyCode],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode],
+              upper: [companyCode, customerCode],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeCustomerCodeSkuNoEqualTo(
+          int companyCode, String customerCode, int skuNo) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'companyCode_customerCode_skuNo',
+        value: [companyCode, customerCode, skuNo],
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeCustomerCodeEqualToSkuNoNotEqualTo(
+          int companyCode, String customerCode, int skuNo) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode, customerCode],
+              upper: [companyCode, customerCode, skuNo],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode, customerCode, skuNo],
+              includeLower: false,
+              upper: [companyCode, customerCode],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode, customerCode, skuNo],
+              includeLower: false,
+              upper: [companyCode, customerCode],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_customerCode_skuNo',
+              lower: [companyCode, customerCode],
+              upper: [companyCode, customerCode, skuNo],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeCustomerCodeEqualToSkuNoGreaterThan(
+    int companyCode,
+    String customerCode,
+    int skuNo, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'companyCode_customerCode_skuNo',
+        lower: [companyCode, customerCode, skuNo],
+        includeLower: include,
+        upper: [companyCode, customerCode],
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeCustomerCodeEqualToSkuNoLessThan(
+    int companyCode,
+    String customerCode,
+    int skuNo, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'companyCode_customerCode_skuNo',
+        lower: [companyCode, customerCode],
+        upper: [companyCode, customerCode, skuNo],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterWhereClause>
+      companyCodeCustomerCodeEqualToSkuNoBetween(
+    int companyCode,
+    String customerCode,
+    int lowerSkuNo,
+    int upperSkuNo, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'companyCode_customerCode_skuNo',
+        lower: [companyCode, customerCode, lowerSkuNo],
+        includeLower: includeLower,
+        upper: [companyCode, customerCode, upperSkuNo],
         includeUpper: includeUpper,
       ));
     });
@@ -458,80 +728,6 @@ extension CustomerPluQueryFilter
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      lastUpdatedIsNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastUpdated',
-      ));
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      lastUpdatedIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastUpdated',
-      ));
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      lastUpdatedEqualTo(DateTime? value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastUpdated',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      lastUpdatedGreaterThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastUpdated',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      lastUpdatedLessThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastUpdated',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      lastUpdatedBetween(
-    DateTime? lower,
-    DateTime? upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastUpdated',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> pluNoEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -665,59 +861,128 @@ extension CustomerPluQueryFilter
   }
 
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+      int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'skuNo',
         value: value,
-        caseSensitive: caseSensitive,
       ));
     });
   }
 
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
       skuNoGreaterThan(
-    String value, {
+    int value, {
     bool include = false,
-    bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
         property: r'skuNo',
         value: value,
-        caseSensitive: caseSensitive,
       ));
     });
   }
 
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoLessThan(
-    String value, {
+    int value, {
     bool include = false,
-    bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
         property: r'skuNo',
         value: value,
-        caseSensitive: caseSensitive,
       ));
     });
   }
 
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoBetween(
-    String lower,
-    String upper, {
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'skuNo',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'uom',
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'uom',
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'uom',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'uom',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'uom',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomBetween(
+    String? lower,
+    String? upper, {
     bool includeLower = true,
     bool includeUpper = true,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
-        property: r'skuNo',
+        property: r'uom',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -727,70 +992,70 @@ extension CustomerPluQueryFilter
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoStartsWith(
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'skuNo',
+        property: r'uom',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoEndsWith(
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'skuNo',
+        property: r'uom',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoContains(
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomContains(
       String value,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.contains(
-        property: r'skuNo',
+        property: r'uom',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoMatches(
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomMatches(
       String pattern,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.matches(
-        property: r'skuNo',
+        property: r'uom',
         wildcard: pattern,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> skuNoIsEmpty() {
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition> uomIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'skuNo',
+        property: r'uom',
         value: '',
       ));
     });
   }
 
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterFilterCondition>
-      skuNoIsNotEmpty() {
+      uomIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'skuNo',
+        property: r'uom',
         value: '',
       ));
     });
@@ -830,18 +1095,6 @@ extension CustomerPluQuerySortBy
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> sortByLastUpdated() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastUpdated', Sort.asc);
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> sortByLastUpdatedDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastUpdated', Sort.desc);
-    });
-  }
-
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> sortByPluNo() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'pluNo', Sort.asc);
@@ -863,6 +1116,18 @@ extension CustomerPluQuerySortBy
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> sortBySkuNoDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'skuNo', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> sortByUom() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'uom', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> sortByUomDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'uom', Sort.desc);
     });
   }
 }
@@ -906,18 +1171,6 @@ extension CustomerPluQuerySortThenBy
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> thenByLastUpdated() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastUpdated', Sort.asc);
-    });
-  }
-
-  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> thenByLastUpdatedDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastUpdated', Sort.desc);
-    });
-  }
-
   QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> thenByPluNo() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'pluNo', Sort.asc);
@@ -941,6 +1194,18 @@ extension CustomerPluQuerySortThenBy
       return query.addSortBy(r'skuNo', Sort.desc);
     });
   }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> thenByUom() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'uom', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QAfterSortBy> thenByUomDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'uom', Sort.desc);
+    });
+  }
 }
 
 extension CustomerPluQueryWhereDistinct
@@ -958,12 +1223,6 @@ extension CustomerPluQueryWhereDistinct
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QDistinct> distinctByLastUpdated() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'lastUpdated');
-    });
-  }
-
   QueryBuilder<CustomerPlu, CustomerPlu, QDistinct> distinctByPluNo(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -971,10 +1230,16 @@ extension CustomerPluQueryWhereDistinct
     });
   }
 
-  QueryBuilder<CustomerPlu, CustomerPlu, QDistinct> distinctBySkuNo(
+  QueryBuilder<CustomerPlu, CustomerPlu, QDistinct> distinctBySkuNo() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'skuNo');
+    });
+  }
+
+  QueryBuilder<CustomerPlu, CustomerPlu, QDistinct> distinctByUom(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'skuNo', caseSensitive: caseSensitive);
+      return query.addDistinctBy(r'uom', caseSensitive: caseSensitive);
     });
   }
 }
@@ -999,21 +1264,21 @@ extension CustomerPluQueryProperty
     });
   }
 
-  QueryBuilder<CustomerPlu, DateTime?, QQueryOperations> lastUpdatedProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'lastUpdated');
-    });
-  }
-
   QueryBuilder<CustomerPlu, String, QQueryOperations> pluNoProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'pluNo');
     });
   }
 
-  QueryBuilder<CustomerPlu, String, QQueryOperations> skuNoProperty() {
+  QueryBuilder<CustomerPlu, int, QQueryOperations> skuNoProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'skuNo');
+    });
+  }
+
+  QueryBuilder<CustomerPlu, String?, QQueryOperations> uomProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'uom');
     });
   }
 }

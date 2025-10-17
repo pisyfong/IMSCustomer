@@ -5,30 +5,40 @@ part 'customer_plu.g.dart';
 @collection
 class CustomerPlu {
   Id id = Isar.autoIncrement;
-  
+
+  @Index(composite: [CompositeIndex('customerCode'), CompositeIndex('skuNo')])
   late int companyCode;
+
   late String customerCode;
-  late String skuNo;
+
+  late int skuNo;
+
   late String pluNo;
-  
-  DateTime? lastUpdated;
-  
+
+  String? uom;
+
   CustomerPlu();
-  
-  factory CustomerPlu.fromJson(Map<String, dynamic> json, int companyCode, String customerCode) {
+
+  factory CustomerPlu.fromMap(Map<String, dynamic> map) {
     return CustomerPlu()
-      ..companyCode = companyCode
-      ..customerCode = customerCode
-      ..skuNo = json['Sku_No']?.toString() ?? json['skuNo']?.toString() ?? ''
-      ..pluNo = json['Plu_No']?.toString() ?? json['pluNo']?.toString() ?? ''
-      ..lastUpdated = DateTime.now();
+      ..companyCode = map['Company_Code'] is int
+          ? map['Company_Code'] as int
+          : int.tryParse(map['Company_Code']?.toString() ?? '') ?? 0
+      ..customerCode = map['Customer']?.toString() ?? map['Customer_Code']?.toString() ?? ''
+      ..skuNo = map['Sku_No'] is int
+          ? map['Sku_No'] as int
+          : int.tryParse(map['Sku_No']?.toString() ?? '') ?? 0
+      ..pluNo = map['Plu_No']?.toString() ?? ''
+      ..uom = map['Uom']?.toString();
   }
-  
-  Map<String, dynamic> toJson() => {
-    'companyCode': companyCode,
-    'customerCode': customerCode,
-    'skuNo': skuNo,
-    'pluNo': pluNo,
-    'lastUpdated': lastUpdated?.toIso8601String(),
-  };
+
+  Map<String, dynamic> toMap() {
+    return {
+      'Company_Code': companyCode,
+      'Customer_Code': customerCode,
+      'Sku_No': skuNo,
+      'Plu_No': pluNo,
+      'Uom': uom,
+    };
+  }
 }
