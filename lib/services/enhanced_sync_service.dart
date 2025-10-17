@@ -31,7 +31,6 @@ import 'invoice_service.dart';
 import 'offline_first_service.dart';
 import '../models/credit_term.dart';
 import '../models/invoice.dart';
-import '../models/customer_plu.dart';
 
 /// Enhanced sync service that combines your existing sync with SignalR real-time updates
 class EnhancedSyncService {
@@ -557,6 +556,89 @@ class EnhancedSyncService {
     );
   }
 
+  /// Preload customer-specific PLU mappings for frequently used SKUs
+  Future<void> _preloadCustomerPlus() async {
+    try {
+      print('🏷️ PRELOAD: Loading customer PLU mappings...');
+
+      // Skip if offline to avoid repeated timeouts
+      if (!OfflineFirstService.isLikelyOnline()) {
+        print('🏷️ PRELOAD: Skipping customer PLU sync (offline)');
+        return;
+      }
+
+      // Strategy: For each company, for each customer present in local DB,
+      // take recent quote items to collect a set of SKU numbers to sync PLU for.
+      final companies = await _isar.companys.where().findAll();
+      int totalMappings = 0;
+
+      for (final company in companies) {
+        final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+        if (companyCode <= 0) continue;
+
+        // Collect recent SKUs from recent quotes (limit to reduce server load)
+        final recentQuotes = await _isar.quotes
+            .where()
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .limit(50)
+            .findAll();
+
+        // Skip if no quotes for this company
+        if (recentQuotes.isEmpty) {
+          print('🏷️ PRELOAD: No quotes for company $companyCode, skipping customer PLU');
+          continue;
+        }
+
+        // Use the first 50 quotes (already limited by query)
+        final limitedQuotes = recentQuotes;
+
+        // Get customers for this company
+        final customers = await _isar.customers
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .findAll();
+
+        // Build a map of customerCode -> Set<int> skuNos
+        final Map<String, Set<int>> customerSkuMap = {};
+
+        for (final q in limitedQuotes) {
+          if (q.quotePreLabel == null) continue;
+          final items = await _isar.quoteItems
+              .filter()
+              .companyCodeEqualTo(companyCode)
+              .and()
+              .quotePreLabelEqualTo(q.quotePreLabel!)
+              .findAll();
+          final skus = items.map((i) => i.skuNo).where((s) => s > 0);
+          final cust = q.customer ?? '';
+          if (cust.isEmpty) continue;
+          customerSkuMap.putIfAbsent(cust, () => <int>{}).addAll(skus);
+        }
+
+        // For any customer without recent quotes, skip to avoid heavy loads
+        for (final c in customers) {
+          final custCode = c.code;
+          final skuSet = customerSkuMap[custCode];
+          if (skuSet == null || skuSet.isEmpty) continue;
+          // Batch request per customer
+          final skuList = skuSet.take(200).toList();
+          await _pluService.syncCustomerPlusForCustomer(
+            companyCode: companyCode,
+            customerCode: custCode,
+            skuNos: skuList,
+          );
+          totalMappings += skuList.length;
+          print('🏷️ PRELOAD: Synced customer PLU for $custCode (${skuList.length} SKUs)');
+        }
+      }
+
+      print('✅ PRELOAD: Customer PLU preload completed. Estimated mappings touched: $totalMappings');
+    } catch (e) {
+      print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
+    }
+  }
+
   /// Full data preload at app startup
   Future<void> preloadAllDataAtStartup() async {
     if (_isFullDataPreloaded) {
@@ -603,9 +685,21 @@ class EnhancedSyncService {
       await _preloadAllPlus();
       await _preloadAllQuotes();
       await _preloadAllQuoteItems();
+      
+      // Customer PLU preload with timeout to prevent hangs
+      try {
+        await _preloadCustomerPlus().timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            print('⏱️ PRELOAD: Customer PLU preload timed out after 30s, continuing...');
+          },
+        );
+      } catch (e) {
+        print('❌ PRELOAD: Customer PLU preload failed: $e');
+      }
+      
       await _preloadAllInvoices();
       await _preloadGroupAndDepartmentLookups();
-      await _preloadCustomerPlu();
       
       _isFullDataPreloaded = true;
       print('✅ FULL PRELOAD: Successfully completed full data preload');
@@ -1179,106 +1273,6 @@ class EnhancedSyncService {
       
     } catch (e) {
       print('❌ PRELOAD LOOKUPS ERROR: $e');
-    }
-  }
-  
-  /// Preload customer PLU for all customers
-  Future<void> _preloadCustomerPlu() async {
-    try {
-      print('🏷️ PRELOAD: Loading customer PLU...');
-      
-      // Quick offline check - skip if we know we're offline
-      if (!OfflineFirstService.isLikelyOnline()) {
-        print('🏷️ PRELOAD: Skipping customer PLU sync (offline)');
-        return;
-      }
-      
-      // Get all customers
-      final customers = await _isar.customers.where().findAll();
-      int totalPluRecords = 0;
-      
-      for (final customer in customers) {
-        try {
-          if (customer.code.isEmpty || customer.companyCode == null) continue;
-          
-          print('🏷️ PRELOAD: Loading PLU for customer ${customer.code}...');
-          
-          // Get all inventory items for this company
-          final inventoryItems = await _isar.inventoryItems
-              .filter()
-              .companyCodeEqualTo(customer.companyCode!)
-              .findAll();
-          
-          if (inventoryItems.isEmpty) {
-            print('🏷️ PRELOAD: No inventory items for company ${customer.companyCode}, skipping');
-            continue;
-          }
-          
-          // Get SKU numbers
-          final skuNos = inventoryItems.map((item) => item.skuNo).toList();
-          
-          // Fetch customer PLU from server
-          try {
-            final customerPluData = await _signalRService.invoke('getCustomerPlu', [
-              customer.companyCode,
-              customer.code,
-              skuNos,
-            ]).timeout(
-              const Duration(seconds: 5),
-              onTimeout: () {
-                print('⏱️ Customer PLU fetch timed out for ${customer.code}');
-                return [];
-              },
-            ) as List<dynamic>;
-            
-            if (customerPluData.isNotEmpty) {
-              // Save to local database
-              await _isar.writeTxn(() async {
-                // Clear old PLU for this customer
-                await _isar.customerPlus
-                    .filter()
-                    .companyCodeEqualTo(customer.companyCode!)
-                    .customerCodeEqualTo(customer.code)
-                    .deleteAll();
-                
-                // Save new PLU
-                final pluRecords = <CustomerPlu>[];
-                for (final pluData in customerPluData) {
-                  if (pluData is Map<String, dynamic>) {
-                    try {
-                      final plu = CustomerPlu.fromJson(
-                        pluData,
-                        customer.companyCode!,
-                        customer.code,
-                      );
-                      if (plu.skuNo.isNotEmpty && plu.pluNo.isNotEmpty) {
-                        pluRecords.add(plu);
-                      }
-                    } catch (e) {
-                      print('❌ Error parsing customer PLU: $e');
-                    }
-                  }
-                }
-                
-                await _isar.customerPlus.putAll(pluRecords);
-                totalPluRecords += pluRecords.length;
-                print('💾 PRELOAD: Saved ${pluRecords.length} PLU records for customer ${customer.code}');
-              });
-            }
-          } catch (e) {
-            print('❌ PRELOAD: Error fetching PLU for customer ${customer.code}: $e');
-            break; // Stop trying other customers if one fails
-          }
-          
-        } catch (e) {
-          print('❌ PRELOAD: Error processing customer ${customer.code}: $e');
-        }
-      }
-      
-      print('✅ PRELOAD: Total customer PLU records loaded: $totalPluRecords');
-      
-    } catch (e) {
-      print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
     }
   }
 }
