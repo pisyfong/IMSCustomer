@@ -29,6 +29,7 @@ import 'quotation_service.dart';
 import 'credit_term_service.dart';
 import 'invoice_service.dart';
 import 'offline_first_service.dart';
+import 'inventory_image_service.dart';
 import '../models/credit_term.dart';
 import '../models/invoice.dart';
 
@@ -698,8 +699,24 @@ class EnhancedSyncService {
         print('❌ PRELOAD: Customer PLU preload failed: $e');
       }
       
-      await _preloadAllInvoices();
+      // Disabled automatic invoice preloading for faster startup
+      // Invoices will be loaded on-demand when user views Previous Orders
+      // Manual sync still available in Settings page
+      // await _preloadAllInvoices();
+      
       await _preloadGroupAndDepartmentLookups();
+      
+      // Preload inventory images with timeout (5 minutes for all images)
+      try {
+        await _preloadInventoryImages().timeout(
+          const Duration(minutes: 5),
+          onTimeout: () {
+            print('⏱️ PRELOAD: Image preload timed out after 5 minutes, continuing...');
+          },
+        );
+      } catch (e) {
+        print('❌ PRELOAD: Image preload failed: $e');
+      }
       
       _isFullDataPreloaded = true;
       print('✅ FULL PRELOAD: Successfully completed full data preload');
@@ -1196,8 +1213,8 @@ class EnhancedSyncService {
     }
   }
   
-  /// Preload all invoices for all customers
-  Future<void> _preloadAllInvoices() async {
+  /// Preload all invoices for all customers (public for manual sync)
+  Future<void> preloadAllInvoices() async {
     try {
       print('🧾 PRELOAD: Loading all invoices...');
       
@@ -1232,6 +1249,106 @@ class EnhancedSyncService {
       
     } catch (e) {
       print('❌ PRELOAD INVOICES ERROR: $e');
+    }
+  }
+  
+  /// Preload inventory images for all inventory items
+  Future<void> _preloadInventoryImages() async {
+    try {
+      print('🖼️ PRELOAD: Starting inventory image preload for ALL items...');
+      
+      // Initialize image service
+      final imageService = InventoryImageService();
+      await imageService.initialize();
+      
+      // Get all companies
+      final companies = await _isar.companys.where().findAll();
+      int totalImagesQueued = 0;
+      int totalItemsProcessed = 0;
+      
+      for (final company in companies) {
+        try {
+          final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+          if (companyCode <= 0) continue;
+          
+          // Check if this company has image configuration
+          if (!imageService.hasImageConfig(companyCode)) {
+            print('🖼️ PRELOAD: No image config for company $companyCode, skipping');
+            continue;
+          }
+          
+          print('🖼️ PRELOAD: Preloading images for company $companyCode...');
+          
+          // Get ALL inventory items for this company
+          final inventoryItems = await _isar.inventoryItems
+              .filter()
+              .companyCodeEqualTo(companyCode)
+              .findAll();
+          
+          print('🖼️ PRELOAD: Found ${inventoryItems.length} inventory items for company $companyCode');
+          
+          if (inventoryItems.isEmpty) continue;
+          
+          // Queue image downloads in batches
+          final List<Future> downloadTasks = [];
+          int processedForCompany = 0;
+          
+          for (final item in inventoryItems) {
+            final imageUrl = imageService.getImageUrl(companyCode, item.skuNo, item.uom);
+            if (imageUrl != null) {
+              // Check if already cached
+              final isCached = await imageService.isImageCached(imageUrl, companyCode, item.skuNo);
+              if (!isCached) {
+                // Queue download (non-blocking)
+                downloadTasks.add(
+                  imageService.downloadAndCacheImage(imageUrl, companyCode, item.skuNo, item.uom)
+                    .timeout(const Duration(seconds: 5), onTimeout: () => null)
+                );
+                totalImagesQueued++;
+                
+                // Process in batches of 20 to optimize network usage
+                if (downloadTasks.length >= 20) {
+                  await Future.wait(downloadTasks);
+                  downloadTasks.clear();
+                  processedForCompany += 20;
+                  totalItemsProcessed += 20;
+                  
+                  // Progress report every 100 items
+                  if (processedForCompany % 100 == 0) {
+                    print('🖼️ PRELOAD: Company $companyCode - Processed $processedForCompany/${inventoryItems.length} items');
+                  }
+                }
+              }
+            }
+          }
+          
+          // Process remaining downloads
+          if (downloadTasks.isNotEmpty) {
+            await Future.wait(downloadTasks);
+            processedForCompany += downloadTasks.length;
+            totalItemsProcessed += downloadTasks.length;
+            print('🖼️ PRELOAD: Company $companyCode - Final batch of ${downloadTasks.length} images processed');
+          }
+          
+          print('✅ PRELOAD: Company $companyCode completed - Processed ${inventoryItems.length} items');
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error preloading images for company ${company.companyCode}: $e');
+        }
+      }
+      
+      // Get cache stats
+      final stats = await imageService.getCacheStats();
+      print('✅ PRELOAD: Image preload completed for ALL inventory items');
+      print('📊 Image cache stats:');
+      print('   - Total items processed: $totalItemsProcessed');
+      print('   - Total cached images: ${stats['totalCachedImages']}');
+      print('   - Cache size: ${stats['totalSizeFormatted']}');
+      print('   - New downloads: $totalImagesQueued images');
+      print('   - Companies processed: ${companies.length}');
+      
+    } catch (e) {
+      print('❌ PRELOAD IMAGES ERROR: $e');
     }
   }
   

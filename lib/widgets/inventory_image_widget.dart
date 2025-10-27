@@ -57,6 +57,9 @@ class _InventoryImageWidgetState extends State<InventoryImageWidget> {
     });
 
     try {
+      // Initialize image service
+      await _imageService.initialize();
+      
       // Check if company has image configuration
       if (!_imageService.hasImageConfig(widget.companyCode)) {
         print('🖼️ No image configuration for Company ${widget.companyCode}');
@@ -81,19 +84,29 @@ class _InventoryImageWidgetState extends State<InventoryImageWidget> {
       }
 
       // Check if image is cached
+      print('🔍 Checking cache for: Company ${widget.companyCode}, SKU ${widget.skuNo}, UOM ${widget.uom}');
+      print('🔍 Image URL: $imageUrl');
+      
       final cachedPath = await _imageService.getCachedImagePath(imageUrl, widget.companyCode, widget.skuNo);
       
       if (cachedPath != null) {
         // Image is cached, use local file
+        print('✅ Found cached image at: $cachedPath');
+        final file = File(cachedPath);
+        final exists = await file.exists();
+        print('📁 File exists: $exists');
+        
         setState(() {
           _cachedImagePath = cachedPath;
           _isLoading = false;
         });
       } else {
         // Image not cached, try to download it
+        print('⬇️ Image not cached, attempting download...');
         final downloadedPath = await _imageService.downloadAndCacheImage(imageUrl, widget.companyCode, widget.skuNo, widget.uom);
         
         if (downloadedPath != null) {
+          print('✅ Downloaded and cached image at: $downloadedPath');
           setState(() {
             _cachedImagePath = downloadedPath;
             _isLoading = false;

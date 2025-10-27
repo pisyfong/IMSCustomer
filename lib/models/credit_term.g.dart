@@ -62,33 +62,38 @@ const CreditTermSchema = CollectionSchema(
       name: r'displayTerm',
       type: IsarType.string,
     ),
-    r'ordering': PropertySchema(
+    r'hashCode': PropertySchema(
       id: 9,
+      name: r'hashCode',
+      type: IsarType.long,
+    ),
+    r'ordering': PropertySchema(
+      id: 10,
       name: r'ordering',
       type: IsarType.long,
     ),
     r'ordering2': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'ordering2',
       type: IsarType.long,
     ),
     r'purchaseLedgerAccount': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'purchaseLedgerAccount',
       type: IsarType.string,
     ),
     r'salesLedgerAccount': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'salesLedgerAccount',
       type: IsarType.string,
     ),
     r'term': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'term',
       type: IsarType.string,
     ),
     r'type': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'type',
       type: IsarType.string,
     )
@@ -193,12 +198,13 @@ void _creditTermSerialize(
   writer.writeString(offsets[6], object.displayDescription);
   writer.writeString(offsets[7], object.displayFull);
   writer.writeString(offsets[8], object.displayTerm);
-  writer.writeLong(offsets[9], object.ordering);
-  writer.writeLong(offsets[10], object.ordering2);
-  writer.writeString(offsets[11], object.purchaseLedgerAccount);
-  writer.writeString(offsets[12], object.salesLedgerAccount);
-  writer.writeString(offsets[13], object.term);
-  writer.writeString(offsets[14], object.type);
+  writer.writeLong(offsets[9], object.hashCode);
+  writer.writeLong(offsets[10], object.ordering);
+  writer.writeLong(offsets[11], object.ordering2);
+  writer.writeString(offsets[12], object.purchaseLedgerAccount);
+  writer.writeString(offsets[13], object.salesLedgerAccount);
+  writer.writeString(offsets[14], object.term);
+  writer.writeString(offsets[15], object.type);
 }
 
 CreditTerm _creditTermDeserialize(
@@ -214,12 +220,12 @@ CreditTerm _creditTermDeserialize(
   object.description = reader.readStringOrNull(offsets[3]);
   object.description2 = reader.readStringOrNull(offsets[4]);
   object.id = id;
-  object.ordering = reader.readLongOrNull(offsets[9]);
-  object.ordering2 = reader.readLongOrNull(offsets[10]);
-  object.purchaseLedgerAccount = reader.readStringOrNull(offsets[11]);
-  object.salesLedgerAccount = reader.readStringOrNull(offsets[12]);
-  object.term = reader.readString(offsets[13]);
-  object.type = reader.readStringOrNull(offsets[14]);
+  object.ordering = reader.readLongOrNull(offsets[10]);
+  object.ordering2 = reader.readLongOrNull(offsets[11]);
+  object.purchaseLedgerAccount = reader.readStringOrNull(offsets[12]);
+  object.salesLedgerAccount = reader.readStringOrNull(offsets[13]);
+  object.term = reader.readString(offsets[14]);
+  object.type = reader.readStringOrNull(offsets[15]);
   return object;
 }
 
@@ -249,16 +255,18 @@ P _creditTermDeserializeProp<P>(
     case 8:
       return (reader.readString(offset)) as P;
     case 9:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 10:
       return (reader.readLongOrNull(offset)) as P;
     case 11:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 12:
       return (reader.readStringOrNull(offset)) as P;
     case 13:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1550,6 +1558,60 @@ extension CreditTermQueryFilter
     });
   }
 
+  QueryBuilder<CreditTerm, CreditTerm, QAfterFilterCondition> hashCodeEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'hashCode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditTerm, CreditTerm, QAfterFilterCondition>
+      hashCodeGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'hashCode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditTerm, CreditTerm, QAfterFilterCondition> hashCodeLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'hashCode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditTerm, CreditTerm, QAfterFilterCondition> hashCodeBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'hashCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<CreditTerm, CreditTerm, QAfterFilterCondition> idEqualTo(
       Id value) {
     return QueryBuilder.apply(this, (query) {
@@ -2450,6 +2512,18 @@ extension CreditTermQuerySortBy
     });
   }
 
+  QueryBuilder<CreditTerm, CreditTerm, QAfterSortBy> sortByHashCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hashCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditTerm, CreditTerm, QAfterSortBy> sortByHashCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hashCode', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditTerm, CreditTerm, QAfterSortBy> sortByOrdering() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'ordering', Sort.asc);
@@ -2639,6 +2713,18 @@ extension CreditTermQuerySortThenBy
     });
   }
 
+  QueryBuilder<CreditTerm, CreditTerm, QAfterSortBy> thenByHashCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hashCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditTerm, CreditTerm, QAfterSortBy> thenByHashCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hashCode', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditTerm, CreditTerm, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -2791,6 +2877,12 @@ extension CreditTermQueryWhereDistinct
     });
   }
 
+  QueryBuilder<CreditTerm, CreditTerm, QDistinct> distinctByHashCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'hashCode');
+    });
+  }
+
   QueryBuilder<CreditTerm, CreditTerm, QDistinct> distinctByOrdering() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'ordering');
@@ -2894,6 +2986,12 @@ extension CreditTermQueryProperty
   QueryBuilder<CreditTerm, String, QQueryOperations> displayTermProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'displayTerm');
+    });
+  }
+
+  QueryBuilder<CreditTerm, int, QQueryOperations> hashCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'hashCode');
     });
   }
 

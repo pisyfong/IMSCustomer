@@ -1021,45 +1021,214 @@ class _PreviousOrderPageState extends State<PreviousOrderPage> with SingleTicker
   }
 
   void _showInvoiceDetails(Invoice invoice) {
-    final formattedDate = invoice.invoiceDate != null
-        ? '${invoice.invoiceDate!.day}/${invoice.invoiceDate!.month}/${invoice.invoiceDate!.year}'
-        : 'No Date';
-    final formattedAmount = 'RM ${(invoice.netAmount ?? 0).toStringAsFixed(2)}';
-    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Invoice: ${invoice.invoicePreLabel}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDetailRow('Date', formattedDate),
-              _buildDetailRow('Customer', invoice.customer ?? 'N/A'),
-              _buildDetailRow('Status', invoice.status ?? 'N/A'),
-              _buildDetailRow('Net Amount', formattedAmount),
-              if (invoice.grossAmount != null)
-                _buildDetailRow('Gross Amount', 'RM ${invoice.grossAmount!.toStringAsFixed(2)}'),
-              if (invoice.currency?.isNotEmpty == true)
-                _buildDetailRow('Currency', invoice.currency!),
-              if (invoice.ref1?.isNotEmpty == true)
-                _buildDetailRow('Reference 1', invoice.ref1!),
-              if (invoice.remark1?.isNotEmpty == true)
-                _buildDetailRow('Remarks', invoice.remark1!),
-            ],
+      builder: (context) => _InvoiceDetailsDialog(
+        invoice: invoice,
+        invoiceService: _invoiceService,
+      ),
+    );
+  }
+}
+
+/// Stateful dialog widget for invoice details with lazy-loaded items
+class _InvoiceDetailsDialog extends StatefulWidget {
+  final Invoice invoice;
+  final InvoiceService invoiceService;
+
+  const _InvoiceDetailsDialog({
+    required this.invoice,
+    required this.invoiceService,
+  });
+
+  @override
+  State<_InvoiceDetailsDialog> createState() => _InvoiceDetailsDialogState();
+}
+
+class _InvoiceDetailsDialogState extends State<_InvoiceDetailsDialog> {
+  List<InvoiceItem>? _items;
+  bool _isLoadingItems = false;
+  String? _itemsError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load items immediately when dialog opens
+    _loadInvoiceItems();
+  }
+
+  Future<void> _loadInvoiceItems() async {
+    setState(() {
+      _isLoadingItems = true;
+      _itemsError = null;
+    });
+
+    try {
+      final companyCodeRaw = widget.invoice.companyCode;
+      int? companyCode;
+      
+      if (companyCodeRaw is String) {
+        companyCode = int.tryParse(companyCodeRaw as String);
+      } else if (companyCodeRaw is int) {
+        companyCode = companyCodeRaw as int;
+      }
+
+      if (companyCode == null) {
+        throw Exception('Invalid company code');
+      }
+
+      final items = await widget.invoiceService.getInvoiceItems(
+        companyCode: companyCode,
+        invoicePreLabel: widget.invoice.invoicePreLabel,
+      );
+
+      setState(() {
+        _items = items;
+        _isLoadingItems = false;
+      });
+    } catch (e) {
+      print('❌ Error loading invoice items: $e');
+      setState(() {
+        _itemsError = e.toString();
+        _isLoadingItems = false;
+      });
+    }
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+          Expanded(
+            child: Text(value),
           ),
         ],
       ),
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    final formattedDate = widget.invoice.invoiceDate != null
+        ? '${widget.invoice.invoiceDate!.day}/${widget.invoice.invoiceDate!.month}/${widget.invoice.invoiceDate!.year}'
+        : 'No Date';
+    final formattedAmount = 'RM ${(widget.invoice.netAmount ?? 0).toStringAsFixed(2)}';
+
+    return AlertDialog(
+      title: Text('Invoice: ${widget.invoice.invoicePreLabel}'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Information
+              _buildDetailRow('Date', formattedDate),
+              _buildDetailRow('Customer', widget.invoice.customer ?? 'N/A'),
+              _buildDetailRow('Status', widget.invoice.status ?? 'N/A'),
+              _buildDetailRow('Net Amount', formattedAmount),
+              if (widget.invoice.grossAmount != null)
+                _buildDetailRow('Gross Amount', 'RM ${widget.invoice.grossAmount!.toStringAsFixed(2)}'),
+              if (widget.invoice.currency?.isNotEmpty == true)
+                _buildDetailRow('Currency', widget.invoice.currency!),
+              if (widget.invoice.ref1?.isNotEmpty == true)
+                _buildDetailRow('Reference 1', widget.invoice.ref1!),
+              if (widget.invoice.remark1?.isNotEmpty == true)
+                _buildDetailRow('Remarks', widget.invoice.remark1!),
+              
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              
+              // Items Section
+              const Text(
+                'Invoice Items',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              if (_isLoadingItems)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_itemsError != null)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Error loading items: $_itemsError',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                )
+              else if (_items == null || _items!.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('No items found'),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _items!.length,
+                  itemBuilder: (context, index) {
+                    final item = _items![index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        dense: true,
+                        title: Text(
+                          'SKU: ${item.skuNo} (${item.uom})',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Qty: ${item.quantity?.toStringAsFixed(2) ?? '0'} | '
+                          'Price: RM ${item.unitPrice?.toStringAsFixed(2) ?? '0'}',
+                        ),
+                        trailing: Text(
+                          'RM ${item.netAmount?.toStringAsFixed(2) ?? '0'}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+// Extension to add methods to _PreviousOrderPageState
+extension _PreviousOrderPageStateMethods on _PreviousOrderPageState {
   void _navigateToQuoteItems(Quote quote) {
     Navigator.push(
       context,

@@ -17,7 +17,10 @@ import '../services/signalr_service.dart';
 import '../services/quote_number_service.dart';
 import '../services/quotation_service.dart';
 import '../services/credit_term_service.dart';
+import '../services/offline_first_service.dart';
+import '../services/plu_service.dart';
 import '../models/credit_term.dart';
+import '../main.dart'; // For isar instance
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -153,69 +156,43 @@ class _CheckoutPageState extends State<CheckoutPage> {
     });
   }
 
-  Future<List<CartItem>> _fetchCustomerPluForItems() async {
+  Future<List<CartItem>> _fetchCustomerPlu() async {
     try {
-      final selectedCompany = await _authService.getSelectedCompany();
-      final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
-      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
-      final customerCode = _selectedCustomer!['code'];
-      
-      // Get SKU numbers from cart items
-      final skuNos = widget.cartItems.map((item) => item.skuNo).toList();
-      
-      // Fetch customer PLU from server (with offline fallback)
-      final signalRService = SignalRService();
-      
-      // Check if online before attempting server call
-      if (!signalRService.isConnected) {
-        print('📱 Offline mode: Skipping customer PLU fetch');
-        // Return items with empty PLU when offline
-        return widget.cartItems.map((item) {
-          final updatedItem = CartItem()
-            ..id = item.id
-            ..companyCode = item.companyCode
-            ..skuNo = item.skuNo
-            ..pluNo = '' // Empty string when offline
-            ..description = item.description
-            ..uom = item.uom
-            ..unitPrice = item.unitPrice
-            ..gstPrice = item.gstPrice
-            ..factor = item.factor
-            ..quantity = item.quantity
-            ..remarks = item.remarks
-            ..addedDate = item.addedDate;
-          return updatedItem;
-        }).toList();
+      // Skip if not using customer PLU
+      if (!_useCustomerPlu || _selectedCustomer == null) {
+        return widget.cartItems;
       }
       
-      final customerPluData = await signalRService.invoke('getCustomerPlu', [
-        companyCode,
-        customerCode,
-        skuNos,
-      ]).timeout(
-        const Duration(seconds: 2),
-        onTimeout: () {
-          print('⏱️ Customer PLU fetch timed out - continuing without PLU');
-          return [];
-        },
-      ) as List<dynamic>;
+      final companyCode = widget.cartItems.first.companyCode;
+      final customerCode = _selectedCustomer!['code'] as String;
+      final skuNos = widget.cartItems.map((item) => item.skuNo).toList();
+      final pluService = PluService(isar);
       
-      print('📦 Fetched ${customerPluData.length} customer PLU records');
+      print('🔍 CHECKOUT: Fetching customer PLU (offline-first)...');
       
-      // Create new list with updated PLU
-      return widget.cartItems.map((item) {
-        // Find matching customer PLU
-        final customerPlu = customerPluData.firstWhere(
-          (plu) => plu['Sku_No'] == item.skuNo,
-          orElse: () => null,
+      // OFFLINE-FIRST: Check local cache first
+      final List<CartItem> updatedItems = [];
+      int cachedCount = 0;
+      
+      for (final item in widget.cartItems) {
+        // Try to get from local cache first
+        final cachedPlu = await pluService.getCachedCustomerPlu(
+          companyCode: companyCode,
+          customerCode: customerCode,
+          skuNo: item.skuNo,
         );
         
-        // Create a copy of the item with updated PLU
+        if (cachedPlu != null) {
+          cachedCount++;
+          print('📱 Found cached PLU for SKU ${item.skuNo}: ${cachedPlu.pluNo}');
+        }
+        
+        // Create updated item with PLU (from cache or empty)
         final updatedItem = CartItem()
           ..id = item.id
           ..companyCode = item.companyCode
           ..skuNo = item.skuNo
-          ..pluNo = customerPlu != null ? customerPlu['Plu_No'] : '' // Empty string if not found
+          ..pluNo = cachedPlu?.pluNo ?? '' // Use cached PLU or empty string
           ..description = item.description
           ..uom = item.uom
           ..unitPrice = item.unitPrice
@@ -225,8 +202,66 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ..remarks = item.remarks
           ..addedDate = item.addedDate;
         
-        return updatedItem;
-      }).toList();
+        updatedItems.add(updatedItem);
+      }
+      
+      print('📱 CHECKOUT: Found $cachedCount/${skuNos.length} PLUs in local cache');
+      
+      // If we have all PLUs cached, return immediately (offline-first)
+      if (cachedCount == skuNos.length) {
+        print('✅ CHECKOUT: All PLUs found in cache, skipping server sync');
+        return updatedItems;
+      }
+      
+      // Try to sync missing PLUs from server if online (background, non-blocking)
+      if (await OfflineFirstService.isServerReachable(timeout: Duration(milliseconds: 500))) {
+        print('🌐 CHECKOUT: Syncing missing customer PLUs from server...');
+        
+        // Get only the SKUs that are missing from cache
+        final missingSkus = <int>[];
+        for (int i = 0; i < widget.cartItems.length; i++) {
+          if (updatedItems[i].pluNo == null || updatedItems[i].pluNo!.isEmpty) {
+            missingSkus.add(widget.cartItems[i].skuNo);
+          }
+        }
+        
+        if (missingSkus.isNotEmpty) {
+          try {
+            // Sync missing PLUs to local cache
+            await pluService.syncCustomerPlusForCustomer(
+              companyCode: companyCode,
+              customerCode: customerCode,
+              skuNos: missingSkus,
+            ).timeout(
+              const Duration(seconds: 2),
+              onTimeout: () {
+                print('⏱️ Customer PLU sync timed out - using cached data');
+              },
+            );
+            
+            // Re-fetch from cache after sync
+            for (int i = 0; i < updatedItems.length; i++) {
+              if (updatedItems[i].pluNo == null || updatedItems[i].pluNo!.isEmpty) {
+                final freshPlu = await pluService.getCachedCustomerPlu(
+                  companyCode: companyCode,
+                  customerCode: customerCode,
+                  skuNo: widget.cartItems[i].skuNo,
+                );
+                if (freshPlu != null) {
+                  updatedItems[i].pluNo = freshPlu.pluNo;
+                  print('✅ Updated PLU for SKU ${widget.cartItems[i].skuNo}: ${freshPlu.pluNo}');
+                }
+              }
+            }
+          } catch (e) {
+            print('⚠️ Customer PLU sync failed: $e - using cached data');
+          }
+        }
+      } else {
+        print('📱 CHECKOUT: Offline mode - using cached PLU data only');
+      }
+      
+      return updatedItems;
     } catch (e) {
       print('❌ Error fetching customer PLU: $e');
       // Return items with empty PLU on error
@@ -264,7 +299,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       // Fetch customer PLU if toggle is ON
       List<CartItem> cartItemsWithPlu = widget.cartItems;
       if (_useCustomerPlu && _selectedCustomer != null) {
-        cartItemsWithPlu = await _fetchCustomerPluForItems();
+        cartItemsWithPlu = await _fetchCustomerPlu();
       }
       
       // Generate quote number

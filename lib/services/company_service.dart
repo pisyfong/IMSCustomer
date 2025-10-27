@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'signalr_service.dart';
 
 class CompanyService {
@@ -15,8 +16,18 @@ class CompanyService {
       // Get SignalR service instance
       final signalRService = SignalRService();
       
-      // Ensure connection
-      await signalRService.connect();
+      // Ensure connection (with timeout)
+      try {
+        await signalRService.connect().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            throw TimeoutException('Connection timeout');
+          },
+        );
+      } catch (e) {
+        print('⚠️ Company service: SignalR connection failed - $e');
+        throw Exception('Unable to connect to server');
+      }
       
       // Call getCompany via SignalR
       final result = await signalRService.getCompany(userId);

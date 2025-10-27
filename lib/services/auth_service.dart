@@ -54,11 +54,16 @@ class AuthService {
         // Save login to Isar database (always update current login)
         await _saveCurrentLogin(userData);
         
-        // Establish SignalR connection if we're online
+        // Establish SignalR connection if we're online (with timeout)
         if (!isOfflineLogin) {
           try {
             print('Establishing SignalR connection for online login...');
-            await signalRService.connect();
+            await signalRService.connect().timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                print('⏱️ SignalR connection timed out after 3s - continuing without connection');
+              },
+            );
             print('✅ SignalR connection established');
           } catch (signalRError) {
             print('⚠️ SignalR connection failed after login: $signalRError');
@@ -139,10 +144,15 @@ class AuthService {
         print('\n=== Loading Saved Login ===');
         print('Found saved login for: ${savedLogin.username}');
         
-        // CRITICAL: Establish SignalR connection when loading saved login
+        // Establish SignalR connection when loading saved login (with timeout)
         print('Establishing SignalR connection for saved login...');
         try {
-          await signalRService.connect();
+          await signalRService.connect().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              print('⏱️ SignalR connection timed out after 3s - continuing in offline mode');
+            },
+          );
           print('✅ SignalR connection established for saved login');
         } catch (e) {
           print('⚠️ SignalR connection failed during saved login: $e');

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:isar/isar.dart';
 import '../models/quotation.dart';
@@ -344,22 +345,33 @@ class QuotationService {
       final apiUrl = '${AppConfig.apiBaseUrl}/api/quotation-items';
       print('📤 Sending ${itemsToSend.length} items to: $apiUrl');
       
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'items': itemsToSend}),
-      );
+      try {
+        final response = await http.post(
+          Uri.parse(apiUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'items': itemsToSend}),
+        ).timeout(
+          const Duration(seconds: 4),
+          onTimeout: () {
+            print('⏱️ QUOTATION ITEMS: Request timed out after 4 seconds (likely offline)');
+            throw TimeoutException('Server request timed out');
+          },
+        );
 
-      if (response.statusCode == 200) {
-        print('✅ QUOTATION ITEMS: Successfully saved ${items.length} items');
-        return true;
-      } else {
-        print('❌ QUOTATION ITEMS: Server returned ${response.statusCode}: ${response.body}');
-        return false;
+        if (response.statusCode == 200) {
+          print('✅ QUOTATION ITEMS: Successfully saved ${items.length} items');
+          return true;
+        } else {
+          print('❌ QUOTATION ITEMS: Server returned ${response.statusCode}: ${response.body}');
+          return false;
+        }
+      } on TimeoutException {
+        print('📱 QUOTATION ITEMS: Offline mode - items will sync when online');
+        return false; // Return false but don't throw - allow PDF generation to continue
       }
     } catch (e) {
       print('❌ QUOTATION ITEMS: Error saving items: $e');
-      return false;
+      return false; // Return false but don't throw - allow PDF generation to continue
     }
   }
 }

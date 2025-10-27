@@ -1,6 +1,7 @@
 import 'package:isar/isar.dart';
 import 'dart:math' as math;
 import '../models/plu.dart';
+import '../models/customer_plu.dart';
 import 'auth_service.dart';
 import 'signalr_service.dart';
 
@@ -161,6 +162,76 @@ class PluService {
     } catch (e) {
       print('❌ PLU SERVICE: Error syncing PLUs: $e');
       rethrow;
+    }
+  }
+
+  /// Fetch and cache customer-specific PLU mappings for a set of SKUs
+  Future<void> syncCustomerPlusForCustomer({
+    required int companyCode,
+    required String customerCode,
+    required List<int> skuNos,
+  }) async {
+    try {
+      if (skuNos.isEmpty) return;
+      final response = await _signalRService.invoke('getCustomerPlu', [
+        companyCode,
+        customerCode,
+        skuNos,
+      ]);
+
+      if (response is! List) return;
+
+      final records = response
+          .cast<Map<String, dynamic>>()
+          .map((m) => CustomerPlu.fromMap(m))
+          .where((cp) => cp.companyCode == companyCode && cp.customerCode.isNotEmpty)
+          .toList();
+
+      if (records.isEmpty) return;
+
+      await _isar.writeTxn(() async {
+        final col = _isar.collection<CustomerPlu>();
+        // Upsert by (company, customer, sku)
+        for (final r in records) {
+          final existing = await col
+              .where()
+              .filter()
+              .companyCodeEqualTo(r.companyCode)
+              .and()
+              .customerCodeEqualTo(r.customerCode)
+              .and()
+              .skuNoEqualTo(r.skuNo)
+              .findFirst();
+          if (existing != null) {
+            r.id = existing.id;
+          }
+          await col.put(r);
+        }
+      });
+    } catch (e) {
+      print('❌ PLU SERVICE: Error syncing customer PLU for $customerCode: $e');
+    }
+  }
+
+  /// Lookup cached customer PLU for a given SKU
+  Future<CustomerPlu?> getCachedCustomerPlu({
+    required int companyCode,
+    required String customerCode,
+    required int skuNo,
+  }) async {
+    try {
+      final col = _isar.collection<CustomerPlu>();
+      return await col
+          .where()
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .and()
+          .customerCodeEqualTo(customerCode)
+          .and()
+          .skuNoEqualTo(skuNo)
+          .findFirst();
+    } catch (e) {
+      return null;
     }
   }
 

@@ -49,7 +49,16 @@ class InventoryImageService {
     
     // Create unique filename: COMPANY_SKU_originalname.ext
     final uniqueFileName = '${companyCode}_${skuNo}_${nameWithoutExt}$extension';
-    return path.join(_imageDirectory!.path, uniqueFileName);
+    final fullPath = path.join(_imageDirectory!.path, uniqueFileName);
+    
+    print('🔧 _getLocalImagePath:');
+    print('   Input: $imagePath');
+    print('   Company: $companyCode, SKU: $skuNo');
+    print('   Filename: $fileName');
+    print('   Unique: $uniqueFileName');
+    print('   Full path: $fullPath');
+    
+    return fullPath;
   }
 
   // Check if image is cached locally
@@ -58,7 +67,11 @@ class InventoryImageService {
     
     final localPath = _getLocalImagePath(imagePath, companyCode, skuNo);
     final file = File(localPath);
-    return await file.exists();
+    final exists = await file.exists();
+    
+    print('🔍 isImageCached: $exists for $localPath');
+    
+    return exists;
   }
 
   // Get cached image path
@@ -189,16 +202,63 @@ class InventoryImageService {
     return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
+  // Debug: List sample cached files
+  Future<void> listSampleCachedFiles({int limit = 10}) async {
+    if (_imageDirectory == null) await initialize();
+    
+    try {
+      if (_imageDirectory != null && await _imageDirectory!.exists()) {
+        print('📁 Cache directory: ${_imageDirectory!.path}');
+        final files = _imageDirectory!.listSync();
+        print('📁 Total items in directory: ${files.length}');
+        
+        final imageFiles = files.where((file) => file is File).toList();
+        print('📁 Total files: ${imageFiles.length}');
+        
+        if (imageFiles.isEmpty) {
+          print('⚠️ No files found in cache directory!');
+          return;
+        }
+        
+        print('📁 Sample cached files (first $limit):');
+        for (var file in imageFiles.take(limit)) {
+          final fileName = path.basename(file.path);
+          final stat = await (file as File).stat();
+          print('   ✓ $fileName (${(stat.size / 1024).toStringAsFixed(1)} KB)');
+        }
+      } else {
+        print('❌ Cache directory does not exist!');
+      }
+    } catch (e) {
+      print('❌ Error listing cached files: $e');
+    }
+  }
+  
   // Get statistics about cached images
   Future<Map<String, dynamic>> getCacheStats() async {
+    // Ensure directory is initialized
+    if (_imageDirectory == null) {
+      await initialize();
+    }
+    
     final size = await getCacheSize();
     final sizeFormatted = await getCacheSizeFormatted();
     
     // Count cached image files
     int totalCachedImages = 0;
-    if (_imageDirectory != null && await _imageDirectory!.exists()) {
-      final files = _imageDirectory!.listSync();
-      totalCachedImages = files.where((file) => file is File).length;
+    try {
+      if (_imageDirectory != null && await _imageDirectory!.exists()) {
+        final files = _imageDirectory!.listSync();
+        totalCachedImages = files.where((file) => file is File).length;
+        print('📊 Image Cache Stats: Found $totalCachedImages files in ${_imageDirectory!.path}');
+        
+        // List sample files for debugging
+        await listSampleCachedFiles(limit: 5);
+      } else {
+        print('⚠️ Image Cache Stats: Directory does not exist or not initialized');
+      }
+    } catch (e) {
+      print('❌ Image Cache Stats Error: $e');
     }
     
     return {

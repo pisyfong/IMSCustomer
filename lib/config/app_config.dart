@@ -4,9 +4,9 @@ class AppConfig {
   static const bool _isDevelopment = false; // Set to false for production
   
   // Backend domains
-  static const String _productionDomain = 'plusintralinkapps.dyndns.org';
+  static const String _productionDomain = 'fungseng.dyndns.org';
   static const String _developmentDomain = '192.168.16.12';//'10.0.2.2'; // Android emulator localhost
-  
+ 
   // Ports
   static const int _productionPort = 1194;
   static const int _developmentPort = 1194; // Change if your local server uses different port

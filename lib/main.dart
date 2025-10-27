@@ -24,9 +24,9 @@ import 'models/user_customer.dart';
 import 'models/user_app_settings.dart';
 import 'models/quotation.dart';
 import 'models/credit_term.dart';
-import '../models/group_lookup.dart';
-import '../models/department_lookup.dart';
-import '../models/customer_plu.dart';
+import 'models/group_lookup.dart';
+import 'models/department_lookup.dart';
+import 'models/customer_plu.dart';
 import 'services/auth_service.dart';
 import 'services/signalr_service.dart';
 import 'services/enhanced_sync_service.dart';
@@ -307,6 +307,7 @@ Future<Isar> openIsar() async {
   _isarInstance = await Isar.open([
     DummyItemSchema,
     CompanySchema,
+    CustomerPluSchema,
   ], directory: dir.path);
   return _isarInstance!;
 }

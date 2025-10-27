@@ -98,17 +98,20 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
       if (mounted && !signalRService.isConnected) {
         print('🔄 CompanySelectionPage: Attempting background SignalR reconnection...');
         try {
-          await signalRService.connect();
+          await signalRService.connect().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              print('⏱️ CompanySelectionPage: Background reconnection timed out after 3s');
+            },
+          );
           if (signalRService.isConnected) {
             print('✅ CompanySelectionPage: Background reconnection successful, setting up listeners...');
             _setupRealTimeListeners();
           } else {
-            print('❌ CompanySelectionPage: Background reconnection failed, will retry later');
-            _retrySignalRConnectionInBackground(); // Retry again
+            print('⚠️ CompanySelectionPage: Background reconnection failed');
           }
         } catch (e) {
-          print('❌ CompanySelectionPage: Background reconnection error: $e');
-          _retrySignalRConnectionInBackground(); // Retry again
+          print('⚠️ CompanySelectionPage: Background reconnection failed: $e');
         }
       }
     });
