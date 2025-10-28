@@ -3081,11 +3081,11 @@ class _InventoryPageState extends State<InventoryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 60,
+                              width: 40,
                               alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               color: Colors.green.shade600,
-                              child: const Text('Invoices', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                              child: const Text('Inv.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -3128,9 +3128,9 @@ class _InventoryPageState extends State<InventoryPage> {
                                         physics: const NeverScrollableScrollPhysics(),
                                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                           crossAxisCount: crossAxisCount,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                          childAspectRatio: 2.8,
+                                          crossAxisSpacing: 6,
+                                          mainAxisSpacing: 6,
+                                          childAspectRatio: 1.4,
                                         ),
                                         itemCount: data.length,
                                         itemBuilder: (context, index) {
@@ -3153,48 +3153,33 @@ class _InventoryPageState extends State<InventoryPage> {
                                                 ),
                                               ],
                                             ),
-                                            padding: const EdgeInsets.all(10),
+                                            padding: const EdgeInsets.all(6),
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        '#${order['invoiceNo'] ?? order['quoteNo'] ?? '-'}',
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      dateStr,
-                                                      style: const TextStyle(fontSize: 12, color: Colors.black54),
-                                                    ),
-                                                  ],
+                                                Text(
+                                                  '#${order['invoiceNo'] ?? order['quoteNo'] ?? '-'}',
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
                                                 ),
-                                                const SizedBox(height: 6),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.blue.shade50,
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text('Qty: $qty $uom', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.green.shade50,
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text('RM $price', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                                                    ),
-                                                  ],
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  dateStr,
+                                                  style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  '$qty $uom',
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'RM $price',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
                                                 ),
                                               ],
                                             ),
@@ -3214,11 +3199,11 @@ class _InventoryPageState extends State<InventoryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 60,
+                              width: 40,
                               alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               color: Colors.blue.shade600,
-                              child: const Text('Quotations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                              child: const Text('Quote.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -3261,9 +3246,9 @@ class _InventoryPageState extends State<InventoryPage> {
                                         physics: const NeverScrollableScrollPhysics(),
                                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                           crossAxisCount: crossAxisCount,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                          childAspectRatio: 2.8,
+                                          crossAxisSpacing: 6,
+                                          mainAxisSpacing: 6,
+                                          childAspectRatio: 1.4,
                                         ),
                                         itemCount: data.length,
                                         itemBuilder: (context, index) {
@@ -3286,48 +3271,33 @@ class _InventoryPageState extends State<InventoryPage> {
                                                 ),
                                               ],
                                             ),
-                                            padding: const EdgeInsets.all(10),
+                                            padding: const EdgeInsets.all(6),
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        '#${order['quoteNo']}',
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      dateStr,
-                                                      style: const TextStyle(fontSize: 12, color: Colors.black54),
-                                                    ),
-                                                  ],
+                                                Text(
+                                                  '#${order['quoteNo']}',
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
                                                 ),
-                                                const SizedBox(height: 6),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.blue.shade50,
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text('Qty: $qty $uom', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.green.shade50,
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text('RM $price', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                                                    ),
-                                                  ],
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  dateStr,
+                                                  style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  '$qty $uom',
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'RM $price',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
                                                 ),
                                               ],
                                             ),
