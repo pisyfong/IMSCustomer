@@ -2742,9 +2742,10 @@ class _InventoryPageState extends State<InventoryPage> {
         int priceTapCount = 0;
         bool showCost = false;
         
-        // Cache futures to prevent reload on every rebuild
-        Future<List<Map<String, dynamic>>>? cachedInvoicesFuture;
-        Future<List<Map<String, dynamic>>>? cachedQuotationsFuture;
+        // Cache futures to prevent reload on every rebuild - initialize immediately
+        var cachedInvoicesFuture = _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
+        var cachedQuotationsFuture = _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
+        
         return DraggableScrollableSheet(
           initialChildSize: 0.45,
           maxChildSize: 0.9,
@@ -2752,13 +2753,6 @@ class _InventoryPageState extends State<InventoryPage> {
           builder: (context, scrollController) {
             return StatefulBuilder(
               builder: (context, setSheetState) {
-                // Initialize cached futures once
-                if (cachedInvoicesFuture == null) {
-                  cachedInvoicesFuture = _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
-                }
-                if (cachedQuotationsFuture == null) {
-                  cachedQuotationsFuture = _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
-                }
                 
                 // Load UOM options when sheet opens (run once)
                 if (isLoadingUom) {
