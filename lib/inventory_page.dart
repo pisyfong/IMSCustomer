@@ -2748,14 +2748,14 @@ class _InventoryPageState extends State<InventoryPage> {
           builder: (context, scrollController) {
             return StatefulBuilder(
               builder: (context, setSheetState) {
-                // Load UOM options when sheet opens
+                // Load UOM options when sheet opens (run once)
                 if (isLoadingUom) {
+                  isLoadingUom = false; // Set flag immediately to prevent re-trigger
                   _loadUomOptions(item).then((options) {
                     // Check if the bottom sheet context is still mounted
                     if (context.mounted) {
                       setSheetState(() {
                         uomOptions = options;
-                        isLoadingUom = false;
                         // Set default selected UOM
                         if (options.isNotEmpty) {
                           selectedUomData = options.firstWhere(
@@ -2769,8 +2769,9 @@ class _InventoryPageState extends State<InventoryPage> {
                   });
                 }
                 
-                // Check price edit permission
+                // Check price edit permission (run once)
                 if (isCheckingPermission) {
+                  isCheckingPermission = false; // Set flag immediately to prevent re-trigger
                   _authService.getSelectedCompany().then((company) async {
                     final companyCodeRaw = company?['companyCode'] ?? 1;
                     final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
@@ -2780,7 +2781,6 @@ class _InventoryPageState extends State<InventoryPage> {
                     if (context.mounted) {
                       setSheetState(() {
                         canEditPrice = canEdit;
-                        isCheckingPermission = false;
                       });
                     }
                   });
