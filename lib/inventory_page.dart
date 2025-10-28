@@ -2741,6 +2741,10 @@ class _InventoryPageState extends State<InventoryPage> {
         // Secret tap counter for showing cost
         int priceTapCount = 0;
         bool showCost = false;
+        
+        // Cache futures to prevent reload on every rebuild
+        Future<List<Map<String, dynamic>>>? cachedInvoicesFuture;
+        Future<List<Map<String, dynamic>>>? cachedQuotationsFuture;
         return DraggableScrollableSheet(
           initialChildSize: 0.45,
           maxChildSize: 0.9,
@@ -2748,6 +2752,14 @@ class _InventoryPageState extends State<InventoryPage> {
           builder: (context, scrollController) {
             return StatefulBuilder(
               builder: (context, setSheetState) {
+                // Initialize cached futures once
+                if (cachedInvoicesFuture == null) {
+                  cachedInvoicesFuture = _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
+                }
+                if (cachedQuotationsFuture == null) {
+                  cachedQuotationsFuture = _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
+                }
+                
                 // Load UOM options when sheet opens (run once)
                 if (isLoadingUom) {
                   isLoadingUom = false; // Set flag immediately to prevent re-trigger
@@ -3065,6 +3077,9 @@ class _InventoryPageState extends State<InventoryPage> {
                                         final newPrice = uomOption.gstPrice ?? uomOption.price ?? 0.0;
                                         _priceSelections[sku] = newPrice;
                                         priceCtrl.text = newPrice.toStringAsFixed(2);
+                                        // Reload invoices and quotations for new UOM
+                                        cachedInvoicesFuture = _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
+                                        cachedQuotationsFuture = _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
                                         print('🔄 UOM changed to ${uomOption.uom}, price updated to RM ${newPrice.toStringAsFixed(2)}');
                                       }),
                                       selectedColor: Colors.orange.shade200,
@@ -3091,7 +3106,7 @@ class _InventoryPageState extends State<InventoryPage> {
                             Expanded(
                               child: FutureBuilder<List<Map<String, dynamic>>>(
                                 key: ValueKey('prev_invoices_${item.skuNo}_$selectedUom'),
-                                future: _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom),
+                                future: cachedInvoicesFuture,
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
                                     return const Padding(
@@ -3209,7 +3224,7 @@ class _InventoryPageState extends State<InventoryPage> {
                             Expanded(
                               child: FutureBuilder<List<Map<String, dynamic>>>(
                                 key: ValueKey('prev_quotes_${item.skuNo}_$selectedUom'), // Rebuild when UOM changes
-                                future: _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom),
+                                future: cachedQuotationsFuture,
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
                                     return const Padding(
