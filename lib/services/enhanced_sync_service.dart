@@ -557,6 +557,11 @@ class EnhancedSyncService {
     );
   }
 
+  /// Public method to sync customer PLU mappings (called from settings page)
+  Future<void> syncCustomerPlu() async {
+    await _preloadCustomerPlus();
+  }
+  
   /// Preload customer-specific PLU mappings for frequently used SKUs
   Future<void> _preloadCustomerPlus() async {
     try {

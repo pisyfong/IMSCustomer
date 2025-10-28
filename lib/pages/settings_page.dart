@@ -8,6 +8,7 @@ import '../services/inventory_service.dart';
 import '../services/invoice_service.dart';
 import '../services/inventory_image_service.dart';
 import '../services/offline_first_service.dart';
+import '../services/plu_service.dart';
 import '../main.dart';
 import '../sync_info.dart';
 import '../company.dart';
@@ -194,19 +195,79 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   Future<void> _performFullSync() async {
     setState(() {
       _isSyncing = true;
-      _syncStatus = 'Syncing all data...';
+      _syncStatus = 'Starting full sync...';
     });
     
     try {
-      // Perform full sync (no parameters needed)
+      // Step 1: Core sync (customers, inventory, quotes)
+      setState(() {
+        _syncStatus = 'Syncing core data...';
+      });
       await _syncService.performSync();
+      
+      // Step 2: Sync PLU codes
+      setState(() {
+        _syncStatus = 'Syncing PLU codes...';
+      });
+      try {
+        final pluService = PluService(isar);
+        // Fetch all PLUs from server and sync to local database
+        await pluService.syncPlus();
+      } catch (e) {
+        print('⚠️ PLU sync failed during full sync: $e');
+      }
+      
+      // Step 3: Sync Customer PLU mappings
+      setState(() {
+        _syncStatus = 'Syncing customer PLU mappings...';
+      });
+      try {
+        await _syncService.syncCustomerPlu();
+      } catch (e) {
+        print('⚠️ Customer PLU sync failed during full sync: $e');
+      }
+      
+      // Step 4: Sync Invoices
+      setState(() {
+        _syncStatus = 'Syncing invoices...';
+      });
+      try {
+        final invoiceService = InvoiceService(_signalRService);
+        await _syncService.preloadAllInvoices();
+      } catch (e) {
+        print('⚠️ Invoice sync failed during full sync: $e');
+      }
+      
+      // Step 5: Sync Invoice Items
+      setState(() {
+        _syncStatus = 'Syncing invoice items...';
+      });
+      try {
+        final invoiceService = InvoiceService(_signalRService);
+        final invoices = await isar.invoices.where().findAll();
+        for (final invoice in invoices) {
+          if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
+          try {
+            await invoiceService.getInvoiceItems(
+              companyCode: invoice.companyCode is String 
+                  ? int.tryParse(invoice.companyCode as String) ?? 1 
+                  : invoice.companyCode as int,
+              invoicePreLabel: invoice.invoicePreLabel,
+            );
+          } catch (e) {
+            // Continue with next invoice
+          }
+        }
+      } catch (e) {
+        print('⚠️ Invoice items sync failed during full sync: $e');
+      }
       
       // Reload stats
       await _loadCacheStats();
       await _loadLastSyncTime();
       
       setState(() {
-        _syncStatus = 'Sync completed successfully!';
+        _syncStatus = 'Full sync completed!';
       });
       
       if (mounted) {
@@ -214,6 +275,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           const SnackBar(
             content: Text('✅ Full sync completed successfully'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
       }
@@ -642,6 +704,30 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           subtitle: 'Update invoice history',
           color: Colors.green,
           onPressed: _isSyncing ? null : _syncInvoices,
+        ),
+        const SizedBox(height: 12),
+        _buildActionButton(
+          icon: Icons.receipt_long,
+          label: 'Sync Invoice Items',
+          subtitle: 'Update invoice line items',
+          color: Colors.teal,
+          onPressed: _isSyncing ? null : _syncInvoiceItems,
+        ),
+        const SizedBox(height: 12),
+        _buildActionButton(
+          icon: Icons.qr_code_2,
+          label: 'Sync PLU',
+          subtitle: 'Update product lookup codes',
+          color: Colors.orange,
+          onPressed: _isSyncing ? null : _syncPLU,
+        ),
+        const SizedBox(height: 12),
+        _buildActionButton(
+          icon: Icons.person_pin,
+          label: 'Sync Customer PLU',
+          subtitle: 'Update customer-specific PLUs',
+          color: Colors.indigo,
+          onPressed: _isSyncing ? null : _syncCustomerPLU,
         ),
       ],
     );
@@ -1199,6 +1285,143 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Invoice sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = 'Ready';
+      });
+    }
+  }
+  
+  Future<void> _syncInvoiceItems() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing invoice items...';
+    });
+    
+    try {
+      final invoiceService = InvoiceService(_signalRService);
+      final invoices = await isar.invoices.where().findAll();
+      int totalSynced = 0;
+      int processedCount = 0;
+      
+      for (final invoice in invoices) {
+        if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
+        
+        processedCount++;
+        setState(() {
+          _syncStatus = 'Syncing items for invoice ${processedCount}/${invoices.length}...';
+        });
+        
+        try {
+          final items = await invoiceService.getInvoiceItems(
+            companyCode: invoice.companyCode is String 
+                ? int.tryParse(invoice.companyCode as String) ?? 1 
+                : invoice.companyCode as int,
+            invoicePreLabel: invoice.invoicePreLabel,
+          );
+          
+          totalSynced += items.length;
+        } catch (e) {
+          print('⚠️ Failed to sync items for ${invoice.invoicePreLabel}: $e');
+        }
+      }
+      
+      await _loadCacheStats();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced $totalSynced invoice items from ${processedCount} invoices'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Invoice items sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = 'Ready';
+      });
+    }
+  }
+  
+  Future<void> _syncPLU() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing PLU codes...';
+    });
+    
+    try {
+      final pluService = PluService(isar);
+      
+      // Fetch all PLUs from server and sync to local database
+      await pluService.syncPlus();
+      
+      await _loadCacheStats();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced ${_pluCount} PLU codes'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ PLU sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = 'Ready';
+      });
+    }
+  }
+  
+  Future<void> _syncCustomerPLU() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing customer PLU mappings...';
+    });
+    
+    try {
+      // Call the enhanced sync service method for customer PLU
+      await _syncService.syncCustomerPlu();
+      
+      await _loadCacheStats();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced ${_customerPluCount} customer PLU mappings'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Customer PLU sync failed: $e'),
             backgroundColor: Colors.red,
           ),
         );

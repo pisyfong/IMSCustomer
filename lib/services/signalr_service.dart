@@ -610,7 +610,8 @@ class SignalRService {
     try {
       print('🌐 HTTP: Fetching user-customer mappings from PI_User_Customer...');
       
-      final url = Uri.parse('http://192.168.16.12:3001/api/user-customers');
+      // Use AppConfig for the API URL
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/user-customers');
       print('📡 HTTP: GET $url');
       
       final response = await http.get(
@@ -619,10 +620,16 @@ class SignalRService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('⏱️ HTTP: getUserCustomers request timed out after 10 seconds');
+          throw TimeoutException('Request timed out');
+        },
       );
       
       print('📥 HTTP: getUserCustomers status: ${response.statusCode}');
-      print('📥 HTTP: getUserCustomers body: ${response.body}');
+      print('📥 HTTP: getUserCustomers body length: ${response.body.length} chars');
       
       if (response.statusCode == 200) {
         final result = json.decode(response.body);
@@ -642,6 +649,9 @@ class SignalRService {
         print('❌ HTTP: getUserCustomers failed with status ${response.statusCode}');
         return null;
       }
+    } on TimeoutException catch (e) {
+      print('⏱️ HTTP: getUserCustomers timed out - $e');
+      return null;
     } catch (e) {
       print('🚨 HTTP: getUserCustomers exception - $e');
       return null;

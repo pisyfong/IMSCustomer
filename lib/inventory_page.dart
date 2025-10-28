@@ -2751,7 +2751,8 @@ class _InventoryPageState extends State<InventoryPage> {
                 // Load UOM options when sheet opens
                 if (isLoadingUom) {
                   _loadUomOptions(item).then((options) {
-                    if (mounted) {
+                    // Check if the bottom sheet context is still mounted
+                    if (context.mounted) {
                       setSheetState(() {
                         uomOptions = options;
                         isLoadingUom = false;
@@ -2775,7 +2776,8 @@ class _InventoryPageState extends State<InventoryPage> {
                     final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
                     final settingsService = UserAppSettingsService();
                     final canEdit = await settingsService.canChangePrice(companyCode: companyCode);
-                    if (mounted) {
+                    // Check if the bottom sheet context is still mounted
+                    if (context.mounted) {
                       setSheetState(() {
                         canEditPrice = canEdit;
                         isCheckingPermission = false;

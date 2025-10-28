@@ -173,11 +173,25 @@ class PluService {
   }) async {
     try {
       if (skuNos.isEmpty) return;
-      final response = await _signalRService.invoke('getCustomerPlu', [
-        companyCode,
-        customerCode,
-        skuNos,
-      ]);
+      
+      dynamic response;
+      
+      // Try SignalR first if connected
+      if (_signalRService.isConnected) {
+        try {
+          response = await _signalRService.invoke('getCustomerPlu', [
+            companyCode,
+            customerCode,
+            skuNos,
+          ]);
+        } catch (e) {
+          print('⚠️ PLU SERVICE: SignalR failed for customer PLU, skipping for $customerCode');
+          return; // Skip HTTP fallback for customer PLU as it's optional data
+        }
+      } else {
+        print('📱 PLU SERVICE: SignalR not connected, skipping customer PLU for $customerCode');
+        return; // Skip when offline - customer PLU is optional
+      }
 
       if (response is! List) return;
 
@@ -238,10 +252,11 @@ class PluService {
   Future<int> _getCurrentCompanyCode() async {
     final company = await _authService.getSelectedCompany();
     if (company == null || company['companyCode'] == null) {
-      throw Exception('No company selected');
+      print('⚠️ PLU SERVICE: No company selected, using default company code 1');
+      return 1; // Default to company code 1
     }
     return company['companyCode'] is int 
         ? company['companyCode'] as int 
-        : int.tryParse(company['companyCode'].toString()) ?? 0;
+        : int.tryParse(company['companyCode'].toString()) ?? 1;
   }
 }
