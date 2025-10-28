@@ -3047,7 +3047,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // Remark input
+                        // Remark button - opens dialog
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -3060,13 +3060,59 @@ class _InventoryPageState extends State<InventoryPage> {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: TextField(
-                                controller: remarkCtrl,
-                                decoration: const InputDecoration(
-                                  hintText: 'Enter item remark',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              child: InkWell(
+                                onTap: () async {
+                                  final result = await showDialog<String>(
+                                    context: context,
+                                    builder: (dialogContext) {
+                                      final dialogRemarkCtrl = TextEditingController(text: remarkCtrl.text);
+                                      return AlertDialog(
+                                        title: const Text('Item Remark'),
+                                        content: TextField(
+                                          controller: dialogRemarkCtrl,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Enter item remark',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          maxLines: 3,
+                                          autofocus: true,
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dialogContext),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dialogContext, dialogRemarkCtrl.text),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                  if (result != null) {
+                                    remarkCtrl.text = result;
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          remarkCtrl.text.isEmpty ? 'Tap to add remark' : remarkCtrl.text,
+                                          style: TextStyle(
+                                            color: remarkCtrl.text.isEmpty ? Colors.grey : Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                      const Icon(Icons.edit, size: 16, color: Colors.grey),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
