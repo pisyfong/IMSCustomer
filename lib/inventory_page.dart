@@ -3118,15 +3118,11 @@ class _InventoryPageState extends State<InventoryPage> {
                                       ),
                                     );
                                   }
-                                  // Render as grid for better readability
+                                  // Render as single row grid (3 items max)
                                   return LayoutBuilder(
                                     builder: (context, constraints) {
-                                      final width = constraints.maxWidth;
-                                      final int crossAxisCount = width >= 600
-                                          ? 3
-                                          : width >= 360
-                                              ? 2
-                                              : 1;
+                                      // Always show 3 items in one row
+                                      final int crossAxisCount = 3;
                                       return GridView.builder(
                                         shrinkWrap: true,
                                         physics: const NeverScrollableScrollPhysics(),
@@ -3255,15 +3251,11 @@ class _InventoryPageState extends State<InventoryPage> {
                                       ),
                                     );
                                   }
-                                  // Render as grid
+                                  // Render as single row grid (3 items max)
                                   return LayoutBuilder(
                                     builder: (context, constraints) {
-                                      final width = constraints.maxWidth;
-                                      final int crossAxisCount = width >= 600
-                                          ? 3
-                                          : width >= 360
-                                              ? 2
-                                              : 1;
+                                      // Always show 3 items in one row
+                                      final int crossAxisCount = 3;
                                       return GridView.builder(
                                         shrinkWrap: true,
                                         physics: const NeverScrollableScrollPhysics(),
@@ -3529,7 +3521,7 @@ class _InventoryPageState extends State<InventoryPage> {
         return qb.compareTo(qa);
       });
 
-      return matched.take(5).map((qi) {
+      return matched.take(3).map((qi) {
         final q = quoteByLabel[qi.quotePreLabel];
         return {
           'quoteNo': qi.quotePreLabel,
@@ -3570,7 +3562,7 @@ class _InventoryPageState extends State<InventoryPage> {
         customerCode: selectedCustomer.code,
         skuNo: item.skuNo,
         filterUom: filterUom,
-        limit: 5,
+        limit: 3,
       );
 
       print('🔎 PreviousInvoices: Optimized query returned ${matchedItems.length} items');
