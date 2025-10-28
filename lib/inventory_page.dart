@@ -2721,52 +2721,45 @@ class _InventoryPageState extends State<InventoryPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         final int sku = item.skuNo;
         int localQty = _qtySelections[sku] ?? 1;
         String selectedUom = (item.uom ?? '').trim();
-        final TextEditingController remarkCtrl = TextEditingController();
-        final TextEditingController qtyCtrl = TextEditingController(text: localQty.toString());
+        String remarkText = '';
+        
         // Initialize price from map or item's default price
         if (!_priceSelections.containsKey(sku)) {
           _priceSelections[sku] = item.gstPrice ?? 0.0;
         }
-        final TextEditingController priceCtrl = TextEditingController(text: _priceSelections[sku]!.toStringAsFixed(2));
+        double currentPrice = _priceSelections[sku]!;
+        
+        // Data storage
         List<InStockUom> uomOptions = [];
-        bool isLoadingUom = true;
-        InStockUom? selectedUomData;
-        bool canEditPrice = false;
-        bool isCheckingPermission = true;
-        
-        // Secret tap counter for showing cost
-        int priceTapCount = 0;
-        bool showCost = false;
-        
-        // Store loaded data directly - no FutureBuilder refresh
         List<Map<String, dynamic>> invoicesData = [];
         List<Map<String, dynamic>> quotationsData = [];
-        bool isLoadingInvoices = true;
-        bool isLoadingQuotations = true;
-        bool invoicesRendered = false; // Track if data has been rendered once
-        bool quotationsRendered = false;
+        bool isLoadingUom = true;
+        bool canEditPrice = false;
+        InStockUom? selectedUomData;
         
         return DraggableScrollableSheet(
-          initialChildSize: 0.45,
-          maxChildSize: 0.9,
-          minChildSize: 0.35,
+          initialChildSize: 0.7,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
           builder: (context, scrollController) {
             return StatefulBuilder(
               builder: (context, setSheetState) {
-                
-                // Load UOM options when sheet opens (run once)
+                // Load data once
                 if (isLoadingUom) {
-                  isLoadingUom = false; // Set flag immediately to prevent re-trigger
+                  isLoadingUom = false;
+                  
+                  // Load UOM options
                   _loadUomOptions(item).then((options) {
-                    // Check if the bottom sheet context is still mounted
                     if (context.mounted) {
                       setSheetState(() {
                         uomOptions = options;
-                        // Set default selected UOM
                         if (options.isNotEmpty) {
                           selectedUomData = options.firstWhere(
                             (uom) => uom.uom?.toLowerCase() == selectedUom.toLowerCase(),
@@ -2777,695 +2770,593 @@ class _InventoryPageState extends State<InventoryPage> {
                       });
                     }
                   });
-                }
-                
-                // Check price edit permission (run once)
-                if (isCheckingPermission) {
-                  isCheckingPermission = false; // Set flag immediately to prevent re-trigger
+                  
+                  // Check price permission
                   _authService.getSelectedCompany().then((company) async {
                     final companyCodeRaw = company?['companyCode'] ?? 1;
                     final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
                     final settingsService = UserAppSettingsService();
                     final canEdit = await settingsService.canChangePrice(companyCode: companyCode);
-                    // Check if the bottom sheet context is still mounted
                     if (context.mounted) {
                       setSheetState(() {
                         canEditPrice = canEdit;
                       });
                     }
                   });
-                }
-                
-                // Load invoices data once
-                if (isLoadingInvoices) {
-                  isLoadingInvoices = false;
+                  
+                  // Load history data
                   _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                    invoicesData = data;
-                    // Only call setState the first time to show data
-                    if (context.mounted && !invoicesRendered) {
-                      invoicesRendered = true;
-                      setSheetState(() {});
+                    if (context.mounted) {
+                      setSheetState(() {
+                        invoicesData = data;
+                      });
                     }
                   });
-                }
-                
-                // Load quotations data once
-                if (isLoadingQuotations) {
-                  isLoadingQuotations = false;
+                  
                   _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                    quotationsData = data;
-                    // Only call setState the first time to show data
-                    if (context.mounted && !quotationsRendered) {
-                      quotationsRendered = true;
-                      setSheetState(() {});
+                    if (context.mounted) {
+                      setSheetState(() {
+                        quotationsData = data;
+                      });
                     }
                   });
                 }
                 
                 return Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Handle bar
-                        Center(
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            height: 4,
-                            width: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
+                  child: Column(
+                    children: [
+                      // Drag Handle
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        // Header with code and name
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Text('${item.skuNo}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                item.displayName,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                // Get the current price BEFORE clearing selections
-                                final currentPrice = _priceSelections[sku] ?? item.gstPrice ?? 0.0;
-                                
-                                // commit local qty and clear selections
-                                setState(() { 
-                                  _qtySelections[sku] = localQty;
-                                  // Clear price selection after adding to cart
-                                  _priceSelections.remove(sku);
-                                });
-                                Navigator.of(context).pop();
-                                
-                                // Add to cart with the correct price for selected UOM
-                                _addToCart(
-                                  item, 
-                                  remark: remarkCtrl.text, 
-                                  uom: selectedUom.isEmpty ? null : selectedUom,
-                                  customGstPrice: currentPrice,
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade600,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                minimumSize: const Size(0, 36),
-                              ),
-                              icon: const Icon(Icons.add_shopping_cart, size: 18),
-                              label: const Text('Add'),
+                      ),
+                      
+                      // Header Section with Product Info
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        // Price row with qty input
-                        Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Dynamic price tag that updates with UOM selection - SECRET TAP TO SHOW COST
-                            GestureDetector(
-                              onTap: () {
-                                setSheetState(() {
-                                  priceTapCount++;
-                                  if (priceTapCount >= 5) {
-                                    showCost = !showCost; // Toggle cost visibility
-                                    priceTapCount = 0; // Reset counter
-                                  }
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.amber.shade200),
-                                ),
-                                child: Text(
-                                  'RM ${_priceSelections[sku]!.toStringAsFixed(2)} / ${selectedUom.isEmpty ? (item.uom ?? 'PCS') : selectedUom}',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Price display with edit icon (only if permission granted)
-                            if (canEditPrice) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.green.shade300),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'RM ${_priceSelections[sku]!.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    InkWell(
-                                      onTap: () async {
-                                        final newPrice = await showDialog<double>(
-                                          context: context,
-                                          barrierDismissible: false,
-                                          builder: (dialogContext) => _InventoryPriceEditDialog(
-                                            itemName: item.displayName,
-                                            initialPrice: _priceSelections[sku]!,
-                                          ),
-                                        );
-                                        if (newPrice != null) {
-                                          setState(() {
-                                            _priceSelections[sku] = newPrice;
-                                          });
-                                          setSheetState(() {
-                                            priceCtrl.text = newPrice.toStringAsFixed(2);
-                                          });
-                                        }
-                                      },
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        child: const Icon(
-                                          Icons.edit,
-                                          size: 16,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            const SizedBox(width: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.blue.shade200),
-                                color: Colors.blue.shade50,
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('Qty', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
-                                  const SizedBox(width: 8),
-                                  InkWell(
-                                    onTap: () => setSheetState(() { 
-                                      localQty = (localQty - 1).clamp(1, 999);
-                                      qtyCtrl.text = localQty.toString();
-                                      _qtySelections[sku] = localQty;
-                                    }),
-                                    child: const Icon(Icons.remove, size: 20),
-                                  ),
-                                  SizedBox(
-                                    width: 64,
-                                    child: TextField(
-                                      key: ValueKey('sheet_qty_${item.skuNo}'),
-                                      keyboardType: TextInputType.number,
-                                      textAlign: TextAlign.center,
-                                      decoration: const InputDecoration(
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      controller: qtyCtrl,
-                                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                      onChanged: (val) {
-                                        final parsed = int.tryParse(val);
-                                        setSheetState(() {
-                                          localQty = (parsed ?? localQty).clamp(1, 999);
-                                          _qtySelections[sku] = localQty;
-                                        });
-                                      },
-                                      onEditingComplete: () {
-                                        final parsed = int.tryParse(qtyCtrl.text) ?? localQty;
-                                        setSheetState(() {
-                                          localQty = parsed.clamp(1, 999);
-                                          qtyCtrl.text = localQty.toString();
-                                          _qtySelections[sku] = localQty;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => setSheetState(() { 
-                                      localQty = (localQty + 1).clamp(1, 999);
-                                      qtyCtrl.text = localQty.toString();
-                                      _qtySelections[sku] = localQty;
-                                    }),
-                                    child: const Icon(Icons.add, size: 20),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Remark button - opens dialog
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 60,
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              color: Colors.blue.shade600,
-                              child: const Text('Remark', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () async {
-                                  final result = await showDialog<String>(
-                                    context: context,
-                                    builder: (dialogContext) {
-                                      final dialogRemarkCtrl = TextEditingController(text: remarkCtrl.text);
-                                      return AlertDialog(
-                                        title: const Text('Item Remark'),
-                                        content: TextField(
-                                          controller: dialogRemarkCtrl,
-                                          decoration: const InputDecoration(
-                                            hintText: 'Enter item remark',
-                                            border: OutlineInputBorder(),
-                                          ),
-                                          maxLines: 3,
-                                          autofocus: true,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(dialogContext),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(dialogContext, dialogRemarkCtrl.text),
-                                            child: const Text('OK'),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                  if (result != null) {
-                                    setSheetState(() {
-                                      remarkCtrl.text = result;
-                                    });
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Row(
+                            // Product Name and SKU
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          remarkCtrl.text.isEmpty ? 'Tap to add remark' : remarkCtrl.text,
-                                          style: TextStyle(
-                                            color: remarkCtrl.text.isEmpty ? Colors.grey : Colors.black,
-                                          ),
+                                      Text(
+                                        item.description ?? 'Product',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      const Icon(Icons.edit, size: 16, color: Colors.grey),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'SKU: ${item.skuNo}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                              ),
+                                // Close Button
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // UOM list (chips)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Price Display
                             Container(
-                              width: 60,
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              color: Colors.blue.shade600,
-                              child: const Text('UOM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.amber.shade200),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  ...uomOptions.map((uomOption) => 
-                                    ChoiceChip(
-                                      label: Text(uomOption.uom ?? ''),
-                                      selected: selectedUom == (uomOption.uom ?? ''),
-                                      onSelected: (_) { 
-                                        setSheetState(() {
-                                          selectedUom = uomOption.uom ?? '';
-                                          selectedUomData = uomOption;
-                                          // Update price when UOM changes
-                                          final newPrice = uomOption.gstPrice ?? uomOption.price ?? 0.0;
-                                          _priceSelections[sku] = newPrice;
-                                          priceCtrl.text = newPrice.toStringAsFixed(2);
-                                          print('🔄 UOM changed to ${uomOption.uom}, price updated to RM ${newPrice.toStringAsFixed(2)}');
-                                        });
-                                        // Reload invoices and quotations for new UOM
-                                        _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                                          if (context.mounted) {
-                                            setSheetState(() {
-                                              invoicesData = data;
-                                            });
-                                          }
-                                        });
-                                        _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                                          if (context.mounted) {
-                                            setSheetState(() {
-                                              quotationsData = data;
-                                            });
-                                          }
-                                        });
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Price',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'RM ${currentPrice.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (canEditPrice)
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.edit, size: 16),
+                                      label: const Text('Edit'),
+                                      onPressed: () async {
+                                        final controller = TextEditingController(text: currentPrice.toStringAsFixed(2));
+                                        final result = await showDialog<double>(
+                                          context: context,
+                                          builder: (dialogContext) => AlertDialog(
+                                            title: const Text('Edit Price'),
+                                            content: TextField(
+                                              controller: controller,
+                                              keyboardType: TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Price (RM)',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              autofocus: true,
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(dialogContext),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () {
+                                                  final price = double.tryParse(controller.text);
+                                                  if (price != null) {
+                                                    Navigator.pop(dialogContext, price);
+                                                  }
+                                                },
+                                                child: const Text('Save'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (result != null) {
+                                          setSheetState(() {
+                                            currentPrice = result;
+                                            _priceSelections[sku] = result;
+                                          });
+                                        }
                                       },
-                                      selectedColor: Colors.orange.shade200,
                                     ),
-                                  ).toList(),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        // Invoices and Quotations section - isolated from remark updates
-                        Builder(
-                          builder: (builderContext) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Previous Invoices (shown first)
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 60,
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      color: Colors.green.shade600,
-                                      child: const Text('Inv.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: invoicesData.isEmpty ?
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          child: Text(
-                                            'No previous invoices found.',
-                                            style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
-                                          ),
-                                        ) :
-                                        // Render as single row grid (3 items max)
-                                        LayoutBuilder(
-                                          builder: (context, constraints) {
-                                            // Always show 3 items in one row
-                                            final int crossAxisCount = 3;
-                                            return GridView.builder(
-                                              shrinkWrap: true,
-                                              physics: const NeverScrollableScrollPhysics(),
-                                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: crossAxisCount,
-                                                crossAxisSpacing: 6,
-                                                mainAxisSpacing: 6,
-                                                childAspectRatio: 1.4,
-                                              ),
-                                              itemCount: invoicesData.length,
-                                              itemBuilder: (context, index) {
-                                                final order = invoicesData[index];
-                                                final DateTime? dt = order['date'] as DateTime?;
-                                                final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
-                                                final qty = order['qty'];
-                                                final uom = order['uom'] ?? '';
-                                                final price = (order['price'] ?? 0).toStringAsFixed(2);
-                                                return Container(
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    border: Border.all(color: const Color(0xFFE0E0E0)),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.black.withOpacity(0.03),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(0, 2),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  padding: const EdgeInsets.all(6),
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(
-                                                        '#${order['invoiceNo'] ?? order['quoteNo'] ?? '-'}',
-                                                        overflow: TextOverflow.ellipsis,
-                                                        maxLines: 1,
-                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        dateStr,
-                                                        style: const TextStyle(fontSize: 10, color: Colors.black54),
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        '$qty $uom',
-                                                        overflow: TextOverflow.ellipsis,
-                                                        maxLines: 1,
-                                                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        'RM $price',
-                                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
-                                        ),
+                      ),
+                      
+                      // Scrollable Content
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Order Configuration Section
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 10,
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                // Previous Quotations (shown second)
-                                Row(
+                                child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 60,
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      color: Colors.blue.shade600,
-                                      child: const Text('Quote.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                    const Text(
+                                      'Order Details',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: quotationsData.isEmpty ?
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          child: Text(
-                                            'No previous quotations found.',
-                                            style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                                    const SizedBox(height: 16),
+                                    
+                                    // Quantity Selector
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.inventory_2_outlined, size: 20, color: Colors.blue),
+                                        const SizedBox(width: 12),
+                                        const Text('Quantity', style: TextStyle(fontSize: 14)),
+                                        const Spacer(),
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            border: Border.all(color: Colors.grey.shade300),
+                                            borderRadius: BorderRadius.circular(8),
                                           ),
-                                        ) :
-                                        // Render as single row grid (3 items max)
-                                        LayoutBuilder(
-                                          builder: (context, constraints) {
-                                            // Always show 3 items in one row
-                                            final int crossAxisCount = 3;
-                                            return GridView.builder(
-                                              shrinkWrap: true,
-                                              physics: const NeverScrollableScrollPhysics(),
-                                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: crossAxisCount,
-                                                crossAxisSpacing: 6,
-                                                mainAxisSpacing: 6,
-                                                childAspectRatio: 1.4,
+                                          child: Row(
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.remove, size: 18),
+                                                onPressed: () {
+                                                  if (localQty > 1) {
+                                                    setSheetState(() {
+                                                      localQty--;
+                                                      _qtySelections[sku] = localQty;
+                                                    });
+                                                  }
+                                                },
                                               ),
-                                              itemCount: quotationsData.length,
-                                              itemBuilder: (context, index) {
-                                                final order = quotationsData[index];
-                                                final DateTime? dt = order['date'] as DateTime?;
-                                                final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
-                                                final qty = order['qty'];
-                                                final uom = order['uom'] ?? '';
-                                                final price = (order['price'] ?? 0).toStringAsFixed(2);
-                                                return Container(
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    border: Border.all(color: const Color(0xFFE0E0E0)),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.black.withOpacity(0.03),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(0, 2),
-                                                      ),
-                                                    ],
+                                              Container(
+                                                constraints: const BoxConstraints(minWidth: 50),
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  localQty.toString(),
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
-                                                  padding: const EdgeInsets.all(6),
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(
-                                                        '#${order['quoteNo']}',
-                                                        overflow: TextOverflow.ellipsis,
-                                                        maxLines: 1,
-                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        dateStr,
-                                                        style: const TextStyle(fontSize: 10, color: Colors.black54),
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        '$qty $uom',
-                                                        overflow: TextOverflow.ellipsis,
-                                                        maxLines: 1,
-                                                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        'RM $price',
-                                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.add, size: 18),
+                                                onPressed: () {
+                                                  if (localQty < 999) {
+                                                    setSheetState(() {
+                                                      localQty++;
+                                                      _qtySelections[sku] = localQty;
+                                                    });
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          ),
                                         ),
+                                      ],
+                                    ),
+                                    
+                                    const Divider(height: 24),
+                                    
+                                    // UOM Selector
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(Icons.straighten_outlined, size: 20, color: Colors.green),
+                                        const SizedBox(width: 12),
+                                        const Text('Unit', style: TextStyle(fontSize: 14)),
+                                        const Spacer(),
+                                        if (uomOptions.isEmpty)
+                                          const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        else
+                                          Wrap(
+                                            spacing: 8,
+                                            children: uomOptions.map((uom) {
+                                              final isSelected = selectedUom == (uom.uom ?? '');
+                                              return ChoiceChip(
+                                                label: Text(uom.uom ?? ''),
+                                                selected: isSelected,
+                                                selectedColor: Colors.green.shade100,
+                                                onSelected: (_) {
+                                                  setSheetState(() {
+                                                    selectedUom = uom.uom ?? '';
+                                                    selectedUomData = uom;
+                                                    final newPrice = uom.gstPrice ?? uom.price ?? 0.0;
+                                                    currentPrice = newPrice;
+                                                    _priceSelections[sku] = newPrice;
+                                                  });
+                                                  
+                                                  // Reload history for new UOM
+                                                  _loadPreviousInvoicesForItem(item, filterUom: selectedUom).then((data) {
+                                                    if (context.mounted) {
+                                                      setSheetState(() {
+                                                        invoicesData = data;
+                                                      });
+                                                    }
+                                                  });
+                                                  
+                                                  _loadPreviousOrdersForItem(item, filterUom: selectedUom).then((data) {
+                                                    if (context.mounted) {
+                                                      setSheetState(() {
+                                                        quotationsData = data;
+                                                      });
+                                                    }
+                                                  });
+                                                },
+                                              );
+                                            }).toList(),
+                                          ),
+                                      ],
+                                    ),
+                                    
+                                    const Divider(height: 24),
+                                    
+                                    // Remark
+                                    InkWell(
+                                      onTap: () async {
+                                        final controller = TextEditingController(text: remarkText);
+                                        final result = await showDialog<String>(
+                                          context: context,
+                                          builder: (dialogContext) => AlertDialog(
+                                            title: const Text('Add Remark'),
+                                            content: TextField(
+                                              controller: controller,
+                                              decoration: const InputDecoration(
+                                                hintText: 'Enter remark...',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              maxLines: 3,
+                                              autofocus: true,
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(dialogContext),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(dialogContext, controller.text),
+                                                child: const Text('Save'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (result != null) {
+                                          setSheetState(() {
+                                            remarkText = result;
+                                          });
+                                        }
+                                      },
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.note_outlined, size: 20, color: Colors.orange),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text('Remark', style: TextStyle(fontSize: 14)),
+                                                if (remarkText.isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    remarkText,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.edit_outlined,
+                                            size: 16,
+                                            color: Colors.grey.shade400,
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 20),
+                              
+                              // Purchase History Section
+                              if (invoicesData.isNotEmpty || quotationsData.isNotEmpty) ...[
+                                const Text(
+                                  'Purchase History',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                
+                                // History Tabs
+                                DefaultTabController(
+                                  length: 2,
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: TabBar(
+                                          labelColor: Colors.blue,
+                                          unselectedLabelColor: Colors.grey,
+                                          indicatorColor: Colors.blue,
+                                          tabs: [
+                                            Tab(text: 'Invoices (${invoicesData.length})'),
+                                            Tab(text: 'Quotations (${quotationsData.length})'),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        height: 150,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: const BorderRadius.vertical(
+                                            bottom: Radius.circular(12),
+                                          ),
+                                        ),
+                                        child: TabBarView(
+                                          children: [
+                                            // Invoices Tab
+                                            _buildHistoryList(invoicesData, 'invoice'),
+                                            // Quotations Tab
+                                            _buildHistoryList(quotationsData, 'quote'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
-                            );
-                          },
+                            ],
+                          ),
                         ),
-                        // SECRET COST DISPLAY - Only visible after tapping yellow price tag 5 times
-                        if (showCost) ...[
-                          const SizedBox(height: 16),
-                          const Divider(),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      
+                      // Bottom Action Button
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, -2),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          ],
+                        ),
+                        child: SafeArea(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              _addToCart(
+                                item,
+                                remark: remarkText,
+                                uom: selectedUom.isEmpty ? null : selectedUom,
+                                customGstPrice: currentPrice,
+                              );
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.lock_open, size: 16, color: Colors.orange.shade700),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Cost Information',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange.shade900,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('Average Cost:', style: TextStyle(fontSize: 13)),
-                                    Text(
-                                      'RM ${(item.averageCost ?? 0).toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('Last Cost:', style: TextStyle(fontSize: 13)),
-                                    Text(
-                                      'RM ${(item.lastCost ?? 0).toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('Standard Cost:', style: TextStyle(fontSize: 13)),
-                                    Text(
-                                      'RM ${(item.standardCost ?? 0).toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                const Divider(),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('Profit Margin:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                    Text(
-                                      'RM ${(_priceSelections[sku]! - (item.averageCost ?? 0)).toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: (_priceSelections[sku]! - (item.averageCost ?? 0)) > 0 
-                                            ? Colors.green.shade700 
-                                            : Colors.red.shade700,
-                                      ),
-                                    ),
-                                  ],
+                                const Icon(Icons.add_shopping_cart, color: Colors.white),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Add to Cart (${localQty} × RM ${currentPrice.toStringAsFixed(2)})',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ],
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
             );
           },
+        );
+      },
+    );
+  }
+  
+  Widget _buildHistoryList(List<Map<String, dynamic>> data, String type) {
+    if (data.isEmpty) {
+      return Center(
+        child: Text(
+          'No previous ${type == 'invoice' ? 'invoices' : 'quotations'}',
+          style: TextStyle(color: Colors.grey.shade500),
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      scrollDirection: Axis.horizontal,
+      itemCount: data.length,
+      itemBuilder: (context, index) {
+        final item = data[index];
+        final DateTime? dt = item['date'] as DateTime?;
+        final dateStr = dt == null ? '-' : '${dt.day}/${dt.month}/${dt.year}';
+        final qty = item['qty'];
+        final uom = item['uom'] ?? '';
+        final price = (item['price'] ?? 0).toStringAsFixed(2);
+        final docNo = type == 'invoice' 
+          ? (item['invoiceNo'] ?? '-')
+          : (item['quoteNo'] ?? '-');
+        
+        return Container(
+          width: 140,
+          margin: const EdgeInsets.only(right: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: type == 'invoice' ? Colors.green.shade50 : Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: type == 'invoice' ? Colors.green.shade200 : Colors.blue.shade200,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '#$docNo',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                dateStr,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$qty $uom',
+                style: const TextStyle(fontSize: 11),
+              ),
+              Text(
+                'RM $price',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: type == 'invoice' ? Colors.green : Colors.blue,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
