@@ -2728,7 +2728,7 @@ class _InventoryPageState extends State<InventoryPage> {
         final int sku = item.skuNo;
         int localQty = _qtySelections[sku] ?? 1;
         String selectedUom = (item.uom ?? '').trim();
-        String remarkText = '';
+        final ValueNotifier<String> remarkText = ValueNotifier<String>('');
         
         // Initialize price from map or item's default price
         if (!_priceSelections.containsKey(sku)) {
@@ -3099,12 +3099,13 @@ class _InventoryPageState extends State<InventoryPage> {
                                     
                                     const Divider(height: 24),
                                     
-                                    // Remark - Isolated in its own StatefulBuilder
-                                    StatefulBuilder(
-                                      builder: (context, setRemarkState) {
+                                    // Remark - Isolated with ValueListenableBuilder (no rebuilds!)
+                                    ValueListenableBuilder<String>(
+                                      valueListenable: remarkText,
+                                      builder: (context, currentRemark, child) {
                                         return InkWell(
                                           onTap: () async {
-                                            final controller = TextEditingController(text: remarkText);
+                                            final controller = TextEditingController(text: currentRemark);
                                             final result = await showDialog<String>(
                                               context: context,
                                               builder: (dialogContext) => AlertDialog(
@@ -3131,9 +3132,7 @@ class _InventoryPageState extends State<InventoryPage> {
                                               ),
                                             );
                                             if (result != null) {
-                                              setRemarkState(() {
-                                                remarkText = result;
-                                              });
+                                              remarkText.value = result; // Update ValueNotifier directly
                                             }
                                           },
                                           child: Row(
@@ -3145,10 +3144,10 @@ class _InventoryPageState extends State<InventoryPage> {
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
                                                     const Text('Remark', style: TextStyle(fontSize: 14)),
-                                                    if (remarkText.isNotEmpty) ...[
+                                                    if (currentRemark.isNotEmpty) ...[
                                                       const SizedBox(height: 4),
                                                       Text(
-                                                        remarkText,
+                                                        currentRemark,
                                                         style: TextStyle(
                                                           fontSize: 12,
                                                           color: Colors.grey.shade600,
@@ -3249,7 +3248,7 @@ class _InventoryPageState extends State<InventoryPage> {
                             onPressed: () {
                               _addToCart(
                                 item,
-                                remark: remarkText,
+                                remark: remarkText.value,
                                 uom: selectedUom.isEmpty ? null : selectedUom,
                                 customGstPrice: currentPrice,
                               );
