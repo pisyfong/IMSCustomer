@@ -3099,7 +3099,6 @@ class _InventoryPageState extends State<InventoryPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: FutureBuilder<List<Map<String, dynamic>>>(
-                                key: ValueKey('prev_invoices_${item.skuNo}_$selectedUom'),
                                 future: cachedInvoicesFuture,
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -3217,7 +3216,6 @@ class _InventoryPageState extends State<InventoryPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: FutureBuilder<List<Map<String, dynamic>>>(
-                                key: ValueKey('prev_quotes_${item.skuNo}_$selectedUom'), // Rebuild when UOM changes
                                 future: cachedQuotationsFuture,
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
