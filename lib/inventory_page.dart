@@ -3081,11 +3081,11 @@ class _InventoryPageState extends State<InventoryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 50,
+                              width: 60,
                               alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               color: Colors.green.shade600,
-                              child: const Text('Inv.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
+                              child: const Text('Inv.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -3199,11 +3199,11 @@ class _InventoryPageState extends State<InventoryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 50,
+                              width: 60,
                               alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               color: Colors.blue.shade600,
-                              child: const Text('Quote.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
+                              child: const Text('Quote.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
