@@ -3177,194 +3177,204 @@ class _InventoryPageState extends State<InventoryPage> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // Previous Invoices (shown first)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 60,
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              color: Colors.green.shade600,
-                              child: const Text('Inv.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: invoicesData.isEmpty ?
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: Text(
-                                    'No previous invoices found.',
-                                    style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
-                                  ),
-                                ) :
-                                // Render as single row grid (3 items max)
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    // Always show 3 items in one row
-                                    final int crossAxisCount = 3;
-                                    return GridView.builder(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                        crossAxisSpacing: 6,
-                                        mainAxisSpacing: 6,
-                                        childAspectRatio: 1.4,
-                                      ),
-                                      itemCount: invoicesData.length,
-                                      itemBuilder: (context, index) {
-                                        final order = invoicesData[index];
-                                          final DateTime? dt = order['date'] as DateTime?;
-                                          final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
-                                          final qty = order['qty'];
-                                          final uom = order['uom'] ?? '';
-                                          final price = (order['price'] ?? 0).toStringAsFixed(2);
-                                          return Container(
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: const Color(0xFFE0E0E0)),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withOpacity(0.03),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            padding: const EdgeInsets.all(6),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  '#${order['invoiceNo'] ?? order['quoteNo'] ?? '-'}',
-                                                  overflow: TextOverflow.ellipsis,
-                                                  maxLines: 1,
-                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  dateStr,
-                                                  style: const TextStyle(fontSize: 10, color: Colors.black54),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  '$qty $uom',
-                                                  overflow: TextOverflow.ellipsis,
-                                                  maxLines: 1,
-                                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  'RM $price',
-                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Previous Quotations (shown second)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 60,
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              color: Colors.blue.shade600,
-                              child: const Text('Quote.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: quotationsData.isEmpty ?
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: Text(
-                                    'No previous quotations found.',
-                                    style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
-                                  ),
-                                ) :
-                                // Render as single row grid (3 items max)
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    // Always show 3 items in one row
-                                    final int crossAxisCount = 3;
-                                    return GridView.builder(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                        crossAxisSpacing: 6,
-                                        mainAxisSpacing: 6,
-                                        childAspectRatio: 1.4,
-                                      ),
-                                      itemCount: quotationsData.length,
-                                      itemBuilder: (context, index) {
-                                        final order = quotationsData[index];
-                                          final DateTime? dt = order['date'] as DateTime?;
-                                          final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
-                                          final qty = order['qty'];
-                                          final uom = order['uom'] ?? '';
-                                          final price = (order['price'] ?? 0).toStringAsFixed(2);
-                                          return Container(
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: const Color(0xFFE0E0E0)),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withOpacity(0.03),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            padding: const EdgeInsets.all(6),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  '#${order['quoteNo']}',
-                                                  overflow: TextOverflow.ellipsis,
-                                                  maxLines: 1,
-                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  dateStr,
-                                                  style: const TextStyle(fontSize: 10, color: Colors.black54),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  '$qty $uom',
-                                                  overflow: TextOverflow.ellipsis,
-                                                  maxLines: 1,
-                                                  style: const TextStyle(fontSize: 10, color: Colors.black87),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  'RM $price',
-                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                            ),
-                          ],
+                        // Invoices and Quotations section - isolated from remark updates
+                        Builder(
+                          builder: (builderContext) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Previous Invoices (shown first)
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 60,
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      color: Colors.green.shade600,
+                                      child: const Text('Inv.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: invoicesData.isEmpty ?
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          child: Text(
+                                            'No previous invoices found.',
+                                            style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                                          ),
+                                        ) :
+                                        // Render as single row grid (3 items max)
+                                        LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            // Always show 3 items in one row
+                                            final int crossAxisCount = 3;
+                                            return GridView.builder(
+                                              shrinkWrap: true,
+                                              physics: const NeverScrollableScrollPhysics(),
+                                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: crossAxisCount,
+                                                crossAxisSpacing: 6,
+                                                mainAxisSpacing: 6,
+                                                childAspectRatio: 1.4,
+                                              ),
+                                              itemCount: invoicesData.length,
+                                              itemBuilder: (context, index) {
+                                                final order = invoicesData[index];
+                                                final DateTime? dt = order['date'] as DateTime?;
+                                                final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+                                                final qty = order['qty'];
+                                                final uom = order['uom'] ?? '';
+                                                final price = (order['price'] ?? 0).toStringAsFixed(2);
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withOpacity(0.03),
+                                                        blurRadius: 4,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  padding: const EdgeInsets.all(6),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        '#${order['invoiceNo'] ?? order['quoteNo'] ?? '-'}',
+                                                        overflow: TextOverflow.ellipsis,
+                                                        maxLines: 1,
+                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        dateStr,
+                                                        style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        '$qty $uom',
+                                                        overflow: TextOverflow.ellipsis,
+                                                        maxLines: 1,
+                                                        style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        'RM $price',
+                                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            );
+                                          },
+                                        ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                // Previous Quotations (shown second)
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 60,
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      color: Colors.blue.shade600,
+                                      child: const Text('Quote.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: quotationsData.isEmpty ?
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          child: Text(
+                                            'No previous quotations found.',
+                                            style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                                          ),
+                                        ) :
+                                        // Render as single row grid (3 items max)
+                                        LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            // Always show 3 items in one row
+                                            final int crossAxisCount = 3;
+                                            return GridView.builder(
+                                              shrinkWrap: true,
+                                              physics: const NeverScrollableScrollPhysics(),
+                                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: crossAxisCount,
+                                                crossAxisSpacing: 6,
+                                                mainAxisSpacing: 6,
+                                                childAspectRatio: 1.4,
+                                              ),
+                                              itemCount: quotationsData.length,
+                                              itemBuilder: (context, index) {
+                                                final order = quotationsData[index];
+                                                final DateTime? dt = order['date'] as DateTime?;
+                                                final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+                                                final qty = order['qty'];
+                                                final uom = order['uom'] ?? '';
+                                                final price = (order['price'] ?? 0).toStringAsFixed(2);
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withOpacity(0.03),
+                                                        blurRadius: 4,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  padding: const EdgeInsets.all(6),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        '#${order['quoteNo']}',
+                                                        overflow: TextOverflow.ellipsis,
+                                                        maxLines: 1,
+                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        dateStr,
+                                                        style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        '$qty $uom',
+                                                        overflow: TextOverflow.ellipsis,
+                                                        maxLines: 1,
+                                                        style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        'RM $price',
+                                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            );
+                                          },
+                                        ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         // SECRET COST DISPLAY - Only visible after tapping yellow price tag 5 times
                         if (showCost) ...[
