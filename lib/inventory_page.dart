@@ -3099,70 +3099,74 @@ class _InventoryPageState extends State<InventoryPage> {
                                     
                                     const Divider(height: 24),
                                     
-                                    // Remark
-                                    InkWell(
-                                      onTap: () async {
-                                        final controller = TextEditingController(text: remarkText);
-                                        final result = await showDialog<String>(
-                                          context: context,
-                                          builder: (dialogContext) => AlertDialog(
-                                            title: const Text('Add Remark'),
-                                            content: TextField(
-                                              controller: controller,
-                                              decoration: const InputDecoration(
-                                                hintText: 'Enter remark...',
-                                                border: OutlineInputBorder(),
+                                    // Remark - Isolated in its own StatefulBuilder
+                                    StatefulBuilder(
+                                      builder: (context, setRemarkState) {
+                                        return InkWell(
+                                          onTap: () async {
+                                            final controller = TextEditingController(text: remarkText);
+                                            final result = await showDialog<String>(
+                                              context: context,
+                                              builder: (dialogContext) => AlertDialog(
+                                                title: const Text('Add Remark'),
+                                                content: TextField(
+                                                  controller: controller,
+                                                  decoration: const InputDecoration(
+                                                    hintText: 'Enter remark...',
+                                                    border: OutlineInputBorder(),
+                                                  ),
+                                                  maxLines: 3,
+                                                  autofocus: true,
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(dialogContext),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(dialogContext, controller.text),
+                                                    child: const Text('Save'),
+                                                  ),
+                                                ],
                                               ),
-                                              maxLines: 3,
-                                              autofocus: true,
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(dialogContext),
-                                                child: const Text('Cancel'),
+                                            );
+                                            if (result != null) {
+                                              setRemarkState(() {
+                                                remarkText = result;
+                                              });
+                                            }
+                                          },
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.note_outlined, size: 20, color: Colors.orange),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('Remark', style: TextStyle(fontSize: 14)),
+                                                    if (remarkText.isNotEmpty) ...[
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        remarkText,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey.shade600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
                                               ),
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(dialogContext, controller.text),
-                                                child: const Text('Save'),
+                                              Icon(
+                                                Icons.edit_outlined,
+                                                size: 16,
+                                                color: Colors.grey.shade400,
                                               ),
                                             ],
                                           ),
                                         );
-                                        if (result != null) {
-                                          setSheetState(() {
-                                            remarkText = result;
-                                          });
-                                        }
                                       },
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.note_outlined, size: 20, color: Colors.orange),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                const Text('Remark', style: TextStyle(fontSize: 14)),
-                                                if (remarkText.isNotEmpty) ...[
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    remarkText,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey.shade600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                          Icon(
-                                            Icons.edit_outlined,
-                                            size: 16,
-                                            color: Colors.grey.shade400,
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   ],
                                 ),
