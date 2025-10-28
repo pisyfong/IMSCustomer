@@ -2742,9 +2742,11 @@ class _InventoryPageState extends State<InventoryPage> {
         int priceTapCount = 0;
         bool showCost = false;
         
-        // Cache futures to prevent reload on every rebuild - initialize immediately
-        var cachedInvoicesFuture = _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
-        var cachedQuotationsFuture = _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
+        // Store loaded data directly - no FutureBuilder refresh
+        List<Map<String, dynamic>> invoicesData = [];
+        List<Map<String, dynamic>> quotationsData = [];
+        bool isLoadingInvoices = true;
+        bool isLoadingQuotations = true;
         
         return DraggableScrollableSheet(
           initialChildSize: 0.45,
@@ -2787,6 +2789,30 @@ class _InventoryPageState extends State<InventoryPage> {
                     if (context.mounted) {
                       setSheetState(() {
                         canEditPrice = canEdit;
+                      });
+                    }
+                  });
+                }
+                
+                // Load invoices data once
+                if (isLoadingInvoices) {
+                  isLoadingInvoices = false;
+                  _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
+                    if (context.mounted) {
+                      setSheetState(() {
+                        invoicesData = data;
+                      });
+                    }
+                  });
+                }
+                
+                // Load quotations data once
+                if (isLoadingQuotations) {
+                  isLoadingQuotations = false;
+                  _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
+                    if (context.mounted) {
+                      setSheetState(() {
+                        quotationsData = data;
                       });
                     }
                   });
@@ -3064,18 +3090,32 @@ class _InventoryPageState extends State<InventoryPage> {
                                     ChoiceChip(
                                       label: Text(uomOption.uom ?? ''),
                                       selected: selectedUom == (uomOption.uom ?? ''),
-                                      onSelected: (_) => setSheetState(() { 
-                                        selectedUom = uomOption.uom ?? '';
-                                        selectedUomData = uomOption;
-                                        // Update price when UOM changes
-                                        final newPrice = uomOption.gstPrice ?? uomOption.price ?? 0.0;
-                                        _priceSelections[sku] = newPrice;
-                                        priceCtrl.text = newPrice.toStringAsFixed(2);
+                                      onSelected: (_) { 
+                                        setSheetState(() {
+                                          selectedUom = uomOption.uom ?? '';
+                                          selectedUomData = uomOption;
+                                          // Update price when UOM changes
+                                          final newPrice = uomOption.gstPrice ?? uomOption.price ?? 0.0;
+                                          _priceSelections[sku] = newPrice;
+                                          priceCtrl.text = newPrice.toStringAsFixed(2);
+                                          print('🔄 UOM changed to ${uomOption.uom}, price updated to RM ${newPrice.toStringAsFixed(2)}');
+                                        });
                                         // Reload invoices and quotations for new UOM
-                                        cachedInvoicesFuture = _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
-                                        cachedQuotationsFuture = _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom);
-                                        print('🔄 UOM changed to ${uomOption.uom}, price updated to RM ${newPrice.toStringAsFixed(2)}');
-                                      }),
+                                        _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
+                                          if (context.mounted) {
+                                            setSheetState(() {
+                                              invoicesData = data;
+                                            });
+                                          }
+                                        });
+                                        _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
+                                          if (context.mounted) {
+                                            setSheetState(() {
+                                              quotationsData = data;
+                                            });
+                                          }
+                                        });
+                                      },
                                       selectedColor: Colors.orange.shade200,
                                     ),
                                   ).toList(),
@@ -3098,51 +3138,31 @@ class _InventoryPageState extends State<InventoryPage> {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: FutureBuilder<List<Map<String, dynamic>>>(
-                                future: cachedInvoicesFuture,
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 8),
-                                      child: Center(child: SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))),
-                                    );
-                                  }
-                                  if (snapshot.hasError) {
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Text('Failed to load previous orders: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
-                                    );
-                                  }
-                                  final data = snapshot.data ?? const [];
-                                  if (data.isEmpty) {
-                                    final isOnline = signalRService.isConnected;
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Text(
-                                        isOnline
-                                          ? 'No previous invoices found.'
-                                          : 'No cached invoices available offline.',
-                                        style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                              child: invoicesData.isEmpty ?
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Text(
+                                    'No previous invoices found.',
+                                    style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                                  ),
+                                ) :
+                                // Render as single row grid (3 items max)
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    // Always show 3 items in one row
+                                    final int crossAxisCount = 3;
+                                    return GridView.builder(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: crossAxisCount,
+                                        crossAxisSpacing: 6,
+                                        mainAxisSpacing: 6,
+                                        childAspectRatio: 1.4,
                                       ),
-                                    );
-                                  }
-                                  // Render as single row grid (3 items max)
-                                  return LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      // Always show 3 items in one row
-                                      final int crossAxisCount = 3;
-                                      return GridView.builder(
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: crossAxisCount,
-                                          crossAxisSpacing: 6,
-                                          mainAxisSpacing: 6,
-                                          childAspectRatio: 1.4,
-                                        ),
-                                        itemCount: data.length,
-                                        itemBuilder: (context, index) {
-                                          final order = data[index];
+                                      itemCount: invoicesData.length,
+                                      itemBuilder: (context, index) {
+                                        final order = invoicesData[index];
                                           final DateTime? dt = order['date'] as DateTime?;
                                           final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
                                           final qty = order['qty'];
@@ -3195,9 +3215,7 @@ class _InventoryPageState extends State<InventoryPage> {
                                         },
                                       );
                                     },
-                                  );
-                                },
-                              ),
+                                  ),
                             ),
                           ],
                         ),
@@ -3215,51 +3233,31 @@ class _InventoryPageState extends State<InventoryPage> {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: FutureBuilder<List<Map<String, dynamic>>>(
-                                future: cachedQuotationsFuture,
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 8),
-                                      child: Center(child: SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))),
-                                    );
-                                  }
-                                  if (snapshot.hasError) {
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Text('Failed to load previous quotations: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
-                                    );
-                                  }
-                                  final data = snapshot.data ?? const [];
-                                  if (data.isEmpty) {
-                                    final isOnline = signalRService.isConnected;
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Text(
-                                        isOnline
-                                          ? 'No previous quotations found.'
-                                          : 'No cached quotations available offline.',
-                                        style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                              child: quotationsData.isEmpty ?
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Text(
+                                    'No previous quotations found.',
+                                    style: const TextStyle(color: Colors.black54, fontStyle: FontStyle.italic, fontSize: 11),
+                                  ),
+                                ) :
+                                // Render as single row grid (3 items max)
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    // Always show 3 items in one row
+                                    final int crossAxisCount = 3;
+                                    return GridView.builder(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: crossAxisCount,
+                                        crossAxisSpacing: 6,
+                                        mainAxisSpacing: 6,
+                                        childAspectRatio: 1.4,
                                       ),
-                                    );
-                                  }
-                                  // Render as single row grid (3 items max)
-                                  return LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      // Always show 3 items in one row
-                                      final int crossAxisCount = 3;
-                                      return GridView.builder(
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: crossAxisCount,
-                                          crossAxisSpacing: 6,
-                                          mainAxisSpacing: 6,
-                                          childAspectRatio: 1.4,
-                                        ),
-                                        itemCount: data.length,
-                                        itemBuilder: (context, index) {
-                                          final order = data[index];
+                                      itemCount: quotationsData.length,
+                                      itemBuilder: (context, index) {
+                                        final order = quotationsData[index];
                                           final DateTime? dt = order['date'] as DateTime?;
                                           final dateStr = dt == null ? '-' : '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
                                           final qty = order['qty'];
@@ -3312,9 +3310,7 @@ class _InventoryPageState extends State<InventoryPage> {
                                         },
                                       );
                                     },
-                                  );
-                                },
-                              ),
+                                  ),
                             ),
                           ],
                         ),
