@@ -3091,7 +3091,9 @@ class _InventoryPageState extends State<InventoryPage> {
                                     },
                                   );
                                   if (result != null) {
-                                    remarkCtrl.text = result;
+                                    setSheetState(() {
+                                      remarkCtrl.text = result;
+                                    });
                                   }
                                 },
                                 child: Container(
