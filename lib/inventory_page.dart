@@ -3081,7 +3081,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 40,
+                              width: 50,
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               color: Colors.green.shade600,
@@ -3199,7 +3199,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 40,
+                              width: 50,
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               color: Colors.blue.shade600,
