@@ -2747,6 +2747,8 @@ class _InventoryPageState extends State<InventoryPage> {
         List<Map<String, dynamic>> quotationsData = [];
         bool isLoadingInvoices = true;
         bool isLoadingQuotations = true;
+        bool invoicesRendered = false; // Track if data has been rendered once
+        bool quotationsRendered = false;
         
         return DraggableScrollableSheet(
           initialChildSize: 0.45,
@@ -2798,10 +2800,11 @@ class _InventoryPageState extends State<InventoryPage> {
                 if (isLoadingInvoices) {
                   isLoadingInvoices = false;
                   _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                    if (context.mounted) {
-                      setSheetState(() {
-                        invoicesData = data;
-                      });
+                    invoicesData = data;
+                    // Only call setState the first time to show data
+                    if (context.mounted && !invoicesRendered) {
+                      invoicesRendered = true;
+                      setSheetState(() {});
                     }
                   });
                 }
@@ -2810,10 +2813,11 @@ class _InventoryPageState extends State<InventoryPage> {
                 if (isLoadingQuotations) {
                   isLoadingQuotations = false;
                   _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                    if (context.mounted) {
-                      setSheetState(() {
-                        quotationsData = data;
-                      });
+                    quotationsData = data;
+                    // Only call setState the first time to show data
+                    if (context.mounted && !quotationsRendered) {
+                      quotationsRendered = true;
+                      setSheetState(() {});
                     }
                   });
                 }
