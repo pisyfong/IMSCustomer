@@ -82,6 +82,9 @@ class _InventoryPageState extends State<InventoryPage> {
     'subDept': false,
     'category': false,
   };
+  
+  // Cache working UOMs to prevent multiple HTTP requests
+  final Map<String, String?> _workingUomCache = {};
 
   @override
   void initState() {
@@ -2718,6 +2721,15 @@ class _InventoryPageState extends State<InventoryPage> {
 
   // Try all available UOMs until one returns a successful image download
   Future<String?> _getWorkingUomForImage(int companyCode, int skuNo) async {
+    final cacheKey = '${companyCode}_$skuNo';
+    
+    // Check cache first
+    if (_workingUomCache.containsKey(cacheKey)) {
+      final cachedUom = _workingUomCache[cacheKey];
+      print('📷 SKU $skuNo: Using cached working UOM "$cachedUom"');
+      return cachedUom;
+    }
+    
     try {
       final uomOptions = await isar.inStockUoms
         .filter()
@@ -2727,6 +2739,7 @@ class _InventoryPageState extends State<InventoryPage> {
       
       if (uomOptions.isEmpty) {
         print('📷 No UOM options found for SKU $skuNo, using item.uom');
+        _workingUomCache[cacheKey] = null;
         return null; // Will fallback to item.uom
       }
       
@@ -2747,6 +2760,7 @@ class _InventoryPageState extends State<InventoryPage> {
           final response = await http.head(Uri.parse(imageUrl));
           if (response.statusCode == 200) {
             print('📷 ✅ SKU $skuNo: Found working image with UOM "$uom"');
+            _workingUomCache[cacheKey] = uom; // Cache the result
             return uom;
           } else {
             print('📷 ❌ SKU $skuNo: UOM "$uom" returned ${response.statusCode}');
@@ -2758,9 +2772,11 @@ class _InventoryPageState extends State<InventoryPage> {
       }
       
       print('📷 ⚠️ SKU $skuNo: No working UOM found, falling back to item.uom');
+      _workingUomCache[cacheKey] = null; // Cache the null result
       return null; // Will fallback to item.uom
     } catch (e) {
       print('❌ Error testing UOMs for SKU $skuNo: $e');
+      _workingUomCache[cacheKey] = null; // Cache the null result
       return null; // Will fallback to item.uom
     }
   }
