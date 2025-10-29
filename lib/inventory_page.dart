@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
+import 'package:http/http.dart' as http;
 import 'models/inventory_item.dart';
 import 'models/plu.dart';
 import '../services/inventory_service.dart';
@@ -865,10 +866,10 @@ class _InventoryPageState extends State<InventoryPage> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: FutureBuilder<String?>(
-                future: _getBaseUomForImage(companyCode, item.skuNo),
+                future: _getWorkingUomForImage(companyCode, item.skuNo),
                 builder: (context, snapshot) {
                   final uom = snapshot.data ?? item.uom;
-                  print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (base UOM method)');
+                  print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (working UOM method)');
                   return InventoryImageWidget(
                     companyCode: companyCode,
                     skuNo: item.skuNo,
@@ -2475,7 +2476,7 @@ class _InventoryPageState extends State<InventoryPage> {
             AspectRatio(
               aspectRatio: 1.0,
               child: FutureBuilder<String?>(
-                future: _getBaseUomForImage(
+                future: _getWorkingUomForImage(
                   _selectedCompany?['companyCode'] is String
                       ? int.parse(_selectedCompany!['companyCode'])
                       : _selectedCompany?['companyCode'] ?? 0,
@@ -2483,7 +2484,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 ),
                 builder: (context, snapshot) {
                   final uom = snapshot.data ?? item.uom;
-                  print('📷 GRID IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (base UOM method)');
+                  print('📷 GRID IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (working UOM method)');
                   return InventoryImageWidget(
                     companyCode: _selectedCompany?['companyCode'] is String
                         ? int.parse(_selectedCompany!['companyCode'])
@@ -2715,8 +2716,8 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  // Get base UOM (factor = 1.0) for images, fallback to first available UOM
-  Future<String?> _getBaseUomForImage(int companyCode, int skuNo) async {
+  // Try all available UOMs until one returns a successful image download
+  Future<String?> _getWorkingUomForImage(int companyCode, int skuNo) async {
     try {
       final uomOptions = await isar.inStockUoms
         .filter()
@@ -2729,19 +2730,37 @@ class _InventoryPageState extends State<InventoryPage> {
         return null; // Will fallback to item.uom
       }
       
-      // First try to find UOM with factor = 1.0 (base UOM)
-      final baseUom = uomOptions.where((uom) => (uom.factor ?? 1.0) == 1.0).firstOrNull;
-      if (baseUom != null) {
-        print('📷 SKU $skuNo: Using base UOM "${baseUom.uom}" (factor=1.0) for image');
-        return baseUom.uom;
+      print('📷 SKU $skuNo: Testing ${uomOptions.length} UOM options for working image...');
+      
+      // Try each UOM until we find one that works
+      for (final uomOption in uomOptions) {
+        final uom = uomOption.uom;
+        if (uom == null || uom.trim().isEmpty) continue;
+        
+        // Check if image exists for this UOM
+        final imageUrl = 'http://fungseng.dyndns.org:88/ItemMasterImages/${skuNo.toString().padLeft(6, '0')}_$uom.jpg';
+        
+        try {
+          print('📷 SKU $skuNo: Testing UOM "$uom" - $imageUrl');
+          
+          // Quick HEAD request to check if image exists (don't download full image)
+          final response = await http.head(Uri.parse(imageUrl));
+          if (response.statusCode == 200) {
+            print('📷 ✅ SKU $skuNo: Found working image with UOM "$uom"');
+            return uom;
+          } else {
+            print('📷 ❌ SKU $skuNo: UOM "$uom" returned ${response.statusCode}');
+          }
+        } catch (e) {
+          print('📷 ❌ SKU $skuNo: UOM "$uom" failed: $e');
+          continue;
+        }
       }
       
-      // If no factor=1.0 found, use the first available UOM
-      final firstUom = uomOptions.first;
-      print('📷 SKU $skuNo: No base UOM found, using first UOM "${firstUom.uom}" (factor=${firstUom.factor}) for image');
-      return firstUom.uom;
+      print('📷 ⚠️ SKU $skuNo: No working UOM found, falling back to item.uom');
+      return null; // Will fallback to item.uom
     } catch (e) {
-      print('❌ Error getting base UOM for SKU $skuNo: $e');
+      print('❌ Error testing UOMs for SKU $skuNo: $e');
       return null; // Will fallback to item.uom
     }
   }
