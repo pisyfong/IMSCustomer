@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:isar/isar.dart';
 import '../config/company_image_config.dart';
+import '../models/in_stock_uom.dart';
+import '../main.dart';
 
 class InventoryImageService {
   static final InventoryImageService _instance = InventoryImageService._internal();
@@ -135,26 +138,99 @@ class InventoryImageService {
     }
   }
 
-  // Batch download images for multiple inventory items
+  // Try all available UOMs for a SKU until one returns a successful image download
+  Future<String?> _findWorkingUomForSync(int companyCode, int skuNo) async {
+    try {
+      final isar = Isar.getInstance();
+      if (isar == null) {
+        print('📷 SYNC: No Isar instance available for SKU $skuNo');
+        return null;
+      }
+
+      final uomOptions = await isar.inStockUoms
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .skuNoEqualTo(skuNo)
+        .findAll();
+      
+      if (uomOptions.isEmpty) {
+        print('📷 SYNC: No UOM options found for SKU $skuNo');
+        return null;
+      }
+      
+      print('📷 SYNC: Testing ${uomOptions.length} UOM options for SKU $skuNo...');
+      
+      // Try each UOM until we find one that works
+      for (final uomOption in uomOptions) {
+        final uom = uomOption.uom;
+        if (uom == null || uom.trim().isEmpty) continue;
+        
+        // Check if image exists for this UOM
+        final imageUrl = getImageUrl(companyCode, skuNo, uom);
+        if (imageUrl == null) continue;
+        
+        try {
+          print('📷 SYNC: Testing UOM "$uom" for SKU $skuNo - $imageUrl');
+          
+          // Quick HEAD request to check if image exists (don't download full image yet)
+          final response = await http.head(Uri.parse(imageUrl));
+          if (response.statusCode == 200) {
+            print('📷 SYNC: ✅ Found working image for SKU $skuNo with UOM "$uom"');
+            return uom;
+          } else {
+            print('📷 SYNC: ❌ SKU $skuNo UOM "$uom" returned ${response.statusCode}');
+          }
+        } catch (e) {
+          print('📷 SYNC: ❌ SKU $skuNo UOM "$uom" failed: $e');
+          continue;
+        }
+      }
+      
+      print('📷 SYNC: ⚠️ No working UOM found for SKU $skuNo');
+      return null;
+    } catch (e) {
+      print('❌ SYNC: Error testing UOMs for SKU $skuNo: $e');
+      return null;
+    }
+  }
+
+  // Batch download images for multiple inventory items (with smart UOM detection)
   Future<void> batchDownloadImages(int companyCode, List<Map<String, dynamic>> inventoryItems) async {
-    print('📥 Starting batch download for Company $companyCode, ${inventoryItems.length} items...');
+    print('📥 Starting SMART batch download for Company $companyCode, ${inventoryItems.length} items...');
     
     final downloadTasks = <Future>[];
     
     for (final item in inventoryItems) {
       final skuNo = item['skuNo'] as int?;
-      final uom = item['uom'] as String?;
       
-      if (skuNo != null && uom != null) {
-        final imageUrl = getImageUrl(companyCode, skuNo, uom);
-        if (imageUrl != null) {
-          downloadTasks.add(downloadAndCacheImage(imageUrl, companyCode, skuNo, uom));
-        }
+      if (skuNo != null) {
+        // Instead of using provided UOM, find a working UOM
+        downloadTasks.add(_downloadImageWithSmartUom(companyCode, skuNo));
       }
     }
     
     await Future.wait(downloadTasks);
-    print('✅ Batch download completed');
+    print('✅ SMART batch download completed');
+  }
+
+  // Download image for a SKU using smart UOM detection
+  Future<void> _downloadImageWithSmartUom(int companyCode, int skuNo) async {
+    try {
+      // Find a working UOM for this SKU
+      final workingUom = await _findWorkingUomForSync(companyCode, skuNo);
+      
+      if (workingUom != null) {
+        final imageUrl = getImageUrl(companyCode, skuNo, workingUom);
+        if (imageUrl != null) {
+          print('📷 SYNC: Downloading image for SKU $skuNo with working UOM "$workingUom"');
+          await downloadAndCacheImage(imageUrl, companyCode, skuNo, workingUom);
+        }
+      } else {
+        print('📷 SYNC: Skipping SKU $skuNo - no working UOM found');
+      }
+    } catch (e) {
+      print('❌ SYNC: Error downloading image for SKU $skuNo: $e');
+    }
   }
 
   // Clear all cached images
