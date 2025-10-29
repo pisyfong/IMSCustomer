@@ -248,8 +248,7 @@ class InventoryService {
           .skuNoEqualTo(skuNo)
           .findAll();
       
-      // Sort by factor (ascending) so base UOM appears first
-      uomOptions.sort((a, b) => (a.factor ?? 1).compareTo(b.factor ?? 1));
+      // Keep UOM options in their natural order (no sorting by lowest factor)
       
       return uomOptions;
     } catch (e) {
