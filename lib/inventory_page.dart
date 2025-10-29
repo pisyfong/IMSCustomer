@@ -864,17 +864,18 @@ class _InventoryPageState extends State<InventoryPage> {
             // Left image (small square)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: InventoryImageWidget(
-                  companyCode: companyCode,
-                  skuNo: item.skuNo,
-                  uom: item.uom,
-                  borderRadius: BorderRadius.zero,
-                  fit: BoxFit.cover,
-                  showLoadingIndicator: true,
-                ),
+              child: Builder(
+                builder: (context) {
+                  print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "${item.uom}" for image');
+                  return InventoryImageWidget(
+                    companyCode: companyCode,
+                    skuNo: item.skuNo,
+                    uom: item.uom, // This should be the UOM from server's in_stock table
+                    borderRadius: BorderRadius.zero,
+                    fit: BoxFit.cover,
+                    showLoadingIndicator: true,
+                  );
+                },
               ),
             ),
             const SizedBox(width: 10),
@@ -2471,15 +2472,20 @@ class _InventoryPageState extends State<InventoryPage> {
             // Image section: full-width square image
             AspectRatio(
               aspectRatio: 1.0,
-              child: InventoryImageWidget(
-                companyCode: _selectedCompany?['companyCode'] is String
-                    ? int.parse(_selectedCompany!['companyCode'])
-                    : _selectedCompany?['companyCode'] ?? 0,
-                skuNo: item.skuNo,
-                uom: item.uom, // This IS the UOM from server's in_stock table
-                borderRadius: BorderRadius.zero,
-                fit: BoxFit.cover,
-                showLoadingIndicator: true,
+              child: Builder(
+                builder: (context) {
+                  print('📷 GRID IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "${item.uom}" for image');
+                  return InventoryImageWidget(
+                    companyCode: _selectedCompany?['companyCode'] is String
+                        ? int.parse(_selectedCompany!['companyCode'])
+                        : _selectedCompany?['companyCode'] ?? 0,
+                    skuNo: item.skuNo,
+                    uom: item.uom, // This should be the UOM from server's in_stock table
+                    borderRadius: BorderRadius.zero,
+                    fit: BoxFit.cover,
+                    showLoadingIndicator: true,
+                  );
+                },
               ),
             ),
             // Details section: compact padding, no Expanded/Spacer to avoid overflow

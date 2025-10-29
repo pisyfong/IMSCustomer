@@ -136,6 +136,14 @@ class InventoryService {
               ? raw
               : Map<String, dynamic>.from(raw as Map);
           final item = InventoryItem.fromJson(itemData);
+          
+          // Debug logging for SKU 8 specifically
+          if (item.skuNo == 8) {
+            print('🔍 SERVER DATA DEBUG - SKU 8: Received UOM "${itemData['Uom']}" from server');
+            print('🔍 SERVER DATA DEBUG - SKU 8: Full item data: $itemData');
+            print('🔍 SERVER DATA DEBUG - SKU 8: Parsed item.uom = "${item.uom}"');
+          }
+          
           inventoryItems.add(item);
         } catch (e, stackTrace) {
           print('❌ ERROR converting inventory item $i: $e');
