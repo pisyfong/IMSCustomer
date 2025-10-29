@@ -44,7 +44,7 @@ class _InventoryImageWidgetState extends State<InventoryImageWidget> {
   @override
   void didUpdateWidget(InventoryImageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.skuNo != widget.skuNo) {
+    if (oldWidget.skuNo != widget.skuNo || oldWidget.uom != widget.uom) {
       _loadImage();
     }
   }
@@ -71,6 +71,7 @@ class _InventoryImageWidgetState extends State<InventoryImageWidget> {
       }
 
       // Get the image URL for this inventory item
+      print('🖼️ InventoryImageWidget: SKU ${widget.skuNo} - Received UOM "${widget.uom}" for image construction');
       final imageUrl = _imageService.getImageUrl(widget.companyCode, widget.skuNo, widget.uom);
       
       if (imageUrl == null) {
