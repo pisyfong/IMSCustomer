@@ -3099,132 +3099,20 @@ class _InventoryPageState extends State<InventoryPage> {
                                     
                                     const Divider(height: 24),
                                     
-                                    // Remark - Isolated with ValueListenableBuilder (no rebuilds!)
-                                    ValueListenableBuilder<String>(
-                                      valueListenable: remarkText,
-                                      builder: (context, currentRemark, child) {
-                                        return InkWell(
-                                          onTap: () async {
-                                            final controller = TextEditingController(text: currentRemark);
-                                            final result = await showDialog<String>(
-                                              context: context,
-                                              builder: (dialogContext) => AlertDialog(
-                                                title: const Text('Add Remark'),
-                                                content: TextField(
-                                                  controller: controller,
-                                                  decoration: const InputDecoration(
-                                                    hintText: 'Enter remark...',
-                                                    border: OutlineInputBorder(),
-                                                  ),
-                                                  maxLines: 3,
-                                                  autofocus: true,
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () => Navigator.pop(dialogContext),
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () => Navigator.pop(dialogContext, controller.text),
-                                                    child: const Text('Save'),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                            if (result != null) {
-                                              remarkText.value = result; // Update ValueNotifier directly
-                                            }
-                                          },
-                                          child: Row(
-                                            children: [
-                                              const Icon(Icons.note_outlined, size: 20, color: Colors.orange),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text('Remark', style: TextStyle(fontSize: 14)),
-                                                    if (currentRemark.isNotEmpty) ...[
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        currentRemark,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey.shade600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                              ),
-                                              Icon(
-                                                Icons.edit_outlined,
-                                                size: 16,
-                                                color: Colors.grey.shade400,
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    // Remark - Completely separate widget
+                                    _RemarkWidget(remarkNotifier: remarkText),
                                   ],
                                 ),
                               ),
                               
                               const SizedBox(height: 20),
                               
-                              // Purchase History Section
-                              if (invoicesData.isNotEmpty || quotationsData.isNotEmpty) ...[
-                                const Text(
-                                  'Purchase History',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                
-                                // History Tabs
-                                DefaultTabController(
-                                  length: 2,
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: TabBar(
-                                          labelColor: Colors.blue,
-                                          unselectedLabelColor: Colors.grey,
-                                          indicatorColor: Colors.blue,
-                                          tabs: [
-                                            Tab(text: 'Invoices (${invoicesData.length})'),
-                                            Tab(text: 'Quotations (${quotationsData.length})'),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        height: 150,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: const BorderRadius.vertical(
-                                            bottom: Radius.circular(12),
-                                          ),
-                                        ),
-                                        child: TabBarView(
-                                          children: [
-                                            // Invoices Tab
-                                            _buildHistoryList(invoicesData, 'invoice'),
-                                            // Quotations Tab
-                                            _buildHistoryList(quotationsData, 'quote'),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                              // Purchase History Section - Completely separate widget
+                              _PurchaseHistoryWidget(
+                                invoicesData: invoicesData,
+                                quotationsData: quotationsData,
+                                buildHistoryList: _buildHistoryList,
+                              ),
                             ],
                           ),
                         ),
@@ -3731,6 +3619,159 @@ class _InventoryPriceEditDialogState extends State<_InventoryPriceEditDialog> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Separate widget for remark - completely isolated from parent rebuilds
+class _RemarkWidget extends StatelessWidget {
+  final ValueNotifier<String> remarkNotifier;
+  
+  const _RemarkWidget({required this.remarkNotifier});
+  
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: remarkNotifier,
+      builder: (context, currentRemark, child) {
+        return InkWell(
+          onTap: () async {
+            final controller = TextEditingController(text: currentRemark);
+            final result = await showDialog<String>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Add Remark'),
+                content: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter remark...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  autofocus: true,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, controller.text),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            );
+            if (result != null) {
+              remarkNotifier.value = result; // Direct update - no parent notification
+            }
+          },
+          child: Row(
+            children: [
+              const Icon(Icons.note_outlined, size: 20, color: Colors.orange),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Remark', style: TextStyle(fontSize: 14)),
+                    if (currentRemark.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        currentRemark,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.edit_outlined,
+                size: 16,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Separate widget for purchase history - completely isolated from parent rebuilds
+class _PurchaseHistoryWidget extends StatelessWidget {
+  final List<Map<String, dynamic>> invoicesData;
+  final List<Map<String, dynamic>> quotationsData;
+  final Widget Function(List<Map<String, dynamic>>, String) buildHistoryList;
+  
+  const _PurchaseHistoryWidget({
+    required this.invoicesData,
+    required this.quotationsData,
+    required this.buildHistoryList,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    if (invoicesData.isEmpty && quotationsData.isEmpty) {
+      return const SizedBox.shrink(); // Don't show anything if no history
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Purchase History',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        // History Tabs
+        DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TabBar(
+                  labelColor: Colors.blue,
+                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: Colors.blue,
+                  tabs: [
+                    Tab(text: 'Invoices (${invoicesData.length})'),
+                    Tab(text: 'Quotations (${quotationsData.length})'),
+                  ],
+                ),
+              ),
+              Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(12),
+                  ),
+                ),
+                child: TabBarView(
+                  children: [
+                    // Invoices Tab
+                    buildHistoryList(invoicesData, 'invoice'),
+                    // Quotations Tab
+                    buildHistoryList(quotationsData, 'quote'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
