@@ -2718,7 +2718,7 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
 
-  // Get the correct UOM from in_stock for images (prioritize UOMs with stock or base UOM)
+  // Get the UOM from in_stock table (use first available)
   Future<String?> _getInStockUom(int companyCode, int skuNo) async {
     try {
       // Get all in_stock UOMs for this item
@@ -2733,23 +2733,10 @@ class _InventoryPageState extends State<InventoryPage> {
         return null;
       }
       
-      print('📷 Found ${uomOptions.length} in_stock UOMs for SKU $skuNo: ${uomOptions.map((u) => '${u.uom}(${u.factor})').join(', ')}');
-      
-      // Strategy 1: Prioritize packaging UOMs (higher factor) for images - like CTN, BOX, CASE
-      final packagingUoms = ['CTN', 'BOX', 'CASE', 'PACK', 'SET', 'KIT'];
-      for (final packageType in packagingUoms) {
-        final packageUom = uomOptions.where((u) => u.uom?.toUpperCase() == packageType).firstOrNull;
-        if (packageUom != null) {
-          print('📷 Using packaging UOM for image: ${packageUom.uom} for SKU $skuNo');
-          return packageUom.uom;
-        }
-      }
-      
-      // Strategy 2: Use the UOM with highest factor (largest packaging unit)
-      uomOptions.sort((a, b) => (b.factor ?? 1).compareTo(a.factor ?? 1));
-      final largestUom = uomOptions.first;
-      print('📷 Using largest UOM for image: ${largestUom.uom}(${largestUom.factor}) for SKU $skuNo');
-      return largestUom.uom;
+      // Use the first UOM from in_stock table
+      final imageUom = uomOptions.first.uom;
+      print('📷 Using in_stock UOM for image: $imageUom for SKU $skuNo');
+      return imageUom;
     } catch (e) {
       print('❌ Error getting in_stock UOM for SKU $skuNo: $e');
       return null; // Will fallback to item.uom in FutureBuilder
