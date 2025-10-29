@@ -2700,6 +2700,42 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
+  // Load all initial data without triggering any rebuilds
+  Future<void> _loadInitialData(
+    InventoryItem item,
+    String selectedUom,
+    ValueNotifier<List<InStockUom>> uomOptions,
+    ValueNotifier<List<Map<String, dynamic>>> invoicesData,
+    ValueNotifier<List<Map<String, dynamic>>> quotationsData,
+    ValueNotifier<bool> canEditPrice,
+  ) async {
+    try {
+      // Load UOM options
+      final options = await _loadUomOptions(item);
+      uomOptions.value = options;
+      
+      // Check price permission
+      final company = await _authService.getSelectedCompany();
+      final companyCodeRaw = company?['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+      final settingsService = UserAppSettingsService();
+      final canEdit = await settingsService.canChangePrice(companyCode: companyCode);
+      canEditPrice.value = canEdit;
+      
+      // Load history data
+      final filterUom = selectedUom.isEmpty ? null : selectedUom;
+      final invoices = await _loadPreviousInvoicesForItem(item, filterUom: filterUom);
+      invoicesData.value = invoices;
+      
+      final quotations = await _loadPreviousOrdersForItem(item, filterUom: filterUom);
+      quotationsData.value = quotations;
+      
+      print('✅ Initial data loaded - UOM: ${options.length}, Invoices: ${invoices.length}, Quotations: ${quotations.length}');
+    } catch (e) {
+      print('❌ Error loading initial data: $e');
+    }
+  }
+
   Future<List<InStockUom>> _loadUomOptions(InventoryItem item) async {
     try {
       final selectedCompany = await _authService.getSelectedCompany();
@@ -2726,7 +2762,7 @@ class _InventoryPageState extends State<InventoryPage> {
       ),
       builder: (context) {
         final int sku = item.skuNo;
-        int localQty = _qtySelections[sku] ?? 1;
+        final ValueNotifier<int> localQty = ValueNotifier<int>(_qtySelections[sku] ?? 1);
         String selectedUom = (item.uom ?? '').trim();
         final ValueNotifier<String> remarkText = ValueNotifier<String>('');
         
@@ -2734,15 +2770,17 @@ class _InventoryPageState extends State<InventoryPage> {
         if (!_priceSelections.containsKey(sku)) {
           _priceSelections[sku] = item.gstPrice ?? 0.0;
         }
-        double currentPrice = _priceSelections[sku]!;
+        final ValueNotifier<double> currentPrice = ValueNotifier<double>(_priceSelections[sku]!);
         
-        // Data storage
-        List<InStockUom> uomOptions = [];
-        List<Map<String, dynamic>> invoicesData = [];
-        List<Map<String, dynamic>> quotationsData = [];
-        bool isLoadingUom = true;
-        bool canEditPrice = false;
+        // Data storage - these will be loaded once and stored
+        final ValueNotifier<List<InStockUom>> uomOptions = ValueNotifier<List<InStockUom>>([]);
+        final ValueNotifier<List<Map<String, dynamic>>> invoicesData = ValueNotifier<List<Map<String, dynamic>>>([]);
+        final ValueNotifier<List<Map<String, dynamic>>> quotationsData = ValueNotifier<List<Map<String, dynamic>>>([]);
+        final ValueNotifier<bool> canEditPrice = ValueNotifier<bool>(false);
         InStockUom? selectedUomData;
+        
+        // Load initial data immediately (no rebuilds)
+        _loadInitialData(item, selectedUom, uomOptions, invoicesData, quotationsData, canEditPrice);
         
         return DraggableScrollableSheet(
           initialChildSize: 0.7,
@@ -2751,56 +2789,7 @@ class _InventoryPageState extends State<InventoryPage> {
           builder: (context, scrollController) {
             return StatefulBuilder(
               builder: (context, setSheetState) {
-                // Load data once
-                if (isLoadingUom) {
-                  isLoadingUom = false;
-                  
-                  // Load UOM options
-                  _loadUomOptions(item).then((options) {
-                    if (context.mounted) {
-                      setSheetState(() {
-                        uomOptions = options;
-                        if (options.isNotEmpty) {
-                          selectedUomData = options.firstWhere(
-                            (uom) => uom.uom?.toLowerCase() == selectedUom.toLowerCase(),
-                            orElse: () => options.first,
-                          );
-                          selectedUom = selectedUomData?.uom ?? selectedUom;
-                        }
-                      });
-                    }
-                  });
-                  
-                  // Check price permission
-                  _authService.getSelectedCompany().then((company) async {
-                    final companyCodeRaw = company?['companyCode'] ?? 1;
-                    final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
-                    final settingsService = UserAppSettingsService();
-                    final canEdit = await settingsService.canChangePrice(companyCode: companyCode);
-                    if (context.mounted) {
-                      setSheetState(() {
-                        canEditPrice = canEdit;
-                      });
-                    }
-                  });
-                  
-                  // Load history data
-                  _loadPreviousInvoicesForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                    if (context.mounted) {
-                      setSheetState(() {
-                        invoicesData = data;
-                      });
-                    }
-                  });
-                  
-                  _loadPreviousOrdersForItem(item, filterUom: selectedUom.isEmpty ? null : selectedUom).then((data) {
-                    if (context.mounted) {
-                      setSheetState(() {
-                        quotationsData = data;
-                      });
-                    }
-                  });
-                }
+                // Only UOM-related changes trigger setSheetState now
                 
                 return Container(
                   decoration: BoxDecoration(
@@ -2893,22 +2882,30 @@ class _InventoryPageState extends State<InventoryPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        'RM ${currentPrice.toStringAsFixed(2)}',
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.orange,
-                                        ),
+                                      ValueListenableBuilder<double>(
+                                        valueListenable: currentPrice,
+                                        builder: (context, price, child) {
+                                          return Text(
+                                            'RM ${price.toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green,
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
-                                  if (canEditPrice)
-                                    TextButton.icon(
+                                  ValueListenableBuilder<bool>(
+                                    valueListenable: canEditPrice,
+                                    builder: (context, canEdit, child) {
+                                      if (!canEdit) return const SizedBox.shrink();
+                                      return TextButton.icon(
                                       icon: const Icon(Icons.edit, size: 16),
                                       label: const Text('Edit'),
                                       onPressed: () async {
-                                        final controller = TextEditingController(text: currentPrice.toStringAsFixed(2));
+                                        final controller = TextEditingController(text: currentPrice.value.toStringAsFixed(2));
                                         final result = await showDialog<double>(
                                           context: context,
                                           builder: (dialogContext) => AlertDialog(
@@ -2940,13 +2937,13 @@ class _InventoryPageState extends State<InventoryPage> {
                                           ),
                                         );
                                         if (result != null) {
-                                          setSheetState(() {
-                                            currentPrice = result;
-                                            _priceSelections[sku] = result;
-                                          });
+                                          currentPrice.value = result;
+                                          _priceSelections[sku] = result;
                                         }
                                       },
-                                    ),
+                                      );
+                                    },
+                                  ),
                                 ],
                               ),
                             ),
@@ -3004,33 +3001,34 @@ class _InventoryPageState extends State<InventoryPage> {
                                               IconButton(
                                                 icon: const Icon(Icons.remove, size: 18),
                                                 onPressed: () {
-                                                  if (localQty > 1) {
-                                                    setSheetState(() {
-                                                      localQty--;
-                                                      _qtySelections[sku] = localQty;
-                                                    });
+                                                  if (localQty.value > 1) {
+                                                    localQty.value--;
+                                                    _qtySelections[sku] = localQty.value;
                                                   }
                                                 },
                                               ),
-                                              Container(
-                                                constraints: const BoxConstraints(minWidth: 50),
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  localQty.toString(),
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
+                                              ValueListenableBuilder<int>(
+                                                valueListenable: localQty,
+                                                builder: (context, qty, child) {
+                                                  return Container(
+                                                    constraints: const BoxConstraints(minWidth: 50),
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      qty.toString(),
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                               IconButton(
                                                 icon: const Icon(Icons.add, size: 18),
                                                 onPressed: () {
-                                                  if (localQty < 999) {
-                                                    setSheetState(() {
-                                                      localQty++;
-                                                      _qtySelections[sku] = localQty;
-                                                    });
+                                                  if (localQty.value < 999) {
+                                                    localQty.value++;
+                                                    _qtySelections[sku] = localQty.value;
                                                   }
                                                 },
                                               ),
@@ -3050,50 +3048,50 @@ class _InventoryPageState extends State<InventoryPage> {
                                         const SizedBox(width: 12),
                                         const Text('Unit', style: TextStyle(fontSize: 14)),
                                         const Spacer(),
-                                        if (uomOptions.isEmpty)
-                                          const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          )
-                                        else
-                                          Wrap(
-                                            spacing: 8,
-                                            children: uomOptions.map((uom) {
-                                              final isSelected = selectedUom == (uom.uom ?? '');
-                                              return ChoiceChip(
-                                                label: Text(uom.uom ?? ''),
-                                                selected: isSelected,
-                                                selectedColor: Colors.green.shade100,
-                                                onSelected: (_) {
-                                                  setSheetState(() {
-                                                    selectedUom = uom.uom ?? '';
-                                                    selectedUomData = uom;
-                                                    final newPrice = uom.gstPrice ?? uom.price ?? 0.0;
-                                                    currentPrice = newPrice;
-                                                    _priceSelections[sku] = newPrice;
-                                                  });
-                                                  
-                                                  // Reload history for new UOM
-                                                  _loadPreviousInvoicesForItem(item, filterUom: selectedUom).then((data) {
-                                                    if (context.mounted) {
-                                                      setSheetState(() {
-                                                        invoicesData = data;
-                                                      });
-                                                    }
-                                                  });
-                                                  
-                                                  _loadPreviousOrdersForItem(item, filterUom: selectedUom).then((data) {
-                                                    if (context.mounted) {
-                                                      setSheetState(() {
-                                                        quotationsData = data;
-                                                      });
-                                                    }
-                                                  });
-                                                },
+                                        ValueListenableBuilder<List<InStockUom>>(
+                                          valueListenable: uomOptions,
+                                          builder: (context, options, child) {
+                                            if (options.isEmpty) {
+                                              return const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(strokeWidth: 2),
                                               );
-                                            }).toList(),
-                                          ),
+                                            }
+                                            return Wrap(
+                                              spacing: 8,
+                                              children: options.map((uom) {
+                                                final isSelected = selectedUom == (uom.uom ?? '');
+                                                return ChoiceChip(
+                                                  label: Text(uom.uom ?? ''),
+                                                  selected: isSelected,
+                                                  selectedColor: Colors.green.shade100,
+                                                  onSelected: (_) {
+                                                    // Only UOM changes trigger rebuilds
+                                                    setSheetState(() {
+                                                      selectedUom = uom.uom ?? '';
+                                                      selectedUomData = uom;
+                                                    });
+                                                    
+                                                    // Update price via ValueNotifier (no rebuild)
+                                                    final newPrice = uom.gstPrice ?? uom.price ?? 0.0;
+                                                    currentPrice.value = newPrice;
+                                                    _priceSelections[sku] = newPrice;
+                                                    
+                                                    // Reload history for new UOM (no rebuild)
+                                                    _loadPreviousInvoicesForItem(item, filterUom: selectedUom).then((data) {
+                                                      invoicesData.value = data;
+                                                    });
+                                                    
+                                                    _loadPreviousOrdersForItem(item, filterUom: selectedUom).then((data) {
+                                                      quotationsData.value = data;
+                                                    });
+                                                  },
+                                                );
+                                              }).toList(),
+                                            );
+                                          },
+                                        ),
                                       ],
                                     ),
                                     
@@ -3138,7 +3136,7 @@ class _InventoryPageState extends State<InventoryPage> {
                                 item,
                                 remark: remarkText.value,
                                 uom: selectedUom.isEmpty ? null : selectedUom,
-                                customGstPrice: currentPrice,
+                                customGstPrice: currentPrice.value,
                               );
                               Navigator.pop(context);
                             },
@@ -3154,13 +3152,23 @@ class _InventoryPageState extends State<InventoryPage> {
                               children: [
                                 const Icon(Icons.add_shopping_cart, color: Colors.white),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Add to Cart (${localQty} × RM ${currentPrice.toStringAsFixed(2)})',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
+                                ValueListenableBuilder<int>(
+                                  valueListenable: localQty,
+                                  builder: (context, qty, child) {
+                                    return ValueListenableBuilder<double>(
+                                      valueListenable: currentPrice,
+                                      builder: (context, price, child) {
+                                        return Text(
+                                          'Add to Cart ($qty × RM ${price.toStringAsFixed(2)})',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -3703,8 +3711,8 @@ class _RemarkWidget extends StatelessWidget {
 
 // Separate widget for purchase history - completely isolated from parent rebuilds
 class _PurchaseHistoryWidget extends StatelessWidget {
-  final List<Map<String, dynamic>> invoicesData;
-  final List<Map<String, dynamic>> quotationsData;
+  final ValueNotifier<List<Map<String, dynamic>>> invoicesData;
+  final ValueNotifier<List<Map<String, dynamic>>> quotationsData;
   final Widget Function(List<Map<String, dynamic>>, String) buildHistoryList;
   
   const _PurchaseHistoryWidget({
@@ -3715,63 +3723,73 @@ class _PurchaseHistoryWidget extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    if (invoicesData.isEmpty && quotationsData.isEmpty) {
-      return const SizedBox.shrink(); // Don't show anything if no history
-    }
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Purchase History',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        
-        // History Tabs
-        DefaultTabController(
-          length: 2,
-          child: Column(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TabBar(
-                  labelColor: Colors.blue,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: Colors.blue,
-                  tabs: [
-                    Tab(text: 'Invoices (${invoicesData.length})'),
-                    Tab(text: 'Quotations (${quotationsData.length})'),
-                  ],
-                ),
-              ),
-              Container(
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(12),
+    return ValueListenableBuilder<List<Map<String, dynamic>>>(
+      valueListenable: invoicesData,
+      builder: (context, invoices, child) {
+        return ValueListenableBuilder<List<Map<String, dynamic>>>(
+          valueListenable: quotationsData,
+          builder: (context, quotations, child) {
+            if (invoices.isEmpty && quotations.isEmpty) {
+              return const SizedBox.shrink(); // Don't show anything if no history
+            }
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Purchase History',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                child: TabBarView(
-                  children: [
-                    // Invoices Tab
-                    buildHistoryList(invoicesData, 'invoice'),
-                    // Quotations Tab
-                    buildHistoryList(quotationsData, 'quote'),
-                  ],
+                const SizedBox(height: 12),
+                
+                // History Tabs
+                DefaultTabController(
+                  length: 2,
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TabBar(
+                          labelColor: Colors.blue,
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: Colors.blue,
+                          tabs: [
+                            Tab(text: 'Invoices (${invoices.length})'),
+                            Tab(text: 'Quotations (${quotations.length})'),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        height: 150,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(12),
+                          ),
+                        ),
+                        child: TabBarView(
+                          children: [
+                            // Invoices Tab
+                            buildHistoryList(invoices, 'invoice'),
+                            // Quotations Tab
+                            buildHistoryList(quotations, 'quote'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ],
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
