@@ -2718,10 +2718,10 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
 
-  // Get the correct UOM from in_stock for images (not using lowest logic)
+  // Get the correct UOM from in_stock for images (prioritize UOMs with stock or base UOM)
   Future<String?> _getInStockUom(int companyCode, int skuNo) async {
     try {
-      // Get all in_stock UOMs for this item (without sorting by lowest factor)
+      // Get all in_stock UOMs for this item
       final uomOptions = await isar.inStockUoms
         .filter()
         .companyCodeEqualTo(companyCode)
@@ -2733,10 +2733,19 @@ class _InventoryPageState extends State<InventoryPage> {
         return null;
       }
       
-      // Use the first available in_stock UOM (not lowest factor logic)
-      final imageUom = uomOptions.first.uom;
-      print('📷 Using in_stock UOM for image: $imageUom for SKU $skuNo');
-      return imageUom;
+      print('📷 Found ${uomOptions.length} in_stock UOMs for SKU $skuNo: ${uomOptions.map((u) => '${u.uom}(${u.factor})').join(', ')}');
+      
+      // Strategy 1: Try to find UOM with factor = 1 (base UOM)
+      final baseUom = uomOptions.where((u) => (u.factor ?? 1) == 1).firstOrNull;
+      if (baseUom != null) {
+        print('📷 Using base UOM for image: ${baseUom.uom} for SKU $skuNo');
+        return baseUom.uom;
+      }
+      
+      // Strategy 2: Use the first available UOM if no base UOM found
+      final firstUom = uomOptions.first.uom;
+      print('📷 Using first available UOM for image: $firstUom for SKU $skuNo');
+      return firstUom;
     } catch (e) {
       print('❌ Error getting in_stock UOM for SKU $skuNo: $e');
       return null; // Will fallback to item.uom in FutureBuilder
