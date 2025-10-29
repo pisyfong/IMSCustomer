@@ -864,13 +864,15 @@ class _InventoryPageState extends State<InventoryPage> {
             // Left image (small square)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Builder(
-                builder: (context) {
-                  print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "${item.uom}" for image');
+              child: FutureBuilder<String?>(
+                future: _getBaseUomForImage(companyCode, item.skuNo),
+                builder: (context, snapshot) {
+                  final uom = snapshot.data ?? item.uom;
+                  print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (base UOM method)');
                   return InventoryImageWidget(
                     companyCode: companyCode,
                     skuNo: item.skuNo,
-                    uom: item.uom, // This should be the UOM from server's in_stock table
+                    uom: uom,
                     borderRadius: BorderRadius.zero,
                     fit: BoxFit.cover,
                     showLoadingIndicator: true,
@@ -2472,15 +2474,22 @@ class _InventoryPageState extends State<InventoryPage> {
             // Image section: full-width square image
             AspectRatio(
               aspectRatio: 1.0,
-              child: Builder(
-                builder: (context) {
-                  print('📷 GRID IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "${item.uom}" for image');
+              child: FutureBuilder<String?>(
+                future: _getBaseUomForImage(
+                  _selectedCompany?['companyCode'] is String
+                      ? int.parse(_selectedCompany!['companyCode'])
+                      : _selectedCompany?['companyCode'] ?? 0,
+                  item.skuNo,
+                ),
+                builder: (context, snapshot) {
+                  final uom = snapshot.data ?? item.uom;
+                  print('📷 GRID IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (base UOM method)');
                   return InventoryImageWidget(
                     companyCode: _selectedCompany?['companyCode'] is String
                         ? int.parse(_selectedCompany!['companyCode'])
                         : _selectedCompany?['companyCode'] ?? 0,
                     skuNo: item.skuNo,
-                    uom: item.uom, // This should be the UOM from server's in_stock table
+                    uom: uom,
                     borderRadius: BorderRadius.zero,
                     fit: BoxFit.cover,
                     showLoadingIndicator: true,
@@ -2706,6 +2715,36 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
+  // Get base UOM (factor = 1.0) for images, fallback to first available UOM
+  Future<String?> _getBaseUomForImage(int companyCode, int skuNo) async {
+    try {
+      final uomOptions = await isar.inStockUoms
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .skuNoEqualTo(skuNo)
+        .findAll();
+      
+      if (uomOptions.isEmpty) {
+        print('📷 No UOM options found for SKU $skuNo, using item.uom');
+        return null; // Will fallback to item.uom
+      }
+      
+      // First try to find UOM with factor = 1.0 (base UOM)
+      final baseUom = uomOptions.where((uom) => (uom.factor ?? 1.0) == 1.0).firstOrNull;
+      if (baseUom != null) {
+        print('📷 SKU $skuNo: Using base UOM "${baseUom.uom}" (factor=1.0) for image');
+        return baseUom.uom;
+      }
+      
+      // If no factor=1.0 found, use the first available UOM
+      final firstUom = uomOptions.first;
+      print('📷 SKU $skuNo: No base UOM found, using first UOM "${firstUom.uom}" (factor=${firstUom.factor}) for image');
+      return firstUom.uom;
+    } catch (e) {
+      print('❌ Error getting base UOM for SKU $skuNo: $e');
+      return null; // Will fallback to item.uom
+    }
+  }
 
   // Load all initial data without triggering any rebuilds
   Future<void> _loadInitialData(
