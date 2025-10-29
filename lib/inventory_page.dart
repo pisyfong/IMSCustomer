@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/plu_service.dart';
 import '../services/signalr_service.dart';
 import '../services/cart_service.dart';
+import '../services/inventory_image_service.dart';
 import '../services/user_app_settings_service.dart';
 import '../main.dart';
 import '../models/inventory_item.dart';
@@ -2719,15 +2720,34 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  // Try all available UOMs until one returns a successful image download
+  // Try all available UOMs until one returns a successful image download (offline-first)
   Future<String?> _getWorkingUomForImage(int companyCode, int skuNo) async {
     final cacheKey = '${companyCode}_$skuNo';
     
-    // Check cache first
+    // Check memory cache first
     if (_workingUomCache.containsKey(cacheKey)) {
       final cachedUom = _workingUomCache[cacheKey];
       print('📷 SKU $skuNo: Using cached working UOM "$cachedUom"');
       return cachedUom;
+    }
+
+    // OFFLINE-FIRST: Check if we have any cached image for this SKU
+    try {
+      final imageService = InventoryImageService();
+      final cachedImagePath = await imageService.findAnyCachedImageForSku(companyCode, skuNo);
+      if (cachedImagePath != null) {
+        // Extract UOM from cached filename: COMPANY_SKU_SKUCODE_UOM.jpg
+        final fileName = cachedImagePath.split('/').last;
+        final parts = fileName.split('_');
+        if (parts.length >= 4) {
+          final uomPart = parts.last.replaceAll('.jpg', '');
+          print('📷 SKU $skuNo: Using OFFLINE cached image UOM "$uomPart"');
+          _workingUomCache[cacheKey] = uomPart; // Cache the result
+          return uomPart;
+        }
+      }
+    } catch (e) {
+      print('❌ OFFLINE: Error checking cached images for SKU $skuNo: $e');
     }
     
     try {

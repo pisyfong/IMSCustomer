@@ -85,6 +85,35 @@ class InventoryImageService {
     return null;
   }
 
+  // Find any cached image for a SKU (offline-first approach)
+  Future<String?> findAnyCachedImageForSku(int companyCode, int skuNo) async {
+    if (_imageDirectory == null) await initialize();
+    
+    try {
+      if (!await _imageDirectory!.exists()) return null;
+      
+      // Look for any cached image file that matches the pattern: COMPANY_SKU_*.jpg
+      final files = _imageDirectory!.listSync();
+      final pattern = '${companyCode}_${skuNo}_';
+      
+      for (final file in files) {
+        if (file is File) {
+          final fileName = path.basename(file.path);
+          if (fileName.startsWith(pattern) && fileName.endsWith('.jpg')) {
+            print('📷 OFFLINE: Found cached image for SKU $skuNo: $fileName');
+            return file.path;
+          }
+        }
+      }
+      
+      print('📷 OFFLINE: No cached image found for SKU $skuNo');
+      return null;
+    } catch (e) {
+      print('❌ OFFLINE: Error checking cached images for SKU $skuNo: $e');
+      return null;
+    }
+  }
+
 
 
   // Download and cache an image using the full image URL
