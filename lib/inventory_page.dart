@@ -867,13 +867,19 @@ class _InventoryPageState extends State<InventoryPage> {
               child: SizedBox(
                 width: 56,
                 height: 56,
-                child: InventoryImageWidget(
-                  companyCode: companyCode,
-                  skuNo: item.skuNo,
-                  uom: item.uom,
-                  borderRadius: BorderRadius.zero,
-                  fit: BoxFit.cover,
-                  showLoadingIndicator: true,
+                child: FutureBuilder<String?>(
+                  future: _getInStockUom(companyCode, item.skuNo),
+                  builder: (context, snapshot) {
+                    final uom = snapshot.data ?? item.uom;
+                    return InventoryImageWidget(
+                      companyCode: companyCode,
+                      skuNo: item.skuNo,
+                      uom: uom,
+                      borderRadius: BorderRadius.zero,
+                      fit: BoxFit.cover,
+                      showLoadingIndicator: true,
+                    );
+                  },
                 ),
               ),
             ),
@@ -2471,15 +2477,26 @@ class _InventoryPageState extends State<InventoryPage> {
             // Image section: full-width square image
             AspectRatio(
               aspectRatio: 1.0,
-              child: InventoryImageWidget(
-                companyCode: _selectedCompany?['companyCode'] is String
-                    ? int.parse(_selectedCompany!['companyCode'])
-                    : _selectedCompany?['companyCode'] ?? 0,
-                skuNo: item.skuNo,
-                uom: item.uom,
-                borderRadius: BorderRadius.zero,
-                fit: BoxFit.cover,
-                showLoadingIndicator: true,
+              child: FutureBuilder<String?>(
+                future: _getInStockUom(
+                  _selectedCompany?['companyCode'] is String
+                      ? int.parse(_selectedCompany!['companyCode'])
+                      : _selectedCompany?['companyCode'] ?? 0,
+                  item.skuNo,
+                ),
+                builder: (context, snapshot) {
+                  final uom = snapshot.data ?? item.uom;
+                  return InventoryImageWidget(
+                    companyCode: _selectedCompany?['companyCode'] is String
+                        ? int.parse(_selectedCompany!['companyCode'])
+                        : _selectedCompany?['companyCode'] ?? 0,
+                    skuNo: item.skuNo,
+                    uom: uom,
+                    borderRadius: BorderRadius.zero,
+                    fit: BoxFit.cover,
+                    showLoadingIndicator: true,
+                  );
+                },
               ),
             ),
             // Details section: compact padding, no Expanded/Spacer to avoid overflow
@@ -2697,6 +2714,32 @@ class _InventoryPageState extends State<InventoryPage> {
         return Colors.orange;
       default:
         return Colors.grey;
+    }
+  }
+
+
+  // Get the correct UOM from in_stock for images (not using lowest logic)
+  Future<String?> _getInStockUom(int companyCode, int skuNo) async {
+    try {
+      // Get all in_stock UOMs for this item (without sorting by lowest factor)
+      final uomOptions = await isar.inStockUoms
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .skuNoEqualTo(skuNo)
+        .findAll();
+      
+      if (uomOptions.isEmpty) {
+        print('📷 No in_stock UOM found for SKU $skuNo');
+        return null;
+      }
+      
+      // Use the first available in_stock UOM (not lowest factor logic)
+      final imageUom = uomOptions.first.uom;
+      print('📷 Using in_stock UOM for image: $imageUom for SKU $skuNo');
+      return imageUom;
+    } catch (e) {
+      print('❌ Error getting in_stock UOM for SKU $skuNo: $e');
+      return null; // Will fallback to item.uom in FutureBuilder
     }
   }
 
