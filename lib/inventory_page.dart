@@ -86,6 +86,7 @@ class _InventoryPageState extends State<InventoryPage> {
   
   // Cache working UOMs to prevent multiple HTTP requests
   final Map<String, String?> _workingUomCache = {};
+  final Set<int> _openingDetails = {}; // Prevent multiple popups for same SKU
 
   @override
   void initState() {
@@ -819,13 +820,6 @@ class _InventoryPageState extends State<InventoryPage> {
                         selected: _currentFilter.categories?.contains(category) ?? false,
                         onSelected: (_) => _toggleCategoryFilter(category),
                         selectedColor: Colors.indigo.shade100,
-                      ))
-                  .toList(),
-            ),
-          ),
-        ],
-      ],
-    );
   }
 
   // Build single-row inventory item (one item per line)
@@ -2893,6 +2887,15 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   void _showInventoryDetails(InventoryItem item) {
+    // Prevent multiple popups for the same SKU
+    if (_openingDetails.contains(item.skuNo)) {
+      print('🚫 Preventing duplicate details popup for SKU ${item.skuNo}');
+      return;
+    }
+    
+    _openingDetails.add(item.skuNo);
+    print('📱 Opening details popup for SKU ${item.skuNo}');
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
