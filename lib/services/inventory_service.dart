@@ -97,14 +97,17 @@ class InventoryService {
         throw Exception('Unable to establish SignalR connection');
       }
 
-      // Call server method to get inventory
+      // Call server method to get inventory (with timeout)
       final response = await _signalRService.invoke('getInventory', [
         user.userId,
         effectiveCompanyCode,
         searchQuery ?? '',
         limit,
         offset,
-      ]);
+      ]).timeout(const Duration(seconds: 15), onTimeout: () {
+        print('⏰ INVENTORY SERVICE: Inventory fetch request timed out');
+        return null;
+      });
 
       print('🔍 INVENTORY SERVICE: Server response received');
       
@@ -214,8 +217,12 @@ class InventoryService {
         return await getLocalUomPricing(companyCode: companyCode, skuNo: skuNo);
       }
 
-      // Call server method to get all UOM options for this SKU
-      final response = await _signalRService.invoke('getInStockUom', [companyCode, skuNo]);
+      // Call server method to get all UOM options for this SKU (with timeout)
+      final response = await _signalRService.invoke('getInStockUom', [companyCode, skuNo])
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        print('⏰ INVENTORY SERVICE: UOM pricing request timed out for SKU $skuNo');
+        return null;
+      });
 
       if (response == null) {
         print('⚠️ INVENTORY SERVICE: No UOM data received from server');
