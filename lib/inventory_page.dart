@@ -2811,7 +2811,7 @@ class _InventoryPageState extends State<InventoryPage> {
     ValueNotifier<bool> canEditPrice,
   ) async {
     try {
-      // Load UOM options
+      // Load UOM options (always set a value to stop loading spinner)
       final options = await _loadUomOptions(item);
       uomOptions.value = options;
       
@@ -2834,6 +2834,21 @@ class _InventoryPageState extends State<InventoryPage> {
       print('✅ Initial data loaded - UOM: ${options.length}, Invoices: ${invoices.length}, Quotations: ${quotations.length}');
     } catch (e) {
       print('❌ Error loading initial data: $e');
+      
+      // CRITICAL: Always set UOM options to prevent infinite loading spinner
+      if (uomOptions.value.isEmpty) {
+        // Create a fallback UOM option from item data
+        final fallbackUom = InStockUom()
+          ..companyCode = 1 // Default company
+          ..skuNo = item.skuNo
+          ..uom = item.uom ?? 'EA'
+          ..factor = 1.0
+          ..price = item.price
+          ..gstPrice = item.gstPrice;
+        
+        uomOptions.value = [fallbackUom];
+        print('🔄 Set fallback UOM option to prevent infinite loading');
+      }
     }
   }
 
@@ -2843,13 +2858,37 @@ class _InventoryPageState extends State<InventoryPage> {
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
       
-      return await _inventoryService.getUomPricing(
+      final result = await _inventoryService.getUomPricing(
         companyCode: companyCode,
         skuNo: item.skuNo,
       );
+      
+      // If service returns empty (due to timeout or no data), create fallback
+      if (result.isEmpty) {
+        print('🔄 UOM service returned empty, creating fallback UOM option');
+        final fallbackUom = InStockUom()
+          ..companyCode = companyCode
+          ..skuNo = item.skuNo
+          ..uom = item.uom ?? 'EA'
+          ..factor = 1.0
+          ..price = item.price
+          ..gstPrice = item.gstPrice;
+        return [fallbackUom];
+      }
+      
+      return result;
     } catch (e) {
       print('❌ Error loading UOM options: $e');
-      return [];
+      
+      // Create fallback UOM to prevent infinite loading
+      final fallbackUom = InStockUom()
+        ..companyCode = 1
+        ..skuNo = item.skuNo
+        ..uom = item.uom ?? 'EA'
+        ..factor = 1.0
+        ..price = item.price
+        ..gstPrice = item.gstPrice;
+      return [fallbackUom];
     }
   }
 
