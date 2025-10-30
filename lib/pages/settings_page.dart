@@ -58,6 +58,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   int _customerPluCount = 0;
   int _groupsCount = 0;
   int _departmentsCount = 0;
+  int _uomCount = 0;
   
   // Image cache statistics
   int _cachedImagesCount = 0;
@@ -149,6 +150,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       final customerPluCount = await isar.customerPlus.count();
       final groupsCount = await isar.groupLookups.count();
       final departmentsCount = await isar.departmentLookups.count();
+      final uomCount = await isar.inStockUoms.count();
       
       // Load image cache stats
       final imageStats = await _imageService.getCacheStats();
@@ -172,6 +174,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         _customerPluCount = customerPluCount;
         _groupsCount = groupsCount;
         _departmentsCount = departmentsCount;
+        _uomCount = uomCount;
         
         _cachedImagesCount = imageStats['totalCachedImages'] ?? 0;
         _imageCacheSize = imageStats['totalSizeFormatted'] ?? '0 MB';
@@ -227,7 +230,17 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         print('⚠️ Customer PLU sync failed during full sync: $e');
       }
       
-      // Step 4: Sync Invoices
+      // Step 4: Sync UOM Pricing
+      setState(() {
+        _syncStatus = 'Syncing UOM pricing...';
+      });
+      try {
+        await _syncUomPricing();
+      } catch (e) {
+        print('⚠️ UOM pricing sync failed during full sync: $e');
+      }
+      
+      // Step 5: Sync Invoices
       setState(() {
         _syncStatus = 'Syncing invoices...';
       });
@@ -238,7 +251,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         print('⚠️ Invoice sync failed during full sync: $e');
       }
       
-      // Step 5: Sync Invoice Items
+      // Step 6: Sync Invoice Items
       setState(() {
         _syncStatus = 'Syncing invoice items...';
       });
@@ -288,6 +301,78 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+      });
+    }
+  }
+  
+  Future<void> _syncUomPricing() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing UOM pricing data...';
+    });
+    
+    try {
+      final inventoryService = InventoryService();
+      
+      // Get all inventory items to sync their UOM pricing
+      final inventoryItems = await isar.inventoryItems.where().findAll();
+      int syncedCount = 0;
+      int totalItems = inventoryItems.length;
+      
+      for (final item in inventoryItems) {
+        setState(() {
+          _syncStatus = 'Syncing UOM pricing... ($syncedCount/$totalItems)';
+        });
+        
+        try {
+          // Force refresh to get latest UOM pricing from server
+          await inventoryService.getUomPricing(
+            companyCode: item.companyCode,
+            skuNo: item.skuNo,
+            forceRefresh: true,
+          );
+          syncedCount++;
+        } catch (e) {
+          print('⚠️ Failed to sync UOM pricing for SKU ${item.skuNo}: $e');
+          // Continue with next item
+        }
+        
+        // Small delay to prevent overwhelming the server
+        if (syncedCount % 10 == 0) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      }
+      
+      await _loadCacheStats(); // Refresh stats
+      
+      setState(() {
+        _syncStatus = 'UOM pricing sync completed! Synced $syncedCount items';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced UOM pricing for $syncedCount items'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _syncStatus = 'UOM pricing sync failed: $e';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ UOM pricing sync failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -723,6 +808,14 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         ),
         const SizedBox(height: 12),
         _buildActionButton(
+          icon: Icons.straighten,
+          label: 'Sync UOM Pricing',
+          subtitle: 'Update unit pricing & options',
+          color: Colors.cyan,
+          onPressed: _isSyncing ? null : _syncUomPricing,
+        ),
+        const SizedBox(height: 12),
+        _buildActionButton(
           icon: Icons.person_pin,
           label: 'Sync Customer PLU',
           subtitle: 'Update customer-specific PLUs',
@@ -1001,7 +1094,9 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         const SizedBox(height: 8),
         _buildStatCard('Customers', _customersCount, _customerPluCount, 'PLU mappings', Icons.people, Colors.orange),
         const SizedBox(height: 8),
-        _buildStatCard('Inventory', _inventoryCount, _pluCount, 'PLUs', Icons.inventory_2, Colors.purple),
+        _buildStatCard('PLU Codes', _pluCount, 0, '', Icons.qr_code_2, Colors.amber),
+        const SizedBox(height: 8),
+        _buildStatCard('Inventory', _inventoryCount, _uomCount, 'UOM options', Icons.inventory_2, Colors.purple),
         const SizedBox(height: 8),
         _buildStatCard('Lookups', _groupsCount, _departmentsCount, 'departments', Icons.category, Colors.teal),
       ],
