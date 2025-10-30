@@ -820,7 +820,11 @@ class _InventoryPageState extends State<InventoryPage> {
                         selected: _currentFilter.categories?.contains(category) ?? false,
                         onSelected: (_) => _toggleCategoryFilter(category),
                         selectedColor: Colors.indigo.shade100,
-  }
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
 
   // Build single-row inventory item (one item per line)
   Widget _buildInventoryListItem(InventoryItem item) {
