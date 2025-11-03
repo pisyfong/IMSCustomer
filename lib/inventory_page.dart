@@ -600,9 +600,8 @@ class _InventoryPageState extends State<InventoryPage> {
                       .toList(),
                 ),
               ],
-            ],
+            ),
           ),
-        ),
 
         // Group Filter (collapsible)
         if (_filterOptions['groups']?.isNotEmpty == true) ...[
@@ -825,6 +824,9 @@ class _InventoryPageState extends State<InventoryPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
 
   // Build single-row inventory item (one item per line)
   Widget _buildInventoryListItem(InventoryItem item) {
