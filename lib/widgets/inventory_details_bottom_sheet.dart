@@ -6,7 +6,7 @@ import '../services/user_app_settings_service.dart';
 
 class InventoryDetailsBottomSheet extends StatefulWidget {
   final InventoryItem item;
-  final _InventoryPageState inventoryPageState;
+  final dynamic inventoryPageState;
 
   const InventoryDetailsBottomSheet({
     Key? key,
