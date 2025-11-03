@@ -1397,6 +1397,60 @@ class EnhancedSyncService {
       print('❌ PRELOAD LOOKUPS ERROR: $e');
     }
   }
+  
+  /// Sync customers for a specific company
+  Future<void> syncCustomersForCompany(int companyCode) async {
+    try {
+      print('👥 SYNC: Syncing customers for company $companyCode...');
+      await _customerService.syncCustomers(companyCode);
+      final count = await _isar.customers.filter().companyCodeEqualTo(companyCode).count();
+      print('✅ SYNC: Synced $count customers for company $companyCode');
+    } catch (e) {
+      print('❌ SYNC: Customer sync failed for company $companyCode: $e');
+      rethrow;
+    }
+  }
+  
+  /// Sync inventory for a specific company
+  Future<void> syncInventoryForCompany(int companyCode) async {
+    try {
+      print('📦 SYNC: Syncing inventory for company $companyCode...');
+      
+      // Fetch all inventory items with pagination
+      const int pageSize = 100;
+      int offset = 0;
+      final List<InventoryItem> allItems = [];
+      
+      while (true) {
+        final page = await _inventoryService.fetchInventoryFromServer(
+          companyCode: companyCode,
+          limit: pageSize,
+          offset: offset,
+        );
+        
+        if (page.isEmpty) break;
+        allItems.addAll(page);
+        
+        if (page.length < pageSize) break; // Last page
+        offset += pageSize;
+      }
+      
+      if (allItems.isNotEmpty) {
+        await _inventoryService.saveInventoryToLocal(allItems, companyCode: companyCode);
+        print('✅ SYNC: Synced ${allItems.length} inventory items for company $companyCode');
+      } else {
+        print('⚠️ SYNC: No inventory items found for company $companyCode');
+      }
+    } catch (e) {
+      print('❌ SYNC: Inventory sync failed for company $companyCode: $e');
+      rethrow;
+    }
+  }
+  
+  /// Public method to preload all invoices (called from settings)
+  Future<void> preloadAllInvoices() async {
+    await _preloadAllInvoices();
+  }
 }
 
 /// Sync statistics data class

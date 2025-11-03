@@ -199,80 +199,112 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     setState(() {
       _isSyncing = true;
       _syncStatus = 'Starting full sync...';
+      _syncProgress = 0.0;
     });
     
     try {
-      // Step 1: Core sync (customers, inventory, quotes)
-      setState(() {
-        _syncStatus = 'Syncing core data...';
-      });
-      await _syncService.performSync();
+      // CORRECT SEQUENCE: Dependencies must be synced before dependents
       
-      // Step 2: Sync PLU codes
+      // Step 1: Sync Companies (Foundation - required by everything)
       setState(() {
-        _syncStatus = 'Syncing PLU codes...';
+        _syncStatus = 'Step 1/8: Syncing companies...';
+        _syncProgress = 0.125;
+      });
+      await _syncService.syncCompaniesForUser();
+      print('✅ FULL SYNC: Companies synced');
+      
+      // Step 2: Sync Customers (Depends on: Companies)
+      setState(() {
+        _syncStatus = 'Step 2/8: Syncing customers...';
+        _syncProgress = 0.25;
+      });
+      final companies = await isar.companys.where().findAll();
+      for (final company in companies) {
+        final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+        if (companyCode <= 0) continue;
+        try {
+          await _syncService.syncCustomersForCompany(companyCode);
+        } catch (e) {
+          print('⚠️ Customer sync failed for company $companyCode: $e');
+        }
+      }
+      print('✅ FULL SYNC: Customers synced');
+      
+      // Step 3: Sync Inventory (Depends on: Companies)
+      setState(() {
+        _syncStatus = 'Step 3/8: Syncing inventory...';
+        _syncProgress = 0.375;
+      });
+      for (final company in companies) {
+        final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+        if (companyCode <= 0) continue;
+        try {
+          await _syncService.syncInventoryForCompany(companyCode);
+        } catch (e) {
+          print('⚠️ Inventory sync failed for company $companyCode: $e');
+        }
+      }
+      print('✅ FULL SYNC: Inventory synced');
+      
+      // Step 4: Sync PLU codes (Depends on: Inventory)
+      setState(() {
+        _syncStatus = 'Step 4/8: Syncing PLU codes...';
+        _syncProgress = 0.5;
       });
       try {
         final pluService = PluService(isar);
-        // Fetch all PLUs from server and sync to local database
         await pluService.syncPlus();
+        print('✅ FULL SYNC: PLU codes synced');
       } catch (e) {
-        print('⚠️ PLU sync failed during full sync: $e');
+        print('⚠️ PLU sync failed: $e');
       }
       
-      // Step 3: Sync Customer PLU mappings
+      // Step 5: Sync Customer PLU mappings (Depends on: Customers + PLU + Inventory)
       setState(() {
-        _syncStatus = 'Syncing customer PLU mappings...';
+        _syncStatus = 'Step 5/8: Syncing customer PLU mappings...';
+        _syncProgress = 0.625;
       });
       try {
         await _syncService.syncCustomerPlu();
+        print('✅ FULL SYNC: Customer PLU mappings synced');
       } catch (e) {
-        print('⚠️ Customer PLU sync failed during full sync: $e');
+        print('⚠️ Customer PLU sync failed: $e');
       }
       
-      // Step 4: Sync UOM Pricing
+      // Step 6: Sync UOM Pricing (Depends on: Inventory)
       setState(() {
-        _syncStatus = 'Syncing UOM pricing...';
+        _syncStatus = 'Step 6/8: Syncing UOM pricing...';
+        _syncProgress = 0.75;
       });
       try {
-        await _syncUomPricing();
+        await _syncUomPricingOptimized();
+        print('✅ FULL SYNC: UOM pricing synced');
       } catch (e) {
-        print('⚠️ UOM pricing sync failed during full sync: $e');
+        print('⚠️ UOM pricing sync failed: $e');
       }
       
-      // Step 5: Sync Invoices
+      // Step 7: Sync Invoices (Depends on: Companies + Customers)
       setState(() {
-        _syncStatus = 'Syncing invoices...';
+        _syncStatus = 'Step 7/8: Syncing invoices...';
+        _syncProgress = 0.875;
       });
       try {
-        final invoiceService = InvoiceService(_signalRService);
-        await _syncService.preloadAllInvoices();
+        await _syncInvoices();
+        print('✅ FULL SYNC: Invoices synced');
       } catch (e) {
-        print('⚠️ Invoice sync failed during full sync: $e');
+        print('⚠️ Invoice sync failed: $e');
       }
       
-      // Step 6: Sync Invoice Items
+      // Step 8: Sync Groups & Departments (Depends on: Companies)
       setState(() {
-        _syncStatus = 'Syncing invoice items...';
+        _syncStatus = 'Step 8/8: Syncing groups & departments...';
+        _syncProgress = 1.0;
       });
       try {
-        final invoiceService = InvoiceService(_signalRService);
-        final invoices = await isar.invoices.where().findAll();
-        for (final invoice in invoices) {
-          if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
-          try {
-            await invoiceService.getInvoiceItems(
-              companyCode: invoice.companyCode is String 
-                  ? int.tryParse(invoice.companyCode as String) ?? 1 
-                  : invoice.companyCode as int,
-              invoicePreLabel: invoice.invoicePreLabel,
-            );
-          } catch (e) {
-            // Continue with next invoice
-          }
-        }
+        await _syncGroupsAndDepartments();
+        print('✅ FULL SYNC: Groups & departments synced');
       } catch (e) {
-        print('⚠️ Invoice items sync failed during full sync: $e');
+        print('⚠️ Groups/departments sync failed: $e');
       }
       
       // Reload stats
@@ -281,6 +313,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       
       setState(() {
         _syncStatus = 'Full sync completed!';
+        _syncProgress = 1.0;
       });
       
       if (mounted) {
@@ -295,6 +328,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     } catch (e) {
       setState(() {
         _syncStatus = 'Sync failed: $e';
+        _syncProgress = 0.0;
       });
       
       if (mounted) {
@@ -319,56 +353,17 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     });
     
     try {
-      final inventoryService = InventoryService();
-      
-      // Get all inventory items to sync their UOM pricing
-      final inventoryItems = await isar.inventoryItems.where().findAll();
-      int syncedCount = 0;
-      int totalItems = inventoryItems.length;
-      
-      for (final item in inventoryItems) {
-        setState(() {
-          _syncStatus = 'Syncing UOM pricing... ($syncedCount/$totalItems)';
-        });
-        
-        try {
-          // Force refresh to get latest UOM pricing from server
-          await inventoryService.getUomPricing(
-            companyCode: item.companyCode,
-            skuNo: item.skuNo,
-            forceRefresh: true,
-          );
-          syncedCount++;
-        } catch (e) {
-          print('⚠️ Failed to sync UOM pricing for SKU ${item.skuNo}: $e');
-          // Continue with next item
-        }
-        
-        // Small delay to prevent overwhelming the server
-        if (syncedCount % 10 == 0) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-      }
-      
-      await _loadCacheStats(); // Refresh stats
-      
-      setState(() {
-        _syncStatus = 'UOM pricing sync completed! Synced $syncedCount items';
-      });
+      await _syncUomPricingOptimized();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Synced UOM pricing for $syncedCount items'),
+          const SnackBar(
+            content: Text('✅ UOM pricing sync completed'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      setState(() {
-        _syncStatus = 'UOM pricing sync failed: $e';
-      });
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -380,8 +375,61 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     } finally {
       setState(() {
         _isSyncing = false;
+        _syncStatus = 'Ready';
       });
     }
+  }
+  
+  Future<void> _syncUomPricingOptimized() async {
+    final inventoryService = InventoryService();
+    
+    // Get all inventory items grouped by company
+    final inventoryItems = await isar.inventoryItems.where().findAll();
+    final itemsByCompany = <int, List<InventoryItem>>{};
+    
+    for (final item in inventoryItems) {
+      itemsByCompany.putIfAbsent(item.companyCode, () => []).add(item);
+    }
+    
+    int totalSynced = 0;
+    int totalItems = inventoryItems.length;
+    
+    // Sync by company to batch requests
+    for (final entry in itemsByCompany.entries) {
+      final companyCode = entry.key;
+      final items = entry.value;
+      
+      print('🔄 Syncing UOM pricing for company $companyCode (${items.length} items)...');
+      
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        
+        if (_isSyncing && i % 20 == 0) {
+          setState(() {
+            _syncStatus = 'Syncing UOM pricing... ($totalSynced/$totalItems)';
+          });
+        }
+        
+        try {
+          await inventoryService.getUomPricing(
+            companyCode: item.companyCode,
+            skuNo: item.skuNo,
+            forceRefresh: true,
+          );
+          totalSynced++;
+        } catch (e) {
+          // Continue with next item
+        }
+        
+        // Small delay every 10 items
+        if (i % 10 == 0 && i > 0) {
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+      }
+    }
+    
+    await _loadCacheStats();
+    print('✅ UOM pricing sync completed: $totalSynced/$totalItems items');
   }
   
   Future<void> _syncGroupsAndDepartments() async {
