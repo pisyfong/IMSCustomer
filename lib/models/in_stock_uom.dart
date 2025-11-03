@@ -16,6 +16,7 @@ class InStockUom {
   double? factor;
   double? price;      // Unit price (ex-GST)
   double? gstPrice;   // Unit price (incl. GST)
+  String? status;     // Status: 'A' = Active, 'I' = Inactive
 
   // Convert from server response
   static InStockUom fromJson(Map<String, dynamic> json) {
@@ -29,7 +30,8 @@ class InStockUom {
         ..uom = json['Uom']
         ..factor = _parseDouble(json['Factor'])
         ..price = _parseDouble(json['Price'])
-        ..gstPrice = _parseDouble(json['GST_Price']);
+        ..gstPrice = _parseDouble(json['GST_Price'])
+        ..status = json['Status'];
     } catch (e, stackTrace) {
       print('❌ ERROR in InStockUom.fromJson: $e');
       print('📋 JSON data: $json');
@@ -74,6 +76,7 @@ class InStockUom {
       'Factor': factor,
       'Price': price,
       'GST_Price': gstPrice,
+      'Status': status,
     };
   }
 

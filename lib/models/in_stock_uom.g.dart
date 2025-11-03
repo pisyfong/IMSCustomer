@@ -62,8 +62,13 @@ const InStockUomSchema = CollectionSchema(
       name: r'skuNo',
       type: IsarType.long,
     ),
-    r'uom': PropertySchema(
+    r'status': PropertySchema(
       id: 9,
+      name: r'status',
+      type: IsarType.string,
+    ),
+    r'uom': PropertySchema(
+      id: 10,
       name: r'uom',
       type: IsarType.string,
     )
@@ -120,6 +125,12 @@ int _inStockUomEstimateSize(
   bytesCount += 3 + object.displayPricePerUom.length * 3;
   bytesCount += 3 + object.displayUom.length * 3;
   {
+    final value = object.status;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.uom;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -143,7 +154,8 @@ void _inStockUomSerialize(
   writer.writeDouble(offsets[6], object.gstPrice);
   writer.writeDouble(offsets[7], object.price);
   writer.writeLong(offsets[8], object.skuNo);
-  writer.writeString(offsets[9], object.uom);
+  writer.writeString(offsets[9], object.status);
+  writer.writeString(offsets[10], object.uom);
 }
 
 InStockUom _inStockUomDeserialize(
@@ -159,7 +171,8 @@ InStockUom _inStockUomDeserialize(
   object.id = id;
   object.price = reader.readDoubleOrNull(offsets[7]);
   object.skuNo = reader.readLong(offsets[8]);
-  object.uom = reader.readStringOrNull(offsets[9]);
+  object.status = reader.readStringOrNull(offsets[9]);
+  object.uom = reader.readStringOrNull(offsets[10]);
   return object;
 }
 
@@ -189,6 +202,8 @@ P _inStockUomDeserializeProp<P>(
     case 8:
       return (reader.readLong(offset)) as P;
     case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1425,6 +1440,154 @@ extension InStockUomQueryFilter
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'status',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      statusIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'status',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'status',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'status',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'status',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'status',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'status',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'status',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'status',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'status',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> statusIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'status',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      statusIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'status',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> uomIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1690,6 +1853,18 @@ extension InStockUomQuerySortBy
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy> sortByStatus() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'status', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy> sortByStatusDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'status', Sort.desc);
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QAfterSortBy> sortByUom() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'uom', Sort.asc);
@@ -1827,6 +2002,18 @@ extension InStockUomQuerySortThenBy
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy> thenByStatus() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'status', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy> thenByStatusDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'status', Sort.desc);
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QAfterSortBy> thenByUom() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'uom', Sort.asc);
@@ -1902,6 +2089,13 @@ extension InStockUomQueryWhereDistinct
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QDistinct> distinctByStatus(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'status', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QDistinct> distinctByUom(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1970,6 +2164,12 @@ extension InStockUomQueryProperty
   QueryBuilder<InStockUom, int, QQueryOperations> skuNoProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'skuNo');
+    });
+  }
+
+  QueryBuilder<InStockUom, String?, QQueryOperations> statusProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'status');
     });
   }
 

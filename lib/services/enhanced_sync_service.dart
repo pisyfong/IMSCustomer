@@ -562,10 +562,10 @@ class EnhancedSyncService {
     await _preloadCustomerPlus();
   }
   
-  /// Preload customer-specific PLU mappings for frequently used SKUs
+  /// Preload customer-specific PLU mappings using server's getCustomerPlu function
   Future<void> _preloadCustomerPlus() async {
     try {
-      print('🏷️ PRELOAD: Loading customer PLU mappings...');
+      print('🏷️ PRELOAD: Loading customer PLU mappings using getCustomerPlu...');
 
       // Skip if offline to avoid repeated timeouts
       if (!OfflineFirstService.isLikelyOnline()) {
@@ -573,73 +573,84 @@ class EnhancedSyncService {
         return;
       }
 
-      // Strategy: For each company, for each customer present in local DB,
-      // take recent quote items to collect a set of SKU numbers to sync PLU for.
+      // Strategy: Call getCustomerPlu for each customer with common/popular SKUs
+      // The server's getCustomerPlu function will use AR_Customer_Item to return relevant PLU data
       final companies = await _isar.companys.where().findAll();
       int totalMappings = 0;
 
       for (final company in companies) {
         final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
         if (companyCode <= 0) continue;
+        
+        print('🏷️ PRELOAD: Processing company $companyCode for customer PLU...');
 
-        // Collect recent SKUs from recent quotes (limit to reduce server load)
-        final recentQuotes = await _isar.quotes
-            .where()
-            .filter()
-            .companyCodeEqualTo(companyCode)
-            .limit(50)
-            .findAll();
-
-        // Skip if no quotes for this company
-        if (recentQuotes.isEmpty) {
-          print('🏷️ PRELOAD: No quotes for company $companyCode, skipping customer PLU');
-          continue;
-        }
-
-        // Use the first 50 quotes (already limited by query)
-        final limitedQuotes = recentQuotes;
-
-        // Get customers for this company
+        // Get all customers for this company
         final customers = await _isar.customers
             .filter()
             .companyCodeEqualTo(companyCode)
             .findAll();
 
-        // Build a map of customerCode -> Set<int> skuNos
-        final Map<String, Set<int>> customerSkuMap = {};
+        print('🏷️ PRELOAD: Found ${customers.length} customers for company $companyCode');
 
-        for (final q in limitedQuotes) {
-          if (q.quotePreLabel == null) continue;
-          final items = await _isar.quoteItems
-              .filter()
-              .companyCodeEqualTo(companyCode)
-              .and()
-              .quotePreLabelEqualTo(q.quotePreLabel!)
-              .findAll();
-          final skus = items.map((i) => i.skuNo).where((s) => s > 0);
-          final cust = q.customer ?? '';
-          if (cust.isEmpty) continue;
-          customerSkuMap.putIfAbsent(cust, () => <int>{}).addAll(skus);
+        if (customers.isEmpty) {
+          print('🏷️ PRELOAD: No customers found, skipping customer PLU for company $companyCode');
+          continue;
         }
 
-        // For any customer without recent quotes, skip to avoid heavy loads
-        for (final c in customers) {
-          final custCode = c.code;
-          final skuSet = customerSkuMap[custCode];
-          if (skuSet == null || skuSet.isEmpty) continue;
-          // Batch request per customer
-          final skuList = skuSet.take(200).toList();
-          await _pluService.syncCustomerPlusForCustomer(
-            companyCode: companyCode,
-            customerCode: custCode,
-            skuNos: skuList,
-          );
-          totalMappings += skuList.length;
-          print('🏷️ PRELOAD: Synced customer PLU for $custCode (${skuList.length} SKUs)');
+        // Get ALL SKUs from inventory for comprehensive PLU sync
+        final inventoryItems = await _isar.inventoryItems
+            .where()
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .findAll(); // No limit - get ALL inventory items
+        
+        // Extract ALL SKUs and sort them
+        final allSkus = inventoryItems.map((item) => item.skuNo).where((sku) => sku > 0).toList()..sort();
+        
+        // Use ALL SKUs for manual sync - no sampling or limits
+        final commonSkus = allSkus;
+        print('🏷️ PRELOAD: Using ALL ${commonSkus.length} SKUs for comprehensive PLU sync');
+        print('🏷️ PRELOAD: SKU range: ${allSkus.isNotEmpty ? "${allSkus.first} to ${allSkus.last}" : "none"}');
+        print('🏷️ PRELOAD: This will sync PLU data for every available SKU');
+
+        if (commonSkus.isEmpty) {
+          print('🏷️ PRELOAD: No inventory items found, skipping customer PLU for company $companyCode');
+          continue;
         }
+
+        int processedCustomers = 0;
+        // Process customers in smaller batches for comprehensive sync
+        for (int i = 0; i < customers.length; i += 5) { // Smaller batches due to larger SKU lists
+          final batch = customers.skip(i).take(5).toList();
+          
+          for (final customer in batch) {
+            final customerCode = customer.code;
+            print('🏷️ PRELOAD: Syncing customer PLU for $customerCode with ALL ${commonSkus.length} SKUs...');
+            
+            // The server's getCustomerPlu will filter to only return PLU data for items
+            // that this customer actually has in AR_Customer_Item
+            await _pluService.syncCustomerPlusForCustomer(
+              companyCode: companyCode,
+              customerCode: customerCode,
+              skuNos: commonSkus,
+            );
+            processedCustomers++;
+            print('🏷️ PRELOAD: ✅ Synced customer PLU for $customerCode (comprehensive sync)');
+
+            // Longer delay between customers due to larger requests
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+          
+          // Longer delay between batches for comprehensive sync
+          await Future.delayed(const Duration(milliseconds: 500));
+          print('🏷️ PRELOAD: Processed batch ${(i ~/ 5) + 1}/${(customers.length / 5).ceil()} (${processedCustomers} customers)');
+        }
+        
+        totalMappings = processedCustomers * commonSkus.length; // Estimate
+        print('🏷️ PRELOAD: Processed $processedCustomers customers for company $companyCode');
       }
 
-      print('✅ PRELOAD: Customer PLU preload completed. Estimated mappings touched: $totalMappings');
+      print('✅ PRELOAD: Customer PLU preload completed. Processed customers with estimated mappings: $totalMappings');
     } catch (e) {
       print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
     }
@@ -1397,56 +1408,6 @@ class EnhancedSyncService {
       print('❌ PRELOAD LOOKUPS ERROR: $e');
     }
   }
-  
-  /// Sync customers for a specific company
-  Future<void> syncCustomersForCompany(int companyCode) async {
-    try {
-      print('👥 SYNC: Syncing customers for company $companyCode...');
-      await _customerService.syncCustomers(companyCode);
-      final count = await _isar.customers.filter().companyCodeEqualTo(companyCode).count();
-      print('✅ SYNC: Synced $count customers for company $companyCode');
-    } catch (e) {
-      print('❌ SYNC: Customer sync failed for company $companyCode: $e');
-      rethrow;
-    }
-  }
-  
-  /// Sync inventory for a specific company
-  Future<void> syncInventoryForCompany(int companyCode) async {
-    try {
-      print('📦 SYNC: Syncing inventory for company $companyCode...');
-      
-      // Fetch all inventory items with pagination
-      const int pageSize = 100;
-      int offset = 0;
-      final List<InventoryItem> allItems = [];
-      
-      while (true) {
-        final page = await _inventoryService.fetchInventoryFromServer(
-          companyCode: companyCode,
-          limit: pageSize,
-          offset: offset,
-        );
-        
-        if (page.isEmpty) break;
-        allItems.addAll(page);
-        
-        if (page.length < pageSize) break; // Last page
-        offset += pageSize;
-      }
-      
-      if (allItems.isNotEmpty) {
-        await _inventoryService.saveInventoryToLocal(allItems, companyCode: companyCode);
-        print('✅ SYNC: Synced ${allItems.length} inventory items for company $companyCode');
-      } else {
-        print('⚠️ SYNC: No inventory items found for company $companyCode');
-      }
-    } catch (e) {
-      print('❌ SYNC: Inventory sync failed for company $companyCode: $e');
-      rethrow;
-    }
-  }
-  
 }
 
 /// Sync statistics data class

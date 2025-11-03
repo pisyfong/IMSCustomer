@@ -237,6 +237,15 @@ class InventoryService {
         return await getLocalUomPricing(companyCode: companyCode, skuNo: skuNo);
       }
 
+      // Debug: Log raw server response for SKU 555 to see field names
+      if (skuNo == 555 && uomData.isNotEmpty) {
+        print('🔍 INVENTORY SERVICE SKU 555: Raw server response:');
+        for (int i = 0; i < uomData.length && i < 3; i++) {
+          final record = uomData[i];
+          print('🔍 INVENTORY SERVICE SKU 555: Record $i: $record');
+        }
+      }
+
       final uomOptions = uomData.map((data) => InStockUom.fromJson(data as Map<String, dynamic>)).toList();
       
       // Cache the results
@@ -261,7 +270,10 @@ class InventoryService {
           .filter()
           .companyCodeEqualTo(companyCode)
           .skuNoEqualTo(skuNo)
+          .statusEqualTo('A') // Only get active UOMs (status A)
           .findAll();
+      
+      print('📦 INVENTORY SERVICE: Found ${uomOptions.length} active UOMs for SKU $skuNo (filtered out status C)');
       
       // Keep UOM options in their natural order (no sorting by lowest factor)
       
