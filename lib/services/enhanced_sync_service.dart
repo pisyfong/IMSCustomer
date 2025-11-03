@@ -1447,46 +1447,6 @@ class EnhancedSyncService {
     }
   }
   
-  /// Public method to preload all invoices (called from settings)
-  Future<void> preloadAllInvoices() async {
-    await _preloadAllInvoices();
-  }
-  
-  /// Preload all invoices for all customers
-  Future<void> _preloadAllInvoices() async {
-    try {
-      print('📄 PRELOAD: Loading all invoices...');
-      
-      // Get all customers
-      final customers = await _isar.customers.where().findAll();
-      int totalInvoices = 0;
-      
-      for (final customer in customers) {
-        try {
-          if (customer.code.isEmpty || customer.companyCode == null) continue;
-          
-          print('📄 PRELOAD: Loading invoices for customer ${customer.code}...');
-          
-          final invoices = await _invoiceService.getInvoices(
-            companyCode: customer.companyCode,
-            customerCode: customer.code,
-          );
-          
-          if (invoices.isNotEmpty) {
-            totalInvoices += invoices.length;
-          }
-          
-        } catch (e) {
-          print('❌ PRELOAD: Error loading invoices for customer ${customer.code}: $e');
-        }
-      }
-      
-      print('✅ PRELOAD: Total invoices loaded: $totalInvoices');
-      
-    } catch (e) {
-      print('❌ PRELOAD INVOICES ERROR: $e');
-    }
-  }
 }
 
 /// Sync statistics data class
