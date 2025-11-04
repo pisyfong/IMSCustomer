@@ -3136,14 +3136,15 @@ class _InventoryPageState extends State<InventoryPage> {
 
       print('🔎 PreviousInvoices: Using OPTIMIZED query for SKU ${item.skuNo}');
       
-      // Use optimized single-query method instead of loading all invoice items
+      // Use optimized query with online fallback to populate cache when empty
       final invoiceService = InvoiceService(SignalRService());
-      final matchedItems = await invoiceService.getInvoiceItemsBySku(
+      final matchedItems = await invoiceService.getInvoiceItemsBySkuWithOnlineFallback(
         companyCode: companyCode,
         customerCode: selectedCustomer.code,
         skuNo: item.skuNo,
         filterUom: filterUom,
         limit: 3,
+        fetchInvoicesLimit: 10,
       );
 
       print('🔎 PreviousInvoices: Optimized query returned ${matchedItems.length} items');

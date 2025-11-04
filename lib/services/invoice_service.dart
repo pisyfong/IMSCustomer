@@ -231,6 +231,69 @@ class InvoiceService {
     }
   }
 
+  /// Get invoice items for a SKU with online fallback to populate cache when empty
+  Future<List<Map<String, dynamic>>> getInvoiceItemsBySkuWithOnlineFallback({
+    required int companyCode,
+    required String customerCode,
+    required int skuNo,
+    String? filterUom,
+    int limit = 10,
+    int fetchInvoicesLimit = 10,
+  }) async {
+    // Try local optimized path first
+    final local = await getInvoiceItemsBySku(
+      companyCode: companyCode,
+      customerCode: customerCode,
+      skuNo: skuNo,
+      filterUom: filterUom,
+      limit: limit,
+    );
+    if (local.isNotEmpty) return local;
+
+    // If not connected, return whatever we have (empty)
+    if (!_signalRService.isConnected) return local;
+
+    try {
+      // Fetch recent invoices for this customer from server
+      final serverInvoices = await fetchInvoicesFromServer(
+        companyCode: companyCode,
+        customerCode: customerCode,
+      );
+
+      if (serverInvoices.isEmpty) return local;
+
+      // Take a small batch to limit network calls
+      final recent = serverInvoices.take(fetchInvoicesLimit).toList();
+
+      // For each recent invoice, fetch its items and cache locally
+      for (final inv in recent) {
+        try {
+          final items = await fetchInvoiceItemsFromServer(
+            companyCode: companyCode,
+            invoicePreLabel: inv.invoicePreLabel,
+          );
+          if (items.isNotEmpty) {
+            await saveInvoiceItemsToLocal(items);
+          }
+        } catch (e) {
+          // Skip invoice on error, continue
+          continue;
+        }
+      }
+
+      // Re-run local optimized query after caching
+      return await getInvoiceItemsBySku(
+        companyCode: companyCode,
+        customerCode: customerCode,
+        skuNo: skuNo,
+        filterUom: filterUom,
+        limit: limit,
+      );
+    } catch (e) {
+      return local; // Return whatever we have
+    }
+  }
+
   /// Get invoice items with offline-first pattern
   Future<List<InvoiceItem>> getInvoiceItems({
     required int companyCode,
