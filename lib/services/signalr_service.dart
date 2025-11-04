@@ -23,6 +23,11 @@ class SignalRService {
   // Stream controllers for real-time database changes
   final StreamController<Map<String, dynamic>> _companyChangedController = StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _customerChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _inventoryChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _quotationChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _invoiceChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _pluChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _customerPluChangedController = StreamController<Map<String, dynamic>>.broadcast();
   
   // Getters for streams
   Stream<bool> get connectionState => _connectionStateController.stream;
@@ -33,6 +38,11 @@ class SignalRService {
   // Getters for real-time change streams
   Stream<Map<String, dynamic>> get companyChanged => _companyChangedController.stream;
   Stream<Map<String, dynamic>> get customerChanged => _customerChangedController.stream;
+  Stream<Map<String, dynamic>> get inventoryChanged => _inventoryChangedController.stream;
+  Stream<Map<String, dynamic>> get quotationChanged => _quotationChangedController.stream;
+  Stream<Map<String, dynamic>> get invoiceChanged => _invoiceChangedController.stream;
+  Stream<Map<String, dynamic>> get pluChanged => _pluChangedController.stream;
+  Stream<Map<String, dynamic>> get customerPluChanged => _customerPluChangedController.stream;
   
   bool get isConnected {
     // Direct check of hub connection state instead of relying on our flag
@@ -227,6 +237,51 @@ class SignalRService {
         final changeData = arguments[0] as Map<String, dynamic>;
         print('SignalR: Customer ${changeData['changeType']} - ${changeData['data']?['Code']}');
         _customerChangedController.add(changeData);
+      }
+    });
+    
+    // Listen for inventory changes
+    _hubConnection!.on('inventoryChanged', (arguments) {
+      if (arguments != null && arguments.isNotEmpty) {
+        final changeData = arguments[0] as Map<String, dynamic>;
+        print('📦 SignalR: Inventory ${changeData['changeType']} - SKU ${changeData['data']?['SKU_No']}');
+        _inventoryChangedController.add(changeData);
+      }
+    });
+    
+    // Listen for quotation changes
+    _hubConnection!.on('quotationChanged', (arguments) {
+      if (arguments != null && arguments.isNotEmpty) {
+        final changeData = arguments[0] as Map<String, dynamic>;
+        print('📝 SignalR: Quotation ${changeData['changeType']} - ${changeData['data']?['Quote_PreLabel']}');
+        _quotationChangedController.add(changeData);
+      }
+    });
+    
+    // Listen for invoice changes
+    _hubConnection!.on('invoiceChanged', (arguments) {
+      if (arguments != null && arguments.isNotEmpty) {
+        final changeData = arguments[0] as Map<String, dynamic>;
+        print('🧾 SignalR: Invoice ${changeData['changeType']} - ${changeData['data']?['Invoice_PreLabel']}');
+        _invoiceChangedController.add(changeData);
+      }
+    });
+    
+    // Listen for PLU changes
+    _hubConnection!.on('pluChanged', (arguments) {
+      if (arguments != null && arguments.isNotEmpty) {
+        final changeData = arguments[0] as Map<String, dynamic>;
+        print('🏷️ SignalR: PLU ${changeData['changeType']} - SKU ${changeData['data']?['SKU_No']}');
+        _pluChangedController.add(changeData);
+      }
+    });
+    
+    // Listen for customer PLU changes
+    _hubConnection!.on('customerPluChanged', (arguments) {
+      if (arguments != null && arguments.isNotEmpty) {
+        final changeData = arguments[0] as Map<String, dynamic>;
+        print('🏷️ SignalR: Customer PLU ${changeData['changeType']} - Customer ${changeData['data']?['Customer_Code']} SKU ${changeData['data']?['SKU_No']}');
+        _customerPluChangedController.add(changeData);
       }
     });
     
@@ -526,7 +581,7 @@ class SignalRService {
     try {
       print('🌐 HTTP: Fetching user roles from PI_User_Role...');
       
-      final url = Uri.parse('http://192.168.16.12:3001/api/user-roles');
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/user-roles');
       print('📡 HTTP: GET $url');
       
       final response = await http.get(

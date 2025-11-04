@@ -10,7 +10,7 @@ class AppConfig {
   // Ports
   static const int _productionPort = 1194;
   static const int _developmentPort = 1194; // Change if your local server uses different port
-  static const int _apiPort = 3001; // HTTP API server port (Node.js REST API)
+  static const int _apiPort = 1194; // HTTP API server port (Node.js REST API)
   
   // Protocol
   static const String _protocol = 'http'; // Change to 'https' if needed

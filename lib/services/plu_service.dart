@@ -1,9 +1,12 @@
 import 'package:isar/isar.dart';
 import 'dart:math' as math;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/plu.dart';
 import '../models/customer_plu.dart';
 import 'auth_service.dart';
 import 'signalr_service.dart';
+import '../config/app_config.dart';
 
 class PluService {
   final Isar _isar;
@@ -103,21 +106,46 @@ class PluService {
     }
   }
 
-  // Fetch PLUs from server via SignalR
+  // Fetch PLUs from server via SignalR or HTTP fallback
   Future<List<Map<String, dynamic>>> fetchPlusFromServer() async {
     try {
       final companyCode = await _getCurrentCompanyCode();
       print('🔍 PLU SERVICE: Fetching PLUs from server for company: $companyCode');
       
-      // Call server method to get PLUs
-      final response = await _signalRService.invoke('getPlu', [companyCode]);
-      print('🔍 PLU SERVICE: Server response: ${response?.runtimeType}');
+      // Try SignalR first if connected
+      if (_signalRService.isConnected) {
+        try {
+          print('📡 PLU SERVICE: Using SignalR...');
+          final response = await _signalRService.invoke('getPlu', [companyCode]);
+          print('🔍 PLU SERVICE: SignalR response: ${response?.runtimeType}');
+          
+          if (response is List) {
+            print('✅ PLU SERVICE: Received ${response.length} PLUs from SignalR');
+            return response.cast<Map<String, dynamic>>();
+          }
+        } catch (e) {
+          print('⚠️ PLU SERVICE: SignalR failed, trying HTTP fallback: $e');
+        }
+      }
       
-      if (response is List) {
-        print('🔍 PLU SERVICE: Received ${response.length} PLUs from server');
-        return response.cast<Map<String, dynamic>>();
+      // HTTP Fallback
+      print('🌐 PLU SERVICE: Using HTTP fallback...');
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/plu?companyCode=$companyCode');
+      print('📡 PLU SERVICE: GET $url');
+      
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        print('✅ PLU SERVICE: Received ${data.length} PLUs from HTTP');
+        return data.cast<Map<String, dynamic>>();
       } else {
-        print('❌ PLU SERVICE: Unexpected response type: ${response?.runtimeType}');
+        print('❌ PLU SERVICE: HTTP error ${response.statusCode}: ${response.body}');
         return [];
       }
     } catch (e) {
@@ -132,11 +160,12 @@ class PluService {
       final companyCode = await _getCurrentCompanyCode();
       print('🔍 PLU SERVICE: Starting PLU sync for company: $companyCode');
       
-      // If no PLUs provided, fetch from server
+      // If no PLUs provided, fetch from server (will try SignalR then HTTP)
       final plusData = plus ?? await fetchPlusFromServer();
       
       if (plusData.isEmpty) {
-        print('⚠️ PLU SERVICE: No PLU data to sync');
+        print('⚠️ PLU SERVICE: No PLU data to sync - this is OK if company has no PLU records');
+        // Don't throw - just return. Empty PLU is valid.
         return;
       }
       
@@ -146,6 +175,11 @@ class PluService {
           .toList();
 
       print('🔍 PLU SERVICE: Converting ${plusData.length} PLUs, ${plusList.length} for company $companyCode');
+
+      if (plusList.isEmpty) {
+        print('⚠️ PLU SERVICE: No PLUs for company $companyCode after filtering');
+        return;
+      }
 
       await _isar.writeTxn(() async {
         // Delete existing PLUS for this company
@@ -161,7 +195,8 @@ class PluService {
       print('✅ PLU SERVICE: Successfully synced ${plusList.length} PLUs');
     } catch (e) {
       print('❌ PLU SERVICE: Error syncing PLUs: $e');
-      rethrow;
+      // Don't rethrow - PLU sync failure should not stop other syncs
+      print('⚠️ PLU SERVICE: Continuing despite PLU sync error...');
     }
   }
 
@@ -176,24 +211,32 @@ class PluService {
       
       dynamic response;
       
-      // Try SignalR first if connected
-      if (_signalRService.isConnected) {
+      // Ensure SignalR connection
+      if (!_signalRService.isConnected) {
         try {
-          response = await _signalRService.invoke('getCustomerPlu', [
-            companyCode,
-            customerCode,
-            skuNos,
-          ]);
+          await _signalRService.connect().timeout(const Duration(seconds: 3));
         } catch (e) {
-          print('⚠️ PLU SERVICE: SignalR failed for customer PLU, skipping for $customerCode');
-          return; // Skip HTTP fallback for customer PLU as it's optional data
+          print('📱 PLU SERVICE: Cannot connect SignalR, skipping customer PLU for $customerCode');
+          return;
         }
-      } else {
-        print('📱 PLU SERVICE: SignalR not connected, skipping customer PLU for $customerCode');
-        return; // Skip when offline - customer PLU is optional
+      }
+      
+      // Try SignalR with timeout
+      try {
+        response = await _signalRService.invoke('getCustomerPlu', [
+          companyCode,
+          customerCode,
+          skuNos,
+        ]).timeout(const Duration(seconds: 10));
+      } catch (e) {
+        print('⚠️ PLU SERVICE: SignalR invoke failed for customer PLU $customerCode: $e');
+        return; // Skip HTTP fallback for customer PLU as it's optional data
       }
 
-      if (response is! List) return;
+      if (response is! List) {
+        print('⚠️ PLU SERVICE: Invalid response type for customer PLU $customerCode: ${response.runtimeType}');
+        return;
+      }
 
       final records = response
           .cast<Map<String, dynamic>>()
@@ -245,6 +288,29 @@ class PluService {
           .skuNoEqualTo(skuNo)
           .findFirst();
     } catch (e) {
+      return null;
+    }
+  }
+
+  /// Lookup cached customer PLU by barcode/PLU number
+  Future<CustomerPlu?> getCachedCustomerPluByBarcode({
+    required int companyCode,
+    required String customerCode,
+    required String pluNo,
+  }) async {
+    try {
+      final col = _isar.collection<CustomerPlu>();
+      return await col
+          .where()
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .and()
+          .customerCodeEqualTo(customerCode)
+          .and()
+          .pluNoEqualTo(pluNo)
+          .findFirst();
+    } catch (e) {
+      print('❌ PLU SERVICE: Error looking up customer PLU by barcode: $e');
       return null;
     }
   }

@@ -54,6 +54,11 @@ class EnhancedSyncService {
   StreamSubscription? _customerDeletedSubscription;
   StreamSubscription? _companyChangedSubscription;
   StreamSubscription? _customerChangedSubscription;
+  StreamSubscription? _inventoryChangedSubscription;
+  StreamSubscription? _quotationChangedSubscription;
+  StreamSubscription? _invoiceChangedSubscription;
+  StreamSubscription? _pluChangedSubscription;
+  StreamSubscription? _customerPluChangedSubscription;
   
   bool _isOnline = false;
   bool _isSyncing = false;
@@ -96,6 +101,11 @@ class EnhancedSyncService {
     // Listen to real-time database changes
     _companyChangedSubscription = _signalRService.companyChanged.listen(_onCompanyChanged);
     _customerChangedSubscription = _signalRService.customerChanged.listen(_onCustomerChanged);
+    _inventoryChangedSubscription = _signalRService.inventoryChanged.listen(_onInventoryChanged);
+    _quotationChangedSubscription = _signalRService.quotationChanged.listen(_onQuotationChanged);
+    _invoiceChangedSubscription = _signalRService.invoiceChanged.listen(_onInvoiceChanged);
+    _pluChangedSubscription = _signalRService.pluChanged.listen(_onPluChanged);
+    _customerPluChangedSubscription = _signalRService.customerPluChanged.listen(_onCustomerPluChanged);
     
     // Start periodic sync using configured interval
     print('Enhanced Sync: Starting periodic sync every ${AppConfig.periodicSyncMinutes} minutes');
@@ -262,6 +272,73 @@ class EnhancedSyncService {
     // For now, just log the change
     print('Enhanced Sync: Customer change received but not processed (no Customer model)');
   }
+
+  /// Handle real-time inventory change events
+  void _onInventoryChanged(Map<String, dynamic> changeData) async {
+    final changeType = changeData['changeType'] as String;
+    final inventoryData = changeData['data'] as Map<String, dynamic>;
+    final skuNo = inventoryData['SKU_No'];
+    
+    print('📦 Enhanced Sync: Real-time inventory $changeType - SKU $skuNo');
+    print('📦 Inventory change detected - will be synced on next periodic sync');
+    // Note: Individual item sync will be handled by periodic sync
+  }
+
+  /// Handle real-time quotation change events
+  void _onQuotationChanged(Map<String, dynamic> changeData) async {
+    final changeType = changeData['changeType'] as String;
+    final quotationData = changeData['data'] as Map<String, dynamic>;
+    final quoteLabel = quotationData['Quote_PreLabel'];
+    
+    print('📝 Enhanced Sync: Real-time quotation $changeType - $quoteLabel');
+    print('📝 Quotation change detected - triggering background sync');
+    // Trigger a background sync to fetch updated quotations
+    Future.microtask(() => performSync());
+  }
+
+  /// Handle real-time invoice change events
+  void _onInvoiceChanged(Map<String, dynamic> changeData) async {
+    final changeType = changeData['changeType'] as String;
+    final invoiceData = changeData['data'] as Map<String, dynamic>;
+    final invoiceLabel = invoiceData['Invoice_PreLabel'];
+    
+    print('🧾 Enhanced Sync: Real-time invoice $changeType - $invoiceLabel');
+    print('🧾 Invoice change detected - data will be refreshed on next access');
+    // Invoices are loaded on-demand when viewing invoice history
+  }
+
+  /// Handle real-time PLU change events
+  void _onPluChanged(Map<String, dynamic> changeData) async {
+    final changeType = changeData['changeType'] as String;
+    final pluData = changeData['data'] as Map<String, dynamic>;
+    final skuNo = pluData['SKU_No'];
+    
+    print('🏷️ Enhanced Sync: Real-time PLU $changeType - SKU $skuNo');
+    print('🏷️ PLU change detected - will be synced on next periodic sync');
+    // PLU data is synced during periodic inventory sync
+  }
+
+  /// Handle real-time customer PLU change events
+  void _onCustomerPluChanged(Map<String, dynamic> changeData) async {
+    final changeType = changeData['changeType'] as String;
+    final customerPluData = changeData['data'] as Map<String, dynamic>;
+    final customerCode = customerPluData['Customer_Code'];
+    final skuNo = customerPluData['SKU_No'];
+    
+    print('🏷️ Enhanced Sync: Real-time customer PLU $changeType - Customer $customerCode SKU $skuNo');
+    
+    // Trigger customer PLU refresh
+    try {
+      await _pluService.syncCustomerPlusForCustomer(
+        companyCode: customerPluData['Company_Code'] ?? 1,
+        customerCode: customerCode,
+        skuNos: [skuNo],
+      );
+      print('✅ Enhanced Sync: Customer PLU for $customerCode SKU $skuNo synced successfully');
+    } catch (e) {
+      print('❌ Enhanced Sync: Error syncing customer PLU for $customerCode SKU $skuNo: $e');
+    }
+  }
   
   /// Perform sync operation
   Future<void> performSync() async {
@@ -297,7 +374,12 @@ class EnhancedSyncService {
       print('🔄 ENHANCED SYNC: About to sync unsynced quotations...');
       await _syncUnsyncedQuotations();
       print('🔄 ENHANCED SYNC: Quotation sync completed');
-      
+
+      // Periodic inventory sync (paged, per company)
+      print('🔄 ENHANCED SYNC: About to sync inventory (periodic)...');
+      await _syncInventoryPeriodically();
+      print('🔄 ENHANCED SYNC: Inventory sync completed');
+
     } catch (e) {
       print('Enhanced Sync: Error during sync: $e');
       print('🚨 ENHANCED SYNC: Exception in performSync - ensuring _isSyncing reset');
@@ -562,107 +644,185 @@ class EnhancedSyncService {
     await _preloadCustomerPlus();
   }
   
+  /// Public method to sync quotations (called from settings page)
+  Future<void> syncQuotations() async {
+    await _preloadAllQuotesForceSync();
+    await _preloadAllQuoteItems();
+  }
+  
+  /// Force sync all quotes (for manual sync from settings)
+  Future<void> _preloadAllQuotesForceSync() async {
+    try {
+      print('📝 PRELOAD: Force syncing all quotes...');
+      
+      // Get all companies first
+      final companies = await _isar.companys.where().findAll();
+      double totalQuotes = 0;
+      
+      for (final company in companies) {
+        try {
+          final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+          if (companyCode <= 0) continue;
+          
+          print('📝 PRELOAD: Force syncing quotes for company $companyCode...');
+          
+          // Fetch ALL quotes for this company (no customer filter)
+          // Server now supports fetching all quotes when customerCode is empty
+          final quotes = await _quoteService.getQuotes(
+            companyCode: companyCode,
+            customerCode: null,  // Fetch all quotes for company
+            forceSync: true,     // Force sync from server
+          );
+          
+          if (quotes.isNotEmpty) {
+            totalQuotes += quotes.length;
+            print('📝 PRELOAD: Synced ${quotes.length} quotes for company $companyCode');
+          } else {
+            print('📝 PRELOAD: No quotes found for company $companyCode');
+          }
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error syncing quotes for company ${company.companyCode}: $e');
+        }
+      }
+      
+      print('✅ PRELOAD: Total quotes synced: $totalQuotes');
+      
+    } catch (e) {
+      print('❌ PRELOAD QUOTES ERROR: $e');
+      rethrow;
+    }
+  }
+  
+  /// Public method to sync PLUs (called from settings page)
+  Future<void> syncPlus() async {
+    await _preloadAllPlus();
+  }
+
   /// Preload customer-specific PLU mappings using server's getCustomerPlu function
   Future<void> _preloadCustomerPlus() async {
     try {
       print('🏷️ PRELOAD: Loading customer PLU mappings using getCustomerPlu...');
 
-      // Skip if offline to avoid repeated timeouts
-      if (!OfflineFirstService.isLikelyOnline()) {
-        print('🏷️ PRELOAD: Skipping customer PLU sync (offline)');
-        return;
+      // Try to connect if not connected
+      if (!_signalRService.isConnected) {
+        try {
+          await _signalRService.connect().timeout(const Duration(seconds: 5));
+        } catch (e) {
+          print('🏷️ PRELOAD: Cannot connect to server, skipping customer PLU sync');
+          return;
+        }
       }
 
-      // Strategy: Call getCustomerPlu for each customer with common/popular SKUs
-      // The server's getCustomerPlu function will use AR_Customer_Item to return relevant PLU data
+      // Strategy: Call getCustomerPlu for each customer with comprehensive SKU list
       final companies = await _isar.companys.where().findAll();
-      int totalMappings = 0;
 
       for (final company in companies) {
         final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
         if (companyCode <= 0) continue;
-        
+
         print('🏷️ PRELOAD: Processing company $companyCode for customer PLU...');
 
-        // Get all customers for this company
-        final customers = await _isar.customers
-            .filter()
-            .companyCodeEqualTo(companyCode)
-            .findAll();
+        // OPTIMIZATION: Get only customers that have PLU records from server
+        List<String> customersWithPlu = [];
+        try {
+          final response = await _signalRService.invoke('getCustomersWithPlu', [companyCode])
+              .timeout(const Duration(seconds: 10));
+          if (response is List) {
+            customersWithPlu = response.cast<String>();
+            print('🏷️ PRELOAD: Found ${customersWithPlu.length} customers with PLU for company $companyCode');
+          }
+        } catch (e) {
+          print('⚠️ PRELOAD: Failed to get customers with PLU, falling back to all customers: $e');
+          // Fallback: get all customers if the query fails
+          final allCustomers = await _isar.customers
+              .filter()
+              .companyCodeEqualTo(companyCode)
+              .findAll();
+          customersWithPlu = allCustomers.map((c) => c.code).toList();
+        }
 
-        print('🏷️ PRELOAD: Found ${customers.length} customers for company $companyCode');
-
-        if (customers.isEmpty) {
-          print('🏷️ PRELOAD: No customers found, skipping customer PLU for company $companyCode');
+        if (customersWithPlu.isEmpty) {
+          print('🏷️ PRELOAD: No customers with PLU found, skipping company $companyCode');
           continue;
         }
 
-        // Get ALL SKUs from inventory for comprehensive PLU sync
+        // Get ALL SKUs for this company
         final inventoryItems = await _isar.inventoryItems
-            .where()
             .filter()
             .companyCodeEqualTo(companyCode)
-            .findAll(); // No limit - get ALL inventory items
-        
-        // Extract ALL SKUs and sort them
-        final allSkus = inventoryItems.map((item) => item.skuNo).where((sku) => sku > 0).toList()..sort();
-        
-        // Use ALL SKUs for manual sync - no sampling or limits
-        final commonSkus = allSkus;
-        print('🏷️ PRELOAD: Using ALL ${commonSkus.length} SKUs for comprehensive PLU sync');
-        print('🏷️ PRELOAD: SKU range: ${allSkus.isNotEmpty ? "${allSkus.first} to ${allSkus.last}" : "none"}');
-        print('🏷️ PRELOAD: This will sync PLU data for every available SKU');
-
-        if (commonSkus.isEmpty) {
-          print('🏷️ PRELOAD: No inventory items found, skipping customer PLU for company $companyCode');
+            .findAll();
+        final allSkus = inventoryItems
+            .map((it) => it.skuNo)
+            .where((sku) => sku > 0)
+            .toList()
+          ..sort();
+        if (allSkus.isEmpty) {
+          print('🏷️ PRELOAD: No inventory items found, skipping company $companyCode');
           continue;
         }
 
         int processedCustomers = 0;
-        // Process customers in smaller batches for comprehensive sync
-        for (int i = 0; i < customers.length; i += 5) { // Smaller batches due to larger SKU lists
-          final batch = customers.skip(i).take(5).toList();
-          
-          for (final customer in batch) {
-            final customerCode = customer.code;
-            print('🏷️ PRELOAD: Syncing customer PLU for $customerCode with ALL ${commonSkus.length} SKUs...');
-            
-            // The server's getCustomerPlu will filter to only return PLU data for items
-            // that this customer actually has in AR_Customer_Item
-            await _pluService.syncCustomerPlusForCustomer(
-              companyCode: companyCode,
-              customerCode: customerCode,
-              skuNos: commonSkus,
-            );
-            processedCustomers++;
-            print('🏷️ PRELOAD: ✅ Synced customer PLU for $customerCode (comprehensive sync)');
+        int syncedCustomers = 0;
+        int skippedCustomers = 0;
 
-            // Longer delay between customers due to larger requests
+        for (int i = 0; i < customersWithPlu.length; i += 5) {
+          final batch = customersWithPlu.skip(i).take(5).toList();
+          for (final customerCode in batch) {
+            print('🏷️ PRELOAD: Syncing customer PLU for $customerCode with ALL ${allSkus.length} SKUs...');
+
+            // Skip connection check here - already checked at method start
+            {
+              // Chunk SKUs to reduce payload and avoid potential server-side indexing issues
+              const int chunkSize = 200;
+              bool anyChunkSucceeded = false;
+              for (int start = 0; start < allSkus.length; start += chunkSize) {
+                final end = (start + chunkSize) > allSkus.length ? allSkus.length : (start + chunkSize);
+                final chunk = allSkus.sublist(start, end);
+                try {
+                  await _pluService.syncCustomerPlusForCustomer(
+                    companyCode: companyCode,
+                    customerCode: customerCode,
+                    skuNos: chunk,
+                  );
+                  anyChunkSucceeded = true;
+                } catch (e) {
+                  print('🏷️ PRELOAD: Customer PLU chunk sync failed for $customerCode at [$start..$end): $e');
+                  // If a chunk fails, continue with next chunk to avoid halting entire customer
+                }
+                await Future.delayed(const Duration(milliseconds: 50));
+              }
+              if (anyChunkSucceeded) {
+                print('🏷️ PRELOAD: ✅ Synced customer PLU for $customerCode (chunks=${(allSkus.length / chunkSize).ceil()})');
+                syncedCustomers++;
+              } else {
+                print('🏷️ PRELOAD: ⚠️ No customer PLU chunks succeeded for $customerCode');
+                skippedCustomers++;
+              }
+            }
+            processedCustomers++;
             await Future.delayed(const Duration(milliseconds: 100));
           }
-          
-          // Longer delay between batches for comprehensive sync
           await Future.delayed(const Duration(milliseconds: 500));
-          print('🏷️ PRELOAD: Processed batch ${(i ~/ 5) + 1}/${(customers.length / 5).ceil()} (${processedCustomers} customers)');
+          print('🏷️ PRELOAD: Processed batch ${(i ~/ 5) + 1}/${(customersWithPlu.length / 5).ceil()} ($processedCustomers customers so far)');
         }
-        
-        totalMappings = processedCustomers * commonSkus.length; // Estimate
-        print('🏷️ PRELOAD: Processed $processedCustomers customers for company $companyCode');
+
+        print('🏷️ PRELOAD: Company $companyCode summary - processed: $processedCustomers, synced: $syncedCustomers, skipped: $skippedCustomers');
       }
 
-      print('✅ PRELOAD: Customer PLU preload completed. Processed customers with estimated mappings: $totalMappings');
+      print('✅ PRELOAD: Customer PLU preload completed.');
     } catch (e) {
       print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
     }
   }
-
+  
   /// Full data preload at app startup
+  /// Runs the heavy preload tasks in the background without blocking UI
   Future<void> preloadAllDataAtStartup() async {
     if (_isFullDataPreloaded) {
       print('🚀 FULL PRELOAD: Already completed, skipping');
       return;
     }
-
     // Run in background - don't await, don't block
     _runBackgroundPreload();
   }
@@ -1089,9 +1249,7 @@ class EnhancedSyncService {
       print('⚙️ USER APP SETTINGS SYNC: Inside try block...');
       
       // Get current user for context
-      print('⚙️ USER APP SETTINGS SYNC: Creating AuthService...');
       final authService = AuthService();
-      print('⚙️ USER APP SETTINGS SYNC: Loading saved login...');
       final user = await authService.loadSavedLogin();
       print('⚙️ USER APP SETTINGS SYNC: User loaded: ${user?.userId}');
       
@@ -1154,6 +1312,116 @@ class EnhancedSyncService {
     }
   }
 
+  /// Periodic: Sync inventory for all companies (paged)
+  Future<void> _syncInventoryPeriodically() async {
+    try {
+      // Skip if offline
+      if (!OfflineFirstService.isLikelyOnline()) {
+        print('📦 PERIODIC: Skipping inventory sync (offline)');
+        return;
+      }
+      // Companies
+      final companies = await _isar.companys.where().findAll();
+      for (final company in companies) {
+        final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+        if (companyCode <= 0) continue;
+        print('📦 PERIODIC: Syncing inventory for company $companyCode');
+        const int pageSize = 100;
+        int offset = 0;
+        final List<InventoryItem> allForCompany = [];
+        while (true) {
+          final page = await _inventoryService.fetchInventoryFromServer(
+            companyCode: companyCode,
+            limit: pageSize,
+            offset: offset,
+          );
+          if (page.isEmpty) break;
+          allForCompany.addAll(page);
+          if (page.length < pageSize) break;
+          offset += pageSize;
+        }
+        if (allForCompany.isNotEmpty) {
+          await _inventoryService.saveInventoryToLocal(
+            allForCompany,
+            companyCode: companyCode,
+          );
+          print('📦 PERIODIC: Inventory updated for company $companyCode (items=${allForCompany.length})');
+        }
+      }
+    } catch (e) {
+      print('❌ PERIODIC INVENTORY ERROR: $e');
+    }
+  }
+
+  /// Periodic: Sync quotations (headers and items)
+  Future<void> _syncQuotesPeriodically() async {
+    try {
+      // Reuse preload logic which already handles offline checks
+      await _preloadAllQuotes();
+      await _preloadAllQuoteItems();
+    } catch (e) {
+      print('❌ PERIODIC QUOTES ERROR: $e');
+    }
+  }
+
+  /// Periodic: Sync recent invoices for each customer and a few items per invoice
+  Future<void> _syncRecentInvoicesPeriodically({int invoicesPerCustomer = 5}) async {
+    try {
+      if (!OfflineFirstService.isLikelyOnline()) {
+        print('🧾 PERIODIC: Skipping invoice sync (offline)');
+        return;
+      }
+      final companies = await _isar.companys.where().findAll();
+      for (final company in companies) {
+        final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
+        if (companyCode <= 0) continue;
+        print('🧾 PERIODIC: Syncing invoices for company $companyCode');
+
+        // Iterate customers for this company (cap to reduce load)
+        final customers = await _isar.customers
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .findAll();
+
+        for (final customer in customers) {
+          final cust = customer.code;
+          if (cust.isEmpty) continue;
+          try {
+            // Force refresh to fetch from server and cache locally
+            final invoices = await _invoiceService.getInvoices(
+              companyCode: companyCode,
+              customerCode: cust,
+              forceRefresh: true,
+            );
+            if (invoices.isEmpty) continue;
+            // Take a few most recent and fetch items
+            invoices.sort((a, b) {
+              final da = a.invoiceDate ?? DateTime(1970);
+              final db = b.invoiceDate ?? DateTime(1970);
+              return db.compareTo(da);
+            });
+            final recent = invoices.take(invoicesPerCustomer).toList();
+            for (final inv in recent) {
+              if (inv.invoicePreLabel.isEmpty) continue;
+              try {
+                await _invoiceService.getInvoiceItems(
+                  companyCode: companyCode,
+                  invoicePreLabel: inv.invoicePreLabel,
+                );
+              } catch (e) {
+                // Continue to next invoice on error
+              }
+            }
+          } catch (e) {
+            // Continue with next customer
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ PERIODIC INVOICES ERROR: $e');
+    }
+  }
+
   /// Reset preload flag (call on app restart)
   void resetPreloadFlag() {
     _isFullDataPreloaded = false;
@@ -1162,6 +1430,80 @@ class EnhancedSyncService {
   
 
   
+
+  /// Perform comprehensive full sync - syncs everything in correct sequence
+  Future<void> performFullSync() async {
+    print('🚀 FULL SYNC: Starting comprehensive sync...');
+    
+    if (!_isOnline) {
+      print('❌ FULL SYNC: Cannot sync - offline');
+      throw Exception('Cannot perform full sync while offline');
+    }
+    
+    if (_isSyncing) {
+      print('⚠️ FULL SYNC: Already syncing, forcing reset...');
+      _isSyncing = false;
+      _syncStatusController.add(false);
+    }
+    
+    _isSyncing = true;
+    _syncStatusController.add(true);
+    
+    try {
+      // Step 1: Credit Terms (needed for checkout)
+      print('📋 FULL SYNC [1/9]: Syncing credit terms...');
+      await _syncCreditTerms();
+      
+      // Step 2: Companies (foundation data)
+      print('🏢 FULL SYNC [2/9]: Syncing companies...');
+      await syncCompaniesForUser();
+      
+      // Step 3: User Roles & Customers (access control)
+      print('👥 FULL SYNC [3/9]: Syncing user roles and customers...');
+      await _syncUserRolesAndCustomers();
+      
+      // Step 4: User App Settings (permissions)
+      print('⚙️ FULL SYNC [4/9]: Syncing user app settings...');
+      await _syncUserAppSettings();
+      
+      // Step 5: Inventory (products must exist before PLU)
+      print('📦 FULL SYNC [5/9]: Syncing inventory...');
+      await _syncInventoryPeriodically();
+      
+      // Step 6: PLU Codes (requires inventory to exist)
+      print('🏷️ FULL SYNC [6/9]: Syncing PLU codes...');
+      final pluService = PluService(_isar);
+      await pluService.syncPlus();
+      
+      // Step 7: Customer PLU (requires customers and PLU)
+      print('🏷️ FULL SYNC [7/9]: Syncing customer PLU mappings...');
+      await syncCustomerPlu();
+      
+      // Step 8: Invoices (historical data)
+      print('🧾 FULL SYNC [8/9]: Syncing invoices...');
+      await preloadAllInvoices();
+      
+      // Step 9: Upload unsynced quotations
+      print('📝 FULL SYNC [9/9]: Uploading unsynced quotations...');
+      await _syncUnsyncedQuotations();
+      
+      // Update sync info
+      await _updateSyncInfo(
+        isOnline: _isOnline,
+        lastSyncTime: DateTime.now(),
+      );
+      
+      _emitSyncStats();
+      
+      print('✅ FULL SYNC: Completed successfully!');
+    } catch (e) {
+      print('❌ FULL SYNC: Failed - $e');
+      rethrow;
+    } finally {
+      _isSyncing = false;
+      _syncStatusController.add(false);
+    }
+  }
 
   /// Dispose resources
   void dispose() {
@@ -1172,6 +1514,11 @@ class EnhancedSyncService {
     _customerDeletedSubscription?.cancel();
     _companyChangedSubscription?.cancel();
     _customerChangedSubscription?.cancel();
+    _inventoryChangedSubscription?.cancel();
+    _quotationChangedSubscription?.cancel();
+    _invoiceChangedSubscription?.cancel();
+    _pluChangedSubscription?.cancel();
+    _customerPluChangedSubscription?.cancel();
     _syncStatusController.close();
     _syncStatsController.close();
   }

@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:barcode/barcode.dart' as bc;
 import '../models/cart_item.dart';
+import '../models/inventory_item.dart';
+import '../models/in_stock_uom.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
 import '../services/user_app_settings_service.dart';
+import '../services/plu_service.dart';
+import '../services/inventory_service.dart';
+import '../services/customer_state_service.dart';
 import '../widgets/inventory_image_widget.dart';
 import 'checkout_page.dart';
+import '../main.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({Key? key}) : super(key: key);
@@ -18,15 +26,20 @@ class _CartPageState extends State<CartPage> {
   final CartService _cartService = CartService();
   final AuthService _authService = AuthService();
   final UserAppSettingsService _settingsService = UserAppSettingsService();
+  final CustomerStateService _customerStateService = CustomerStateService();
+  late final PluService _pluService;
+  final InventoryService _inventoryService = InventoryService();
   
   List<CartItem> _cartItems = [];
   bool _isLoading = true;
   Map<String, dynamic> _cartSummary = {};
   final Map<int, TextEditingController> _qtyControllers = {};
+  MobileScannerController? _scannerController;
 
   @override
   void initState() {
     super.initState();
+    _pluService = PluService(isar);
     _loadCart();
   }
 
@@ -36,6 +49,7 @@ class _CartPageState extends State<CartPage> {
       ctrl.dispose();
     }
     _qtyControllers.clear();
+    _scannerController?.dispose();
     super.dispose();
   }
 
@@ -196,6 +210,27 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
+  Future<String?> _getCustomerPluBarcode(int companyCode, int skuNo) async {
+    try {
+      final customerInfo = _customerStateService.getSelectedCustomerInfo();
+      final customerCode = customerInfo?['code'] as String?;
+      
+      if (customerCode == null || customerCode.isEmpty) {
+        return null;
+      }
+
+      final customerPlu = await _pluService.getCachedCustomerPlu(
+        companyCode: companyCode,
+        customerCode: customerCode,
+        skuNo: skuNo,
+      );
+
+      return customerPlu?.pluNo;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> _clearCart() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -249,6 +284,10 @@ class _CartPageState extends State<CartPage> {
     ).then((_) => _loadCart()); // Refresh cart when returning
   }
 
+  // Barcode scanner methods temporarily disabled due to Isar query API issues
+  // Future<void> _openBarcodeScanner() async { ... }
+  // Future<void> _addScannedItemToCart(...) async { ... }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -275,6 +314,14 @@ class _CartPageState extends State<CartPage> {
                     _buildCartSummary(),
                   ],
                 ),
+      // Barcode scanner temporarily disabled due to Isar query issues
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: _openBarcodeScanner,
+      //   icon: const Icon(Icons.qr_code_scanner),
+      //   label: const Text('Scan PLU'),
+      //   backgroundColor: Colors.blue.shade600,
+      //   foregroundColor: Colors.white,
+      // ),
     );
   }
 
@@ -362,6 +409,25 @@ class _CartPageState extends State<CartPage> {
                               '${item.skuNo}',
                               style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Show customer PLU barcode next to SKU
+                          FutureBuilder<String?>(
+                            future: _getCustomerPluBarcode(item.companyCode, item.skuNo),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
+                                return Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: _BarcodeDisplay(data: snapshot.data!),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
                           ),
                           const Spacer(),
                           IconButton(
@@ -704,3 +770,267 @@ class _PriceEditDialogState extends State<_PriceEditDialog> {
     );
   }
 }
+
+// Custom Barcode Display Widget
+class _BarcodeDisplay extends StatelessWidget {
+  final String data;
+
+  const _BarcodeDisplay({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final barcode = bc.Barcode.code128();
+      return SizedBox(
+        height: 28,
+        width: 80,
+        child: CustomPaint(
+          painter: _BarcodePainter(
+            barcode: barcode,
+            data: data,
+          ),
+        ),
+      );
+    } catch (e) {
+      // If barcode generation fails, show text fallback
+      return SizedBox(
+        height: 28,
+        width: 80,
+        child: Center(
+          child: Text(
+            data,
+            style: const TextStyle(fontSize: 10),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class _BarcodePainter extends CustomPainter {
+  final bc.Barcode barcode;
+  final String data;
+
+  _BarcodePainter({required this.barcode, required this.data});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    try {
+      barcode.make(
+        data,
+        width: size.width,
+        height: size.height,
+        drawText: false,
+      ).forEach((element) {
+        if (element is bc.BarcodeBar) {
+          final paint = Paint()
+            ..color = element.black ? Colors.black : Colors.white
+            ..style = PaintingStyle.fill;
+          canvas.drawRect(
+            Rect.fromLTWH(
+              element.left,
+              element.top,
+              element.width,
+              element.height,
+            ),
+            paint,
+          );
+        }
+      });
+    } catch (e) {
+      // Silent fail - will show text fallback
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Barcode Scanner Page temporarily disabled
+/*
+class _BarcodeScannerPage extends StatefulWidget {
+  final int companyCode;
+  final String customerCode;
+  final Function(int skuNo, String? uom, double? price) onBarcodeScanned;
+
+  const _BarcodeScannerPage({
+    required this.companyCode,
+    required this.customerCode,
+    required this.onBarcodeScanned,
+  });
+
+  @override
+  State<_BarcodeScannerPage> createState() => _BarcodeScannerPageState();
+}
+
+class _BarcodeScannerPageState extends State<_BarcodeScannerPage> {
+  late final PluService _pluService;
+  MobileScannerController? _controller;
+  bool _isProcessing = false;
+  String? _lastScannedCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _pluService = PluService(isar);
+    _controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleBarcode(BarcodeCapture capture) async {
+    if (_isProcessing) return;
+
+    final barcode = capture.barcodes.firstOrNull;
+    if (barcode == null || barcode.rawValue == null) return;
+
+    final code = barcode.rawValue!;
+    
+    // Prevent duplicate scans
+    if (code == _lastScannedCode) return;
+    _lastScannedCode = code;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      print('🔍 Scanned barcode: $code');
+      
+      // Look up customer PLU by barcode
+      final customerPlu = await _pluService.getCachedCustomerPluByBarcode(
+        companyCode: widget.companyCode,
+        customerCode: widget.customerCode,
+        pluNo: code,
+      );
+
+      if (customerPlu != null) {
+        print('✅ Found customer PLU: SKU ${customerPlu.skuNo}, UOM: ${customerPlu.uom}');
+        
+        // Call callback with found item (price will be looked up from inventory/in_stock_uom)
+        await widget.onBarcodeScanned(
+          customerPlu.skuNo,
+          customerPlu.uom,
+          null, // Price will be determined from inventory item
+        );
+
+        if (!mounted) return;
+        
+        // Show success and go back
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Found item: ${customerPlu.pluNo}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+        
+        // Go back after short delay
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } else {
+        print('⚠️ Customer PLU not found for barcode: $code');
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ PLU code not found: $code'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error processing barcode: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+      // Reset last scanned after delay to allow re-scanning
+      Future.delayed(const Duration(seconds: 2), () {
+        _lastScannedCode = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Scan Customer PLU'),
+        backgroundColor: Colors.blue.shade600,
+        foregroundColor: Colors.white,
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: _handleBarcode,
+          ),
+          // Overlay with instructions
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Scan Customer PLU Barcode',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Customer: ${widget.customerCode}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Processing indicator
+          if (_isProcessing)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+*/

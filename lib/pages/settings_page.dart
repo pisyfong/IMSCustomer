@@ -8,7 +8,6 @@ import '../services/inventory_service.dart';
 import '../services/invoice_service.dart';
 import '../services/inventory_image_service.dart';
 import '../services/offline_first_service.dart';
-import '../services/plu_service.dart';
 import '../main.dart';
 import '../sync_info.dart';
 import '../company.dart';
@@ -198,82 +197,12 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   Future<void> _performFullSync() async {
     setState(() {
       _isSyncing = true;
-      _syncStatus = 'Starting full sync...';
+      _syncStatus = 'Starting comprehensive sync...';
     });
     
     try {
-      // Step 1: Core sync (customers, inventory, quotes)
-      setState(() {
-        _syncStatus = 'Syncing core data...';
-      });
-      await _syncService.performSync();
-      
-      // Step 2: Sync PLU codes
-      setState(() {
-        _syncStatus = 'Syncing PLU codes...';
-      });
-      try {
-        final pluService = PluService(isar);
-        // Fetch all PLUs from server and sync to local database
-        await pluService.syncPlus();
-      } catch (e) {
-        print('⚠️ PLU sync failed during full sync: $e');
-      }
-      
-      // Step 3: Sync Customer PLU mappings
-      setState(() {
-        _syncStatus = 'Syncing customer PLU mappings...';
-      });
-      try {
-        await _syncService.syncCustomerPlu();
-      } catch (e) {
-        print('⚠️ Customer PLU sync failed during full sync: $e');
-      }
-      
-      // Step 4: Sync UOM Pricing
-      setState(() {
-        _syncStatus = 'Syncing UOM pricing...';
-      });
-      try {
-        await _syncUomPricing();
-      } catch (e) {
-        print('⚠️ UOM pricing sync failed during full sync: $e');
-      }
-      
-      // Step 5: Sync Invoices
-      setState(() {
-        _syncStatus = 'Syncing invoices...';
-      });
-      try {
-        final invoiceService = InvoiceService(_signalRService);
-        await _syncService.preloadAllInvoices();
-      } catch (e) {
-        print('⚠️ Invoice sync failed during full sync: $e');
-      }
-      
-      // Step 6: Sync Invoice Items
-      setState(() {
-        _syncStatus = 'Syncing invoice items...';
-      });
-      try {
-        final invoiceService = InvoiceService(_signalRService);
-        final invoices = await isar.invoices.where().findAll();
-        for (final invoice in invoices) {
-          if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
-          try {
-            await invoiceService.getInvoiceItems(
-              companyCode: invoice.companyCode is String 
-                  ? int.tryParse(invoice.companyCode as String) ?? 1 
-                  : invoice.companyCode as int,
-              invoicePreLabel: invoice.invoicePreLabel,
-            );
-          } catch (e) {
-            // Continue with next invoice
-          }
-        }
-      } catch (e) {
-        print('⚠️ Invoice items sync failed during full sync: $e');
-      }
+      // Use the comprehensive full sync from EnhancedSyncService
+      await _syncService.performFullSync();
       
       // Reload stats
       await _loadCacheStats();
@@ -767,60 +696,113 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   Widget _buildActionButtons() {
     return Column(
       children: [
+        // Primary Full Sync Button
         _buildActionButton(
           icon: Icons.sync_alt,
           label: 'Full Sync',
-          subtitle: 'Sync all data from server',
+          subtitle: 'Sync all data: companies, customers, inventory, PLU, invoices',
           color: Colors.blue,
           onPressed: _isSyncing ? null : _performFullSync,
         ),
-        const SizedBox(height: 12),
-        _buildActionButton(
-          icon: Icons.image,
-          label: 'Sync Images',
-          subtitle: 'Download all product images',
-          color: Colors.purple,
-          onPressed: _isSyncing ? null : _syncImages,
-        ),
-        const SizedBox(height: 12),
-        _buildActionButton(
-          icon: Icons.receipt,
-          label: 'Sync Invoices',
-          subtitle: 'Update invoice history',
-          color: Colors.green,
-          onPressed: _isSyncing ? null : _syncInvoices,
-        ),
-        const SizedBox(height: 12),
-        _buildActionButton(
-          icon: Icons.receipt_long,
-          label: 'Sync Invoice Items',
-          subtitle: 'Update invoice line items',
-          color: Colors.teal,
-          onPressed: _isSyncing ? null : _syncInvoiceItems,
-        ),
-        const SizedBox(height: 12),
-        _buildActionButton(
-          icon: Icons.qr_code_2,
-          label: 'Sync PLU',
-          subtitle: 'Update product lookup codes',
-          color: Colors.orange,
-          onPressed: _isSyncing ? null : _syncPLU,
-        ),
-        const SizedBox(height: 12),
-        _buildActionButton(
-          icon: Icons.straighten,
-          label: 'Sync UOM Pricing',
-          subtitle: 'Update unit pricing & options',
-          color: Colors.cyan,
-          onPressed: _isSyncing ? null : _syncUomPricing,
-        ),
-        const SizedBox(height: 12),
-        _buildActionButton(
-          icon: Icons.person_pin,
-          label: 'Sync Customer PLU',
-          subtitle: 'Update customer-specific PLUs',
-          color: Colors.indigo,
-          onPressed: _isSyncing ? null : _syncCustomerPLU,
+        
+        const SizedBox(height: 16),
+        
+        // Advanced Sync Options (Expandable)
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            backgroundColor: Colors.grey.shade50,
+            collapsedBackgroundColor: Colors.grey.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade300),
+            ),
+            collapsedShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade300),
+            ),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.tune, color: Colors.grey.shade700),
+            ),
+            title: const Text(
+              'Advanced Sync Options',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              'Individual sync operations',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            children: [
+              const Divider(height: 1),
+              _buildCompactActionButton(
+                icon: Icons.image,
+                label: 'Sync Images',
+                color: Colors.purple,
+                onPressed: _isSyncing ? null : _syncImages,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.description,
+                label: 'Sync Quotations',
+                color: Colors.blue,
+                onPressed: _isSyncing ? null : _syncQuotations,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.list_alt,
+                label: 'Sync Quotation Items',
+                color: Colors.lightBlue,
+                onPressed: _isSyncing ? null : _syncQuotationItems,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.receipt,
+                label: 'Sync Invoices',
+                color: Colors.green,
+                onPressed: _isSyncing ? null : _syncInvoices,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.receipt_long,
+                label: 'Sync Invoice Items',
+                color: Colors.teal,
+                onPressed: _isSyncing ? null : _syncInvoiceItems,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.qr_code_2,
+                label: 'Sync PLU',
+                color: Colors.orange,
+                onPressed: _isSyncing ? null : _syncPLU,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.straighten,
+                label: 'Sync UOM Pricing',
+                color: Colors.cyan,
+                onPressed: _isSyncing ? null : _syncUomPricing,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.person_pin,
+                label: 'Sync Customer PLU',
+                color: Colors.indigo,
+                onPressed: _isSyncing ? null : _syncCustomerPLU,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.cloud_upload,
+                label: 'Upload Quotations',
+                color: Colors.deepOrange,
+                onPressed: _isSyncing ? null : _uploadQuotations,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -894,6 +876,54 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildCompactActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    VoidCallback? onPressed,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: onPressed == null ? Colors.grey.shade400 : Colors.black87,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Colors.grey.shade400,
+            ),
+          ],
         ),
       ),
     );
@@ -1226,6 +1256,49 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     );
   }
   
+  Future<void> _uploadQuotations() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Uploading pending quotations...';
+    });
+    
+    try {
+      // Call performSync which includes uploading unsynced quotations
+      await _syncService.performSync();
+      await _loadCacheStats();
+      
+      setState(() {
+        _syncStatus = 'Quotations uploaded successfully!';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Quotations uploaded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _syncStatus = 'Upload failed: $e';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+      });
+    }
+  }
+
   Future<void> _syncImages() async {
     setState(() {
       _isSyncing = true;
@@ -1453,6 +1526,84 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     }
   }
   
+  Future<void> _syncQuotations() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing quotations...';
+    });
+    
+    try {
+      // Use EnhancedSyncService's proven preload method
+      print('📝 Syncing quotations using EnhancedSyncService...');
+      await _syncService.syncQuotations();
+      
+      await _loadCacheStats();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced ${_quotesCount} quotations'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Quotation sync failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Quotation sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = 'Ready';
+      });
+    }
+  }
+  
+  Future<void> _syncQuotationItems() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing quotation items...';
+    });
+    
+    try {
+      // Use EnhancedSyncService's proven preload method
+      print('📋 Syncing quotation items using EnhancedSyncService...');
+      await _syncService.syncQuotations(); // This syncs both quotes and items
+      
+      await _loadCacheStats();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Synced quotation items'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Quotation items sync failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Quotation items sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = 'Ready';
+      });
+    }
+  }
+
   Future<void> _syncPLU() async {
     setState(() {
       _isSyncing = true;
@@ -1460,10 +1611,9 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     });
     
     try {
-      final pluService = PluService(isar);
-      
-      // Fetch all PLUs from server and sync to local database
-      await pluService.syncPlus();
+      // Use EnhancedSyncService's proven preload method
+      print('🏷️ Syncing PLU codes using EnhancedSyncService...');
+      await _syncService.syncPlus();
       
       await _loadCacheStats();
       

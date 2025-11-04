@@ -56,6 +56,7 @@ class InventoryItem {
   String? type;
   String? openPrice;
   String? discountable;
+  String? flag3;
   String? calculateQtyFromPrice;
   String? allowZeroPrice;
   String? serialNo;
@@ -189,6 +190,7 @@ class InventoryItem {
       ..type = json['Type']
       ..openPrice = _parseString(json['Open_Price'])
       ..discountable = json['Discountable']
+      ..flag3 = _parseString(json['Flag3'] ?? json['flag3'] ?? json['Flag_3'] ?? json['flag_3'])
       ..calculateQtyFromPrice = json['Calculate_Qty_From_Price']
       ..allowZeroPrice = json['Allow_Zero_Price']
       ..serialNo = json['Serial_No']
@@ -359,6 +361,7 @@ class InventoryItem {
       'Type': type,
       'Open_Price': openPrice,
       'Discountable': discountable,
+      'Flag3': flag3,
       'Calculate_Qty_From_Price': calculateQtyFromPrice,
       'Allow_Zero_Price': allowZeroPrice,
       'Serial_No': serialNo,

@@ -42,7 +42,7 @@ class OfflineFirstService {
   
   /// Test if we can connect to the server (with timeout)
   /// Returns true if server is reachable, false if offline
-  static Future<bool> isServerReachable({Duration timeout = const Duration(seconds: 2)}) async {
+  static Future<bool> isServerReachable({Duration timeout = const Duration(seconds: 10)}) async {
     try {
       // Quick check first
       if (_signalRService.isConnected) {

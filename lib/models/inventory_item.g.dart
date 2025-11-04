@@ -167,453 +167,458 @@ const InventoryItemSchema = CollectionSchema(
       name: r'fifoCost',
       type: IsarType.double,
     ),
-    r'givePoint': PropertySchema(
+    r'flag3': PropertySchema(
       id: 30,
+      name: r'flag3',
+      type: IsarType.string,
+    ),
+    r'givePoint': PropertySchema(
+      id: 31,
       name: r'givePoint',
       type: IsarType.string,
     ),
     r'giveRebate': PropertySchema(
-      id: 31,
+      id: 32,
       name: r'giveRebate',
       type: IsarType.string,
     ),
     r'grp': PropertySchema(
-      id: 32,
+      id: 33,
       name: r'grp',
       type: IsarType.string,
     ),
     r'gstPrice': PropertySchema(
-      id: 33,
+      id: 34,
       name: r'gstPrice',
       type: IsarType.double,
     ),
     r'introDate': PropertySchema(
-      id: 34,
+      id: 35,
       name: r'introDate',
       type: IsarType.dateTime,
     ),
     r'introPreLabel': PropertySchema(
-      id: 35,
+      id: 36,
       name: r'introPreLabel',
       type: IsarType.string,
     ),
     r'inventoryItem': PropertySchema(
-      id: 36,
+      id: 37,
       name: r'inventoryItem',
       type: IsarType.string,
     ),
     r'invoicePreLabel': PropertySchema(
-      id: 37,
+      id: 38,
       name: r'invoicePreLabel',
       type: IsarType.string,
     ),
     r'issueNo': PropertySchema(
-      id: 38,
+      id: 39,
       name: r'issueNo',
       type: IsarType.string,
     ),
     r'itemType': PropertySchema(
-      id: 39,
+      id: 40,
       name: r'itemType',
       type: IsarType.string,
     ),
     r'lastCost': PropertySchema(
-      id: 40,
+      id: 41,
       name: r'lastCost',
       type: IsarType.double,
     ),
     r'lastModifiedBy': PropertySchema(
-      id: 41,
+      id: 42,
       name: r'lastModifiedBy',
       type: IsarType.long,
     ),
     r'lastModifiedDate': PropertySchema(
-      id: 42,
+      id: 43,
       name: r'lastModifiedDate',
       type: IsarType.dateTime,
     ),
     r'lastPurDate': PropertySchema(
-      id: 43,
+      id: 44,
       name: r'lastPurDate',
       type: IsarType.dateTime,
     ),
     r'lastSalesDate': PropertySchema(
-      id: 44,
+      id: 45,
       name: r'lastSalesDate',
       type: IsarType.dateTime,
     ),
     r'lastVendorDate': PropertySchema(
-      id: 45,
+      id: 46,
       name: r'lastVendorDate',
       type: IsarType.dateTime,
     ),
     r'lastWriteTimeStamp': PropertySchema(
-      id: 46,
+      id: 47,
       name: r'lastWriteTimeStamp',
       type: IsarType.dateTime,
     ),
     r'location': PropertySchema(
-      id: 47,
+      id: 48,
       name: r'location',
       type: IsarType.string,
     ),
     r'lossPercent': PropertySchema(
-      id: 48,
+      id: 49,
       name: r'lossPercent',
       type: IsarType.double,
     ),
     r'maxStockLevel': PropertySchema(
-      id: 49,
+      id: 50,
       name: r'maxStockLevel',
       type: IsarType.double,
     ),
     r'minStockLevel': PropertySchema(
-      id: 50,
+      id: 51,
       name: r'minStockLevel',
       type: IsarType.double,
     ),
     r'miscCost': PropertySchema(
-      id: 51,
+      id: 52,
       name: r'miscCost',
       type: IsarType.double,
     ),
     r'noCost': PropertySchema(
-      id: 52,
+      id: 53,
       name: r'noCost',
       type: IsarType.string,
     ),
     r'noQty': PropertySchema(
-      id: 53,
+      id: 54,
       name: r'noQty',
       type: IsarType.string,
     ),
     r'nos': PropertySchema(
-      id: 54,
+      id: 55,
       name: r'nos',
       type: IsarType.double,
     ),
     r'nutritionFactsImage': PropertySchema(
-      id: 55,
+      id: 56,
       name: r'nutritionFactsImage',
       type: IsarType.string,
     ),
     r'oldRemarks': PropertySchema(
-      id: 56,
+      id: 57,
       name: r'oldRemarks',
       type: IsarType.string,
     ),
     r'openCode': PropertySchema(
-      id: 57,
+      id: 58,
       name: r'openCode',
       type: IsarType.string,
     ),
     r'openPrice': PropertySchema(
-      id: 58,
+      id: 59,
       name: r'openPrice',
       type: IsarType.string,
     ),
     r'packSize': PropertySchema(
-      id: 59,
+      id: 60,
       name: r'packSize',
       type: IsarType.double,
     ),
     r'packSizeDescription': PropertySchema(
-      id: 60,
+      id: 61,
       name: r'packSizeDescription',
       type: IsarType.string,
     ),
     r'packSizeUom': PropertySchema(
-      id: 61,
+      id: 62,
       name: r'packSizeUom',
       type: IsarType.string,
     ),
     r'pluNo': PropertySchema(
-      id: 62,
+      id: 63,
       name: r'pluNo',
       type: IsarType.long,
     ),
     r'price': PropertySchema(
-      id: 63,
+      id: 64,
       name: r'price',
       type: IsarType.double,
     ),
     r'promoterCommRate': PropertySchema(
-      id: 64,
+      id: 65,
       name: r'promoterCommRate',
       type: IsarType.double,
     ),
     r'qtyOnAdjIn': PropertySchema(
-      id: 65,
+      id: 66,
       name: r'qtyOnAdjIn',
       type: IsarType.double,
     ),
     r'qtyOnAdjKiv': PropertySchema(
-      id: 66,
+      id: 67,
       name: r'qtyOnAdjKiv',
       type: IsarType.double,
     ),
     r'qtyOnAdjOut': PropertySchema(
-      id: 67,
+      id: 68,
       name: r'qtyOnAdjOut',
       type: IsarType.double,
     ),
     r'qtyOnCustomerReturn': PropertySchema(
-      id: 68,
+      id: 69,
       name: r'qtyOnCustomerReturn',
       type: IsarType.double,
     ),
     r'qtyOnExchange': PropertySchema(
-      id: 69,
+      id: 70,
       name: r'qtyOnExchange',
       type: IsarType.double,
     ),
     r'qtyOnHand': PropertySchema(
-      id: 70,
+      id: 71,
       name: r'qtyOnHand',
       type: IsarType.double,
     ),
     r'qtyOnIO': PropertySchema(
-      id: 71,
+      id: 72,
       name: r'qtyOnIO',
       type: IsarType.double,
     ),
     r'qtyOnIR': PropertySchema(
-      id: 72,
+      id: 73,
       name: r'qtyOnIR',
       type: IsarType.double,
     ),
     r'qtyOnOrder': PropertySchema(
-      id: 73,
+      id: 74,
       name: r'qtyOnOrder',
       type: IsarType.double,
     ),
     r'qtyOnQuote': PropertySchema(
-      id: 74,
+      id: 75,
       name: r'qtyOnQuote',
       type: IsarType.double,
     ),
     r'qtyOnReceived': PropertySchema(
-      id: 75,
+      id: 76,
       name: r'qtyOnReceived',
       type: IsarType.double,
     ),
     r'qtyOnRepair': PropertySchema(
-      id: 76,
+      id: 77,
       name: r'qtyOnRepair',
       type: IsarType.double,
     ),
     r'qtyOnRequest': PropertySchema(
-      id: 77,
+      id: 78,
       name: r'qtyOnRequest',
       type: IsarType.double,
     ),
     r'qtyOnReturn': PropertySchema(
-      id: 78,
+      id: 79,
       name: r'qtyOnReturn',
       type: IsarType.double,
     ),
     r'qtyOnSales': PropertySchema(
-      id: 79,
+      id: 80,
       name: r'qtyOnSales',
       type: IsarType.double,
     ),
     r'qtyOnSalesOrder': PropertySchema(
-      id: 80,
+      id: 81,
       name: r'qtyOnSalesOrder',
       type: IsarType.double,
     ),
     r'qtyOnTrading': PropertySchema(
-      id: 81,
+      id: 82,
       name: r'qtyOnTrading',
       type: IsarType.double,
     ),
     r'qtyWithDecimal': PropertySchema(
-      id: 82,
+      id: 83,
       name: r'qtyWithDecimal',
       type: IsarType.string,
     ),
     r'quotaGrp': PropertySchema(
-      id: 83,
+      id: 84,
       name: r'quotaGrp',
       type: IsarType.string,
     ),
     r'ref1': PropertySchema(
-      id: 84,
+      id: 85,
       name: r'ref1',
       type: IsarType.string,
     ),
     r'ref1Text': PropertySchema(
-      id: 85,
+      id: 86,
       name: r'ref1Text',
       type: IsarType.string,
     ),
     r'ref2': PropertySchema(
-      id: 86,
+      id: 87,
       name: r'ref2',
       type: IsarType.string,
     ),
     r'ref2Text': PropertySchema(
-      id: 87,
+      id: 88,
       name: r'ref2Text',
       type: IsarType.string,
     ),
     r'ref3': PropertySchema(
-      id: 88,
+      id: 89,
       name: r'ref3',
       type: IsarType.string,
     ),
     r'ref3Text': PropertySchema(
-      id: 89,
+      id: 90,
       name: r'ref3Text',
       type: IsarType.string,
     ),
     r'ref4': PropertySchema(
-      id: 90,
+      id: 91,
       name: r'ref4',
       type: IsarType.string,
     ),
     r'ref4Text': PropertySchema(
-      id: 91,
+      id: 92,
       name: r'ref4Text',
       type: IsarType.string,
     ),
     r'remarks': PropertySchema(
-      id: 92,
+      id: 93,
       name: r'remarks',
       type: IsarType.string,
     ),
     r'reorderLevel': PropertySchema(
-      id: 93,
+      id: 94,
       name: r'reorderLevel',
       type: IsarType.double,
     ),
     r'returnDue': PropertySchema(
-      id: 94,
+      id: 95,
       name: r'returnDue',
       type: IsarType.string,
     ),
     r'serialNo': PropertySchema(
-      id: 95,
+      id: 96,
       name: r'serialNo',
       type: IsarType.string,
     ),
     r'size': PropertySchema(
-      id: 96,
+      id: 97,
       name: r'size',
       type: IsarType.string,
     ),
     r'skuNo': PropertySchema(
-      id: 97,
+      id: 98,
       name: r'skuNo',
       type: IsarType.long,
     ),
     r'standardCost': PropertySchema(
-      id: 98,
+      id: 99,
       name: r'standardCost',
       type: IsarType.double,
     ),
     r'status': PropertySchema(
-      id: 99,
+      id: 100,
       name: r'status',
       type: IsarType.string,
     ),
     r'stockFactor': PropertySchema(
-      id: 100,
+      id: 101,
       name: r'stockFactor',
       type: IsarType.double,
     ),
     r'subDept': PropertySchema(
-      id: 101,
+      id: 102,
       name: r'subDept',
       type: IsarType.string,
     ),
     r'type': PropertySchema(
-      id: 102,
+      id: 103,
       name: r'type',
       type: IsarType.string,
     ),
     r'uom': PropertySchema(
-      id: 103,
+      id: 104,
       name: r'uom',
       type: IsarType.string,
     ),
     r'uomFactor': PropertySchema(
-      id: 104,
+      id: 105,
       name: r'uomFactor',
       type: IsarType.double,
     ),
     r'warrantyPeriod': PropertySchema(
-      id: 105,
+      id: 106,
       name: r'warrantyPeriod',
       type: IsarType.long,
     ),
     r'warrantyPeriodType': PropertySchema(
-      id: 106,
+      id: 107,
       name: r'warrantyPeriodType',
       type: IsarType.string,
     ),
     r'webCategory': PropertySchema(
-      id: 107,
+      id: 108,
       name: r'webCategory',
       type: IsarType.string,
     ),
     r'webChkDate': PropertySchema(
-      id: 108,
+      id: 109,
       name: r'webChkDate',
       type: IsarType.string,
     ),
     r'webDailyQty': PropertySchema(
-      id: 109,
+      id: 110,
       name: r'webDailyQty',
       type: IsarType.double,
     ),
     r'webDept': PropertySchema(
-      id: 110,
+      id: 111,
       name: r'webDept',
       type: IsarType.string,
     ),
     r'webGrp': PropertySchema(
-      id: 111,
+      id: 112,
       name: r'webGrp',
       type: IsarType.string,
     ),
     r'webImageDetail': PropertySchema(
-      id: 112,
+      id: 113,
       name: r'webImageDetail',
       type: IsarType.string,
     ),
     r'webItemFr': PropertySchema(
-      id: 113,
+      id: 114,
       name: r'webItemFr',
       type: IsarType.dateTime,
     ),
     r'webItemTo': PropertySchema(
-      id: 114,
+      id: 115,
       name: r'webItemTo',
       type: IsarType.dateTime,
     ),
     r'webMixMatch': PropertySchema(
-      id: 115,
+      id: 116,
       name: r'webMixMatch',
       type: IsarType.string,
     ),
     r'webPromoGrp': PropertySchema(
-      id: 116,
+      id: 117,
       name: r'webPromoGrp',
       type: IsarType.string,
     ),
     r'webQtyMethod': PropertySchema(
-      id: 117,
+      id: 118,
       name: r'webQtyMethod',
       type: IsarType.string,
     ),
     r'webSpecialMsg': PropertySchema(
-      id: 118,
+      id: 119,
       name: r'webSpecialMsg',
       type: IsarType.string,
     ),
     r'webSubDept': PropertySchema(
-      id: 119,
+      id: 120,
       name: r'webSubDept',
       type: IsarType.string,
     )
@@ -764,6 +769,12 @@ int _inventoryItemEstimateSize(
   bytesCount += 3 + object.displayStatus.length * 3;
   {
     final value = object.expiry;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.flag3;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -1083,96 +1094,97 @@ void _inventoryItemSerialize(
   writer.writeString(offsets[27], object.displayStatus);
   writer.writeString(offsets[28], object.expiry);
   writer.writeDouble(offsets[29], object.fifoCost);
-  writer.writeString(offsets[30], object.givePoint);
-  writer.writeString(offsets[31], object.giveRebate);
-  writer.writeString(offsets[32], object.grp);
-  writer.writeDouble(offsets[33], object.gstPrice);
-  writer.writeDateTime(offsets[34], object.introDate);
-  writer.writeString(offsets[35], object.introPreLabel);
-  writer.writeString(offsets[36], object.inventoryItem);
-  writer.writeString(offsets[37], object.invoicePreLabel);
-  writer.writeString(offsets[38], object.issueNo);
-  writer.writeString(offsets[39], object.itemType);
-  writer.writeDouble(offsets[40], object.lastCost);
-  writer.writeLong(offsets[41], object.lastModifiedBy);
-  writer.writeDateTime(offsets[42], object.lastModifiedDate);
-  writer.writeDateTime(offsets[43], object.lastPurDate);
-  writer.writeDateTime(offsets[44], object.lastSalesDate);
-  writer.writeDateTime(offsets[45], object.lastVendorDate);
-  writer.writeDateTime(offsets[46], object.lastWriteTimeStamp);
-  writer.writeString(offsets[47], object.location);
-  writer.writeDouble(offsets[48], object.lossPercent);
-  writer.writeDouble(offsets[49], object.maxStockLevel);
-  writer.writeDouble(offsets[50], object.minStockLevel);
-  writer.writeDouble(offsets[51], object.miscCost);
-  writer.writeString(offsets[52], object.noCost);
-  writer.writeString(offsets[53], object.noQty);
-  writer.writeDouble(offsets[54], object.nos);
-  writer.writeString(offsets[55], object.nutritionFactsImage);
-  writer.writeString(offsets[56], object.oldRemarks);
-  writer.writeString(offsets[57], object.openCode);
-  writer.writeString(offsets[58], object.openPrice);
-  writer.writeDouble(offsets[59], object.packSize);
-  writer.writeString(offsets[60], object.packSizeDescription);
-  writer.writeString(offsets[61], object.packSizeUom);
-  writer.writeLong(offsets[62], object.pluNo);
-  writer.writeDouble(offsets[63], object.price);
-  writer.writeDouble(offsets[64], object.promoterCommRate);
-  writer.writeDouble(offsets[65], object.qtyOnAdjIn);
-  writer.writeDouble(offsets[66], object.qtyOnAdjKiv);
-  writer.writeDouble(offsets[67], object.qtyOnAdjOut);
-  writer.writeDouble(offsets[68], object.qtyOnCustomerReturn);
-  writer.writeDouble(offsets[69], object.qtyOnExchange);
-  writer.writeDouble(offsets[70], object.qtyOnHand);
-  writer.writeDouble(offsets[71], object.qtyOnIO);
-  writer.writeDouble(offsets[72], object.qtyOnIR);
-  writer.writeDouble(offsets[73], object.qtyOnOrder);
-  writer.writeDouble(offsets[74], object.qtyOnQuote);
-  writer.writeDouble(offsets[75], object.qtyOnReceived);
-  writer.writeDouble(offsets[76], object.qtyOnRepair);
-  writer.writeDouble(offsets[77], object.qtyOnRequest);
-  writer.writeDouble(offsets[78], object.qtyOnReturn);
-  writer.writeDouble(offsets[79], object.qtyOnSales);
-  writer.writeDouble(offsets[80], object.qtyOnSalesOrder);
-  writer.writeDouble(offsets[81], object.qtyOnTrading);
-  writer.writeString(offsets[82], object.qtyWithDecimal);
-  writer.writeString(offsets[83], object.quotaGrp);
-  writer.writeString(offsets[84], object.ref1);
-  writer.writeString(offsets[85], object.ref1Text);
-  writer.writeString(offsets[86], object.ref2);
-  writer.writeString(offsets[87], object.ref2Text);
-  writer.writeString(offsets[88], object.ref3);
-  writer.writeString(offsets[89], object.ref3Text);
-  writer.writeString(offsets[90], object.ref4);
-  writer.writeString(offsets[91], object.ref4Text);
-  writer.writeString(offsets[92], object.remarks);
-  writer.writeDouble(offsets[93], object.reorderLevel);
-  writer.writeString(offsets[94], object.returnDue);
-  writer.writeString(offsets[95], object.serialNo);
-  writer.writeString(offsets[96], object.size);
-  writer.writeLong(offsets[97], object.skuNo);
-  writer.writeDouble(offsets[98], object.standardCost);
-  writer.writeString(offsets[99], object.status);
-  writer.writeDouble(offsets[100], object.stockFactor);
-  writer.writeString(offsets[101], object.subDept);
-  writer.writeString(offsets[102], object.type);
-  writer.writeString(offsets[103], object.uom);
-  writer.writeDouble(offsets[104], object.uomFactor);
-  writer.writeLong(offsets[105], object.warrantyPeriod);
-  writer.writeString(offsets[106], object.warrantyPeriodType);
-  writer.writeString(offsets[107], object.webCategory);
-  writer.writeString(offsets[108], object.webChkDate);
-  writer.writeDouble(offsets[109], object.webDailyQty);
-  writer.writeString(offsets[110], object.webDept);
-  writer.writeString(offsets[111], object.webGrp);
-  writer.writeString(offsets[112], object.webImageDetail);
-  writer.writeDateTime(offsets[113], object.webItemFr);
-  writer.writeDateTime(offsets[114], object.webItemTo);
-  writer.writeString(offsets[115], object.webMixMatch);
-  writer.writeString(offsets[116], object.webPromoGrp);
-  writer.writeString(offsets[117], object.webQtyMethod);
-  writer.writeString(offsets[118], object.webSpecialMsg);
-  writer.writeString(offsets[119], object.webSubDept);
+  writer.writeString(offsets[30], object.flag3);
+  writer.writeString(offsets[31], object.givePoint);
+  writer.writeString(offsets[32], object.giveRebate);
+  writer.writeString(offsets[33], object.grp);
+  writer.writeDouble(offsets[34], object.gstPrice);
+  writer.writeDateTime(offsets[35], object.introDate);
+  writer.writeString(offsets[36], object.introPreLabel);
+  writer.writeString(offsets[37], object.inventoryItem);
+  writer.writeString(offsets[38], object.invoicePreLabel);
+  writer.writeString(offsets[39], object.issueNo);
+  writer.writeString(offsets[40], object.itemType);
+  writer.writeDouble(offsets[41], object.lastCost);
+  writer.writeLong(offsets[42], object.lastModifiedBy);
+  writer.writeDateTime(offsets[43], object.lastModifiedDate);
+  writer.writeDateTime(offsets[44], object.lastPurDate);
+  writer.writeDateTime(offsets[45], object.lastSalesDate);
+  writer.writeDateTime(offsets[46], object.lastVendorDate);
+  writer.writeDateTime(offsets[47], object.lastWriteTimeStamp);
+  writer.writeString(offsets[48], object.location);
+  writer.writeDouble(offsets[49], object.lossPercent);
+  writer.writeDouble(offsets[50], object.maxStockLevel);
+  writer.writeDouble(offsets[51], object.minStockLevel);
+  writer.writeDouble(offsets[52], object.miscCost);
+  writer.writeString(offsets[53], object.noCost);
+  writer.writeString(offsets[54], object.noQty);
+  writer.writeDouble(offsets[55], object.nos);
+  writer.writeString(offsets[56], object.nutritionFactsImage);
+  writer.writeString(offsets[57], object.oldRemarks);
+  writer.writeString(offsets[58], object.openCode);
+  writer.writeString(offsets[59], object.openPrice);
+  writer.writeDouble(offsets[60], object.packSize);
+  writer.writeString(offsets[61], object.packSizeDescription);
+  writer.writeString(offsets[62], object.packSizeUom);
+  writer.writeLong(offsets[63], object.pluNo);
+  writer.writeDouble(offsets[64], object.price);
+  writer.writeDouble(offsets[65], object.promoterCommRate);
+  writer.writeDouble(offsets[66], object.qtyOnAdjIn);
+  writer.writeDouble(offsets[67], object.qtyOnAdjKiv);
+  writer.writeDouble(offsets[68], object.qtyOnAdjOut);
+  writer.writeDouble(offsets[69], object.qtyOnCustomerReturn);
+  writer.writeDouble(offsets[70], object.qtyOnExchange);
+  writer.writeDouble(offsets[71], object.qtyOnHand);
+  writer.writeDouble(offsets[72], object.qtyOnIO);
+  writer.writeDouble(offsets[73], object.qtyOnIR);
+  writer.writeDouble(offsets[74], object.qtyOnOrder);
+  writer.writeDouble(offsets[75], object.qtyOnQuote);
+  writer.writeDouble(offsets[76], object.qtyOnReceived);
+  writer.writeDouble(offsets[77], object.qtyOnRepair);
+  writer.writeDouble(offsets[78], object.qtyOnRequest);
+  writer.writeDouble(offsets[79], object.qtyOnReturn);
+  writer.writeDouble(offsets[80], object.qtyOnSales);
+  writer.writeDouble(offsets[81], object.qtyOnSalesOrder);
+  writer.writeDouble(offsets[82], object.qtyOnTrading);
+  writer.writeString(offsets[83], object.qtyWithDecimal);
+  writer.writeString(offsets[84], object.quotaGrp);
+  writer.writeString(offsets[85], object.ref1);
+  writer.writeString(offsets[86], object.ref1Text);
+  writer.writeString(offsets[87], object.ref2);
+  writer.writeString(offsets[88], object.ref2Text);
+  writer.writeString(offsets[89], object.ref3);
+  writer.writeString(offsets[90], object.ref3Text);
+  writer.writeString(offsets[91], object.ref4);
+  writer.writeString(offsets[92], object.ref4Text);
+  writer.writeString(offsets[93], object.remarks);
+  writer.writeDouble(offsets[94], object.reorderLevel);
+  writer.writeString(offsets[95], object.returnDue);
+  writer.writeString(offsets[96], object.serialNo);
+  writer.writeString(offsets[97], object.size);
+  writer.writeLong(offsets[98], object.skuNo);
+  writer.writeDouble(offsets[99], object.standardCost);
+  writer.writeString(offsets[100], object.status);
+  writer.writeDouble(offsets[101], object.stockFactor);
+  writer.writeString(offsets[102], object.subDept);
+  writer.writeString(offsets[103], object.type);
+  writer.writeString(offsets[104], object.uom);
+  writer.writeDouble(offsets[105], object.uomFactor);
+  writer.writeLong(offsets[106], object.warrantyPeriod);
+  writer.writeString(offsets[107], object.warrantyPeriodType);
+  writer.writeString(offsets[108], object.webCategory);
+  writer.writeString(offsets[109], object.webChkDate);
+  writer.writeDouble(offsets[110], object.webDailyQty);
+  writer.writeString(offsets[111], object.webDept);
+  writer.writeString(offsets[112], object.webGrp);
+  writer.writeString(offsets[113], object.webImageDetail);
+  writer.writeDateTime(offsets[114], object.webItemFr);
+  writer.writeDateTime(offsets[115], object.webItemTo);
+  writer.writeString(offsets[116], object.webMixMatch);
+  writer.writeString(offsets[117], object.webPromoGrp);
+  writer.writeString(offsets[118], object.webQtyMethod);
+  writer.writeString(offsets[119], object.webSpecialMsg);
+  writer.writeString(offsets[120], object.webSubDept);
 }
 
 InventoryItem _inventoryItemDeserialize(
@@ -1205,97 +1217,98 @@ InventoryItem _inventoryItemDeserialize(
   object.discountable = reader.readStringOrNull(offsets[20]);
   object.expiry = reader.readStringOrNull(offsets[28]);
   object.fifoCost = reader.readDoubleOrNull(offsets[29]);
-  object.givePoint = reader.readStringOrNull(offsets[30]);
-  object.giveRebate = reader.readStringOrNull(offsets[31]);
-  object.grp = reader.readStringOrNull(offsets[32]);
-  object.gstPrice = reader.readDoubleOrNull(offsets[33]);
+  object.flag3 = reader.readStringOrNull(offsets[30]);
+  object.givePoint = reader.readStringOrNull(offsets[31]);
+  object.giveRebate = reader.readStringOrNull(offsets[32]);
+  object.grp = reader.readStringOrNull(offsets[33]);
+  object.gstPrice = reader.readDoubleOrNull(offsets[34]);
   object.id = id;
-  object.introDate = reader.readDateTimeOrNull(offsets[34]);
-  object.introPreLabel = reader.readStringOrNull(offsets[35]);
-  object.inventoryItem = reader.readStringOrNull(offsets[36]);
-  object.invoicePreLabel = reader.readStringOrNull(offsets[37]);
-  object.issueNo = reader.readStringOrNull(offsets[38]);
-  object.itemType = reader.readStringOrNull(offsets[39]);
-  object.lastCost = reader.readDoubleOrNull(offsets[40]);
-  object.lastModifiedBy = reader.readLongOrNull(offsets[41]);
-  object.lastModifiedDate = reader.readDateTimeOrNull(offsets[42]);
-  object.lastPurDate = reader.readDateTimeOrNull(offsets[43]);
-  object.lastSalesDate = reader.readDateTimeOrNull(offsets[44]);
-  object.lastVendorDate = reader.readDateTimeOrNull(offsets[45]);
-  object.lastWriteTimeStamp = reader.readDateTimeOrNull(offsets[46]);
-  object.location = reader.readStringOrNull(offsets[47]);
-  object.lossPercent = reader.readDoubleOrNull(offsets[48]);
-  object.maxStockLevel = reader.readDoubleOrNull(offsets[49]);
-  object.minStockLevel = reader.readDoubleOrNull(offsets[50]);
-  object.miscCost = reader.readDoubleOrNull(offsets[51]);
-  object.noCost = reader.readStringOrNull(offsets[52]);
-  object.noQty = reader.readStringOrNull(offsets[53]);
-  object.nos = reader.readDoubleOrNull(offsets[54]);
-  object.nutritionFactsImage = reader.readStringOrNull(offsets[55]);
-  object.oldRemarks = reader.readStringOrNull(offsets[56]);
-  object.openCode = reader.readStringOrNull(offsets[57]);
-  object.openPrice = reader.readStringOrNull(offsets[58]);
-  object.packSize = reader.readDoubleOrNull(offsets[59]);
-  object.packSizeDescription = reader.readStringOrNull(offsets[60]);
-  object.packSizeUom = reader.readStringOrNull(offsets[61]);
-  object.pluNo = reader.readLongOrNull(offsets[62]);
-  object.price = reader.readDoubleOrNull(offsets[63]);
-  object.promoterCommRate = reader.readDoubleOrNull(offsets[64]);
-  object.qtyOnAdjIn = reader.readDoubleOrNull(offsets[65]);
-  object.qtyOnAdjKiv = reader.readDoubleOrNull(offsets[66]);
-  object.qtyOnAdjOut = reader.readDoubleOrNull(offsets[67]);
-  object.qtyOnCustomerReturn = reader.readDoubleOrNull(offsets[68]);
-  object.qtyOnExchange = reader.readDoubleOrNull(offsets[69]);
-  object.qtyOnHand = reader.readDoubleOrNull(offsets[70]);
-  object.qtyOnIO = reader.readDoubleOrNull(offsets[71]);
-  object.qtyOnIR = reader.readDoubleOrNull(offsets[72]);
-  object.qtyOnOrder = reader.readDoubleOrNull(offsets[73]);
-  object.qtyOnQuote = reader.readDoubleOrNull(offsets[74]);
-  object.qtyOnReceived = reader.readDoubleOrNull(offsets[75]);
-  object.qtyOnRepair = reader.readDoubleOrNull(offsets[76]);
-  object.qtyOnRequest = reader.readDoubleOrNull(offsets[77]);
-  object.qtyOnReturn = reader.readDoubleOrNull(offsets[78]);
-  object.qtyOnSales = reader.readDoubleOrNull(offsets[79]);
-  object.qtyOnSalesOrder = reader.readDoubleOrNull(offsets[80]);
-  object.qtyOnTrading = reader.readDoubleOrNull(offsets[81]);
-  object.qtyWithDecimal = reader.readStringOrNull(offsets[82]);
-  object.quotaGrp = reader.readStringOrNull(offsets[83]);
-  object.ref1 = reader.readStringOrNull(offsets[84]);
-  object.ref1Text = reader.readStringOrNull(offsets[85]);
-  object.ref2 = reader.readStringOrNull(offsets[86]);
-  object.ref2Text = reader.readStringOrNull(offsets[87]);
-  object.ref3 = reader.readStringOrNull(offsets[88]);
-  object.ref3Text = reader.readStringOrNull(offsets[89]);
-  object.ref4 = reader.readStringOrNull(offsets[90]);
-  object.ref4Text = reader.readStringOrNull(offsets[91]);
-  object.remarks = reader.readStringOrNull(offsets[92]);
-  object.reorderLevel = reader.readDoubleOrNull(offsets[93]);
-  object.returnDue = reader.readStringOrNull(offsets[94]);
-  object.serialNo = reader.readStringOrNull(offsets[95]);
-  object.size = reader.readStringOrNull(offsets[96]);
-  object.skuNo = reader.readLong(offsets[97]);
-  object.standardCost = reader.readDoubleOrNull(offsets[98]);
-  object.status = reader.readStringOrNull(offsets[99]);
-  object.stockFactor = reader.readDoubleOrNull(offsets[100]);
-  object.subDept = reader.readStringOrNull(offsets[101]);
-  object.type = reader.readStringOrNull(offsets[102]);
-  object.uom = reader.readStringOrNull(offsets[103]);
-  object.uomFactor = reader.readDoubleOrNull(offsets[104]);
-  object.warrantyPeriod = reader.readLongOrNull(offsets[105]);
-  object.warrantyPeriodType = reader.readStringOrNull(offsets[106]);
-  object.webCategory = reader.readStringOrNull(offsets[107]);
-  object.webChkDate = reader.readStringOrNull(offsets[108]);
-  object.webDailyQty = reader.readDoubleOrNull(offsets[109]);
-  object.webDept = reader.readStringOrNull(offsets[110]);
-  object.webGrp = reader.readStringOrNull(offsets[111]);
-  object.webImageDetail = reader.readStringOrNull(offsets[112]);
-  object.webItemFr = reader.readDateTimeOrNull(offsets[113]);
-  object.webItemTo = reader.readDateTimeOrNull(offsets[114]);
-  object.webMixMatch = reader.readStringOrNull(offsets[115]);
-  object.webPromoGrp = reader.readStringOrNull(offsets[116]);
-  object.webQtyMethod = reader.readStringOrNull(offsets[117]);
-  object.webSpecialMsg = reader.readStringOrNull(offsets[118]);
-  object.webSubDept = reader.readStringOrNull(offsets[119]);
+  object.introDate = reader.readDateTimeOrNull(offsets[35]);
+  object.introPreLabel = reader.readStringOrNull(offsets[36]);
+  object.inventoryItem = reader.readStringOrNull(offsets[37]);
+  object.invoicePreLabel = reader.readStringOrNull(offsets[38]);
+  object.issueNo = reader.readStringOrNull(offsets[39]);
+  object.itemType = reader.readStringOrNull(offsets[40]);
+  object.lastCost = reader.readDoubleOrNull(offsets[41]);
+  object.lastModifiedBy = reader.readLongOrNull(offsets[42]);
+  object.lastModifiedDate = reader.readDateTimeOrNull(offsets[43]);
+  object.lastPurDate = reader.readDateTimeOrNull(offsets[44]);
+  object.lastSalesDate = reader.readDateTimeOrNull(offsets[45]);
+  object.lastVendorDate = reader.readDateTimeOrNull(offsets[46]);
+  object.lastWriteTimeStamp = reader.readDateTimeOrNull(offsets[47]);
+  object.location = reader.readStringOrNull(offsets[48]);
+  object.lossPercent = reader.readDoubleOrNull(offsets[49]);
+  object.maxStockLevel = reader.readDoubleOrNull(offsets[50]);
+  object.minStockLevel = reader.readDoubleOrNull(offsets[51]);
+  object.miscCost = reader.readDoubleOrNull(offsets[52]);
+  object.noCost = reader.readStringOrNull(offsets[53]);
+  object.noQty = reader.readStringOrNull(offsets[54]);
+  object.nos = reader.readDoubleOrNull(offsets[55]);
+  object.nutritionFactsImage = reader.readStringOrNull(offsets[56]);
+  object.oldRemarks = reader.readStringOrNull(offsets[57]);
+  object.openCode = reader.readStringOrNull(offsets[58]);
+  object.openPrice = reader.readStringOrNull(offsets[59]);
+  object.packSize = reader.readDoubleOrNull(offsets[60]);
+  object.packSizeDescription = reader.readStringOrNull(offsets[61]);
+  object.packSizeUom = reader.readStringOrNull(offsets[62]);
+  object.pluNo = reader.readLongOrNull(offsets[63]);
+  object.price = reader.readDoubleOrNull(offsets[64]);
+  object.promoterCommRate = reader.readDoubleOrNull(offsets[65]);
+  object.qtyOnAdjIn = reader.readDoubleOrNull(offsets[66]);
+  object.qtyOnAdjKiv = reader.readDoubleOrNull(offsets[67]);
+  object.qtyOnAdjOut = reader.readDoubleOrNull(offsets[68]);
+  object.qtyOnCustomerReturn = reader.readDoubleOrNull(offsets[69]);
+  object.qtyOnExchange = reader.readDoubleOrNull(offsets[70]);
+  object.qtyOnHand = reader.readDoubleOrNull(offsets[71]);
+  object.qtyOnIO = reader.readDoubleOrNull(offsets[72]);
+  object.qtyOnIR = reader.readDoubleOrNull(offsets[73]);
+  object.qtyOnOrder = reader.readDoubleOrNull(offsets[74]);
+  object.qtyOnQuote = reader.readDoubleOrNull(offsets[75]);
+  object.qtyOnReceived = reader.readDoubleOrNull(offsets[76]);
+  object.qtyOnRepair = reader.readDoubleOrNull(offsets[77]);
+  object.qtyOnRequest = reader.readDoubleOrNull(offsets[78]);
+  object.qtyOnReturn = reader.readDoubleOrNull(offsets[79]);
+  object.qtyOnSales = reader.readDoubleOrNull(offsets[80]);
+  object.qtyOnSalesOrder = reader.readDoubleOrNull(offsets[81]);
+  object.qtyOnTrading = reader.readDoubleOrNull(offsets[82]);
+  object.qtyWithDecimal = reader.readStringOrNull(offsets[83]);
+  object.quotaGrp = reader.readStringOrNull(offsets[84]);
+  object.ref1 = reader.readStringOrNull(offsets[85]);
+  object.ref1Text = reader.readStringOrNull(offsets[86]);
+  object.ref2 = reader.readStringOrNull(offsets[87]);
+  object.ref2Text = reader.readStringOrNull(offsets[88]);
+  object.ref3 = reader.readStringOrNull(offsets[89]);
+  object.ref3Text = reader.readStringOrNull(offsets[90]);
+  object.ref4 = reader.readStringOrNull(offsets[91]);
+  object.ref4Text = reader.readStringOrNull(offsets[92]);
+  object.remarks = reader.readStringOrNull(offsets[93]);
+  object.reorderLevel = reader.readDoubleOrNull(offsets[94]);
+  object.returnDue = reader.readStringOrNull(offsets[95]);
+  object.serialNo = reader.readStringOrNull(offsets[96]);
+  object.size = reader.readStringOrNull(offsets[97]);
+  object.skuNo = reader.readLong(offsets[98]);
+  object.standardCost = reader.readDoubleOrNull(offsets[99]);
+  object.status = reader.readStringOrNull(offsets[100]);
+  object.stockFactor = reader.readDoubleOrNull(offsets[101]);
+  object.subDept = reader.readStringOrNull(offsets[102]);
+  object.type = reader.readStringOrNull(offsets[103]);
+  object.uom = reader.readStringOrNull(offsets[104]);
+  object.uomFactor = reader.readDoubleOrNull(offsets[105]);
+  object.warrantyPeriod = reader.readLongOrNull(offsets[106]);
+  object.warrantyPeriodType = reader.readStringOrNull(offsets[107]);
+  object.webCategory = reader.readStringOrNull(offsets[108]);
+  object.webChkDate = reader.readStringOrNull(offsets[109]);
+  object.webDailyQty = reader.readDoubleOrNull(offsets[110]);
+  object.webDept = reader.readStringOrNull(offsets[111]);
+  object.webGrp = reader.readStringOrNull(offsets[112]);
+  object.webImageDetail = reader.readStringOrNull(offsets[113]);
+  object.webItemFr = reader.readDateTimeOrNull(offsets[114]);
+  object.webItemTo = reader.readDateTimeOrNull(offsets[115]);
+  object.webMixMatch = reader.readStringOrNull(offsets[116]);
+  object.webPromoGrp = reader.readStringOrNull(offsets[117]);
+  object.webQtyMethod = reader.readStringOrNull(offsets[118]);
+  object.webSpecialMsg = reader.readStringOrNull(offsets[119]);
+  object.webSubDept = reader.readStringOrNull(offsets[120]);
   return object;
 }
 
@@ -1373,11 +1386,11 @@ P _inventoryItemDeserializeProp<P>(
     case 32:
       return (reader.readStringOrNull(offset)) as P;
     case 33:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 34:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 35:
       return (reader.readStringOrNull(offset)) as P;
+    case 34:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 35:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 36:
       return (reader.readStringOrNull(offset)) as P;
     case 37:
@@ -1387,11 +1400,11 @@ P _inventoryItemDeserializeProp<P>(
     case 39:
       return (reader.readStringOrNull(offset)) as P;
     case 40:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 41:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 42:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 43:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 44:
@@ -1401,9 +1414,9 @@ P _inventoryItemDeserializeProp<P>(
     case 46:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 47:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 48:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 49:
       return (reader.readDoubleOrNull(offset)) as P;
     case 50:
@@ -1411,13 +1424,13 @@ P _inventoryItemDeserializeProp<P>(
     case 51:
       return (reader.readDoubleOrNull(offset)) as P;
     case 52:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 53:
       return (reader.readStringOrNull(offset)) as P;
     case 54:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 55:
       return (reader.readStringOrNull(offset)) as P;
+    case 55:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 56:
       return (reader.readStringOrNull(offset)) as P;
     case 57:
@@ -1425,15 +1438,15 @@ P _inventoryItemDeserializeProp<P>(
     case 58:
       return (reader.readStringOrNull(offset)) as P;
     case 59:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 60:
       return (reader.readStringOrNull(offset)) as P;
+    case 60:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 61:
       return (reader.readStringOrNull(offset)) as P;
     case 62:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 63:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 64:
       return (reader.readDoubleOrNull(offset)) as P;
     case 65:
@@ -1471,7 +1484,7 @@ P _inventoryItemDeserializeProp<P>(
     case 81:
       return (reader.readDoubleOrNull(offset)) as P;
     case 82:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 83:
       return (reader.readStringOrNull(offset)) as P;
     case 84:
@@ -1493,51 +1506,51 @@ P _inventoryItemDeserializeProp<P>(
     case 92:
       return (reader.readStringOrNull(offset)) as P;
     case 93:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 94:
       return (reader.readStringOrNull(offset)) as P;
+    case 94:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 95:
       return (reader.readStringOrNull(offset)) as P;
     case 96:
       return (reader.readStringOrNull(offset)) as P;
     case 97:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 98:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 99:
-      return (reader.readStringOrNull(offset)) as P;
-    case 100:
       return (reader.readDoubleOrNull(offset)) as P;
-    case 101:
+    case 100:
       return (reader.readStringOrNull(offset)) as P;
+    case 101:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 102:
       return (reader.readStringOrNull(offset)) as P;
     case 103:
       return (reader.readStringOrNull(offset)) as P;
     case 104:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 105:
-      return (reader.readLongOrNull(offset)) as P;
-    case 106:
       return (reader.readStringOrNull(offset)) as P;
+    case 105:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 106:
+      return (reader.readLongOrNull(offset)) as P;
     case 107:
       return (reader.readStringOrNull(offset)) as P;
     case 108:
       return (reader.readStringOrNull(offset)) as P;
     case 109:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 110:
       return (reader.readStringOrNull(offset)) as P;
+    case 110:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 111:
       return (reader.readStringOrNull(offset)) as P;
     case 112:
       return (reader.readStringOrNull(offset)) as P;
     case 113:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 114:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 115:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 116:
       return (reader.readStringOrNull(offset)) as P;
     case 117:
@@ -1545,6 +1558,8 @@ P _inventoryItemDeserializeProp<P>(
     case 118:
       return (reader.readStringOrNull(offset)) as P;
     case 119:
+      return (reader.readStringOrNull(offset)) as P;
+    case 120:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -5789,6 +5804,160 @@ extension InventoryItemQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3IsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'flag3',
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3IsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'flag3',
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3EqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'flag3',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3GreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'flag3',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3LessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'flag3',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3Between(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'flag3',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3StartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'flag3',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3EndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'flag3',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3Contains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'flag3',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3Matches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'flag3',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3IsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'flag3',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterFilterCondition>
+      flag3IsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'flag3',
+        value: '',
       ));
     });
   }
@@ -16877,6 +17046,18 @@ extension InventoryItemQuerySortBy
     });
   }
 
+  QueryBuilder<InventoryItem, InventoryItem, QAfterSortBy> sortByFlag3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flag3', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterSortBy> sortByFlag3Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flag3', Sort.desc);
+    });
+  }
+
   QueryBuilder<InventoryItem, InventoryItem, QAfterSortBy> sortByGivePoint() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'givePoint', Sort.asc);
@@ -18447,6 +18628,18 @@ extension InventoryItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<InventoryItem, InventoryItem, QAfterSortBy> thenByFlag3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flag3', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InventoryItem, InventoryItem, QAfterSortBy> thenByFlag3Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'flag3', Sort.desc);
+    });
+  }
+
   QueryBuilder<InventoryItem, InventoryItem, QAfterSortBy> thenByGivePoint() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'givePoint', Sort.asc);
@@ -19849,6 +20042,13 @@ extension InventoryItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<InventoryItem, InventoryItem, QDistinct> distinctByFlag3(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'flag3', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<InventoryItem, InventoryItem, QDistinct> distinctByGivePoint(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -20664,6 +20864,12 @@ extension InventoryItemQueryProperty
   QueryBuilder<InventoryItem, double?, QQueryOperations> fifoCostProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'fifoCost');
+    });
+  }
+
+  QueryBuilder<InventoryItem, String?, QQueryOperations> flag3Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'flag3');
     });
   }
 

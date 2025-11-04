@@ -157,7 +157,16 @@ class InventoryService {
       }
 
       print('🔍 INVENTORY SERVICE: Successfully converted ${inventoryItems.length} inventory items');
-      return inventoryItems;
+      // Exclude items marked with Flag3 == 'N' from server fetch
+      final before = inventoryItems.length;
+      final filtered = inventoryItems
+          .where((it) => (it.flag3 == null || it.flag3!.toUpperCase() != 'N'))
+          .toList();
+      final removed = before - filtered.length;
+      if (removed > 0) {
+        print('🧹 INVENTORY SERVICE: Filtered out $removed items with Flag3 == N');
+      }
+      return filtered;
 
     } catch (e) {
       print('❌ INVENTORY SERVICE ERROR: $e');
@@ -770,6 +779,11 @@ class InventoryService {
         allItems = await isar.inventoryItems.where().findAll();
       }
       
+      // Apply default front-end filter: exclude items with Flag3 == 'N'
+      allItems = allItems
+          .where((it) => (it.flag3 == null || it.flag3!.toUpperCase() != 'N'))
+          .toList();
+
       // Apply filters
       List<InventoryItem> filteredItems = allItems;
       

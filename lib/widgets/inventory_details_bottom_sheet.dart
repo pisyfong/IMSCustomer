@@ -633,43 +633,47 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
 
   // Get the appropriate cost value from inventory item
   double _getItemCost() {
-    // Base cost from inventory item (already factored)
-    final baseCost = widget.item.standardCost ?? widget.item.price ?? 0.0;
+    // Base cost from inventory item (this is the cost for the base UOM from in_stock)
+    final baseCost = widget.item.standardCost ?? widget.item.averageCost ?? widget.item.lastCost ?? widget.item.price ?? 0.0;
 
-    // Find the base UOM factor (from item's default UOM)
-    final defaultUom = widget.item.uom?.trim();
+    // The base UOM is from in_stock.uom (e.g., "CTN")
+    final baseUom = widget.item.uom?.trim();
     double baseFactor = 1.0;
-
-    if (defaultUom != null && defaultUom.isNotEmpty && _uomOptions.isNotEmpty) {
+    
+    // Find the factor for the base UOM from in_stock_uom
+    if (baseUom != null && baseUom.isNotEmpty && _uomOptions.isNotEmpty) {
       try {
-        final baseUomOption = _uomOptions.firstWhere(
-          (uom) => uom.uom == defaultUom,
-        );
-        baseFactor = baseUomOption.factor ?? 1.0;
+        final target = baseUom.toUpperCase();
+        final baseUomOption = _uomOptions.firstWhere((u) => (u.uom ?? '').trim().toUpperCase() == target);
+        baseFactor = baseUomOption?.factor ?? 1.0;
       } catch (e) {
+        // Base UOM not found in in_stock_uom, default to 1.0
         baseFactor = 1.0;
       }
     }
 
-    // Find the selected UOM's factor
+    // Find the selected UOM's factor from in_stock_uom
+    double selectedFactor = 1.0;
     if (selectedUom.isNotEmpty && _uomOptions.isNotEmpty) {
       try {
-        final selectedUomOption = _uomOptions.firstWhere(
-          (uom) => uom.uom == selectedUom,
-        );
-
-        if (selectedUomOption.factor != null) {
-          // Cost = baseCost × (selectedUOM.factor / baseUOM.factor)
-          final selectedFactor = selectedUomOption.factor!;
-          return baseCost * (selectedFactor / baseFactor);
-        }
+        final targetSel = selectedUom.trim().toUpperCase();
+        final selectedUomOption = _uomOptions.firstWhere((u) => (u.uom ?? '').trim().toUpperCase() == targetSel);
+        selectedFactor = selectedUomOption?.factor ?? 1.0;
       } catch (e) {
-        // Selected UOM not found, fall back to base cost
+        selectedFactor = 1.0;
       }
     }
 
-    // Fallback to base cost if no UOM selected or calculation failed
-    return baseCost;
+    // Guard against division by zero
+    if (baseFactor <= 0) baseFactor = 1.0;
+    if (selectedFactor <= 0) selectedFactor = 1.0;
+
+    // Calculate: cost = (baseCost / baseFactor) * selectedFactor
+    print('💰 COST CALC SKU ${widget.item.skuNo}: baseCost=$baseCost, baseUom=$baseUom, baseFactor=$baseFactor, selectedUom=$selectedUom, selectedFactor=$selectedFactor');
+    final double unitCost = baseCost / baseFactor;
+    final double result = unitCost * selectedFactor;
+    print('💰 COST CALC RESULT: unitCost=$unitCost, finalCost=$result');
+    return result;
   }
 
   void _selectUom(InStockUom uom) {

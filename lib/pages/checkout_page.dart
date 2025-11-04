@@ -512,14 +512,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       ],
                     ),
                     // Item Rows
-                    ...widget.cartItems.asMap().entries.map((entry) {
+                    ...cartItemsWithPlu.asMap().entries.map((entry) {
                       final index = entry.key + 1;
                       final item = entry.value;
+                      print('📄 PDF Item $index: SKU=${item.skuNo}, PLU="${item.pluNo}", Desc=${item.displayDescription}, Remarks="${item.remarks}"');
                       return pw.TableRow(
                         children: [
                           _buildTableCell('$index', fontSize: 8),
                           _buildBarcodeCell(item.pluNo),
-                          _buildTableCell(item.displayDescription, fontSize: 8),
+                          _buildDescriptionWithRemarksCell(item.displayDescription, item.remarks),
                           _buildTableCell('${item.quantity.toInt()}', fontSize: 8, align: pw.TextAlign.right),
                           _buildTableCell('', fontSize: 8),
                           _buildTableCell(item.displayUom, fontSize: 8),
@@ -1198,6 +1199,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: pw.Text(text, style: pw.TextStyle(fontSize: fontSize), textAlign: align),
     );
   }
+  
+  static pw.Widget _buildDescriptionWithRemarksCell(String description, String? remarks) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(3),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(description, style: const pw.TextStyle(fontSize: 8)),
+          if (remarks != null && remarks.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 2),
+              child: pw.Text(
+                'Note: $remarks',
+                style: pw.TextStyle(
+                  fontSize: 7,
+                  color: PdfColors.grey700,
+                  fontStyle: pw.FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   static pw.Widget _buildSignatureBox(String label) {
     return pw.Container(
@@ -1244,22 +1269,42 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     try {
-      // Generate barcode - use EAN13 for 13-digit barcodes, Code128 for others
-      final barcodeType = pluNo.length == 13 ? Barcode.ean13() : Barcode.code128();
+      // Only generate barcode for numeric PLU codes
+      // Check if PLU is purely numeric (for EAN13/Code128)
+      final isNumeric = RegExp(r'^[0-9]+$').hasMatch(pluNo);
       
-      return pw.Padding(
-        padding: const pw.EdgeInsets.all(2),
-        child: pw.BarcodeWidget(
-          barcode: barcodeType,
-          data: pluNo,
-          width: 80,
-          height: 30,
-          drawText: true,
-          textStyle: const pw.TextStyle(fontSize: 6),
-        ),
-      );
+      if (isNumeric) {
+        // Generate barcode - use EAN13 for 13-digit barcodes, Code128 for others
+        final barcodeType = pluNo.length == 13 ? Barcode.ean13() : Barcode.code128();
+        
+        return pw.Padding(
+          padding: const pw.EdgeInsets.all(2),
+          child: pw.BarcodeWidget(
+            barcode: barcodeType,
+            data: pluNo,
+            width: 80,
+            height: 30,
+            drawText: true,
+            textStyle: const pw.TextStyle(fontSize: 6),
+          ),
+        );
+      } else {
+        // For alphanumeric PLU codes, try Code128 which supports alphanumeric
+        return pw.Padding(
+          padding: const pw.EdgeInsets.all(2),
+          child: pw.BarcodeWidget(
+            barcode: Barcode.code128(),
+            data: pluNo,
+            width: 80,
+            height: 30,
+            drawText: true,
+            textStyle: const pw.TextStyle(fontSize: 6),
+          ),
+        );
+      }
     } catch (e) {
       // If barcode generation fails, show text instead
+      print('⚠️ Barcode generation failed for PLU: $pluNo - $e');
       return _buildTableCell(pluNo, fontSize: 7);
     }
   }
