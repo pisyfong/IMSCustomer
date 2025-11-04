@@ -70,57 +70,64 @@ class _InventoryImageWidgetState extends State<InventoryImageWidget> {
         return;
       }
 
-      // Get the image URL for this inventory item
-      print('🖼️ InventoryImageWidget: SKU ${widget.skuNo} - Received UOM "${widget.uom}" for image construction');
-      final imageUrl = _imageService.getImageUrl(widget.companyCode, widget.skuNo, widget.uom);
-      
-      if (imageUrl == null) {
-        // No image URL could be constructed - show placeholder
-        print('🖼️ No image URL available for Company ${widget.companyCode}, SKU ${widget.skuNo}, UOM ${widget.uom}');
-        setState(() {
-          _isLoading = false;
-          _hasError = false; // Not an error, just no image available
-        });
-        return;
-      }
+      String? finalPath;
 
-      // Check if image is cached
-      print('🔍 Checking cache for: Company ${widget.companyCode}, SKU ${widget.skuNo}, UOM ${widget.uom}');
-      print('🔍 Image URL: $imageUrl');
-      
-      final cachedPath = await _imageService.getCachedImagePath(imageUrl, widget.companyCode, widget.skuNo);
-      
-      if (cachedPath != null) {
-        // Image is cached, use local file
-        print('✅ Found cached image at: $cachedPath');
-        final file = File(cachedPath);
-        final exists = await file.exists();
-        print('📁 File exists: $exists');
-        
-        setState(() {
-          _cachedImagePath = cachedPath;
-          _isLoading = false;
-        });
-      } else {
-        // Image not cached, try to download it
-        print('⬇️ Image not cached, attempting download...');
-        final downloadedPath = await _imageService.downloadAndCacheImage(imageUrl, widget.companyCode, widget.skuNo, widget.uom);
-        
-        if (downloadedPath != null) {
-          print('✅ Downloaded and cached image at: $downloadedPath');
-          setState(() {
-            _cachedImagePath = downloadedPath;
-            _isLoading = false;
-          });
-        } else {
-          // Download failed - show placeholder instead of error
-          print('🖼️ Failed to download image for Company ${widget.companyCode}, SKU ${widget.skuNo}, UOM ${widget.uom}, showing placeholder');
-          setState(() {
-            _isLoading = false;
-            _hasError = false; // Show placeholder instead of error state
-          });
+      // Try provided UOM first
+      if (widget.uom != null && widget.uom!.trim().isNotEmpty) {
+        print('🖼️ InventoryImageWidget: SKU ${widget.skuNo} - Trying provided UOM "${widget.uom}"');
+        final imageUrl = _imageService.getImageUrl(widget.companyCode, widget.skuNo, widget.uom);
+        if (imageUrl != null) {
+          print('🔍 Checking cache for: Company ${widget.companyCode}, SKU ${widget.skuNo}, UOM ${widget.uom}');
+          print('🔍 Image URL: $imageUrl');
+          final cachedPath = await _imageService.getCachedImagePath(imageUrl, widget.companyCode, widget.skuNo);
+          if (cachedPath != null) {
+            finalPath = cachedPath;
+          } else {
+            print('⬇️ Image not cached, attempting download...');
+            final downloadedPath = await _imageService.downloadAndCacheImage(imageUrl, widget.companyCode, widget.skuNo, widget.uom);
+            if (downloadedPath != null) {
+              finalPath = downloadedPath;
+            }
+          }
         }
       }
+
+      // If still not found, try any cached image for this SKU (offline-first)
+      if (finalPath == null) {
+        final offlineCached = await _imageService.findAnyCachedImageForSku(widget.companyCode, widget.skuNo);
+        if (offlineCached != null) {
+          print('📷 OFFLINE: Using cached image for SKU ${widget.skuNo}');
+          finalPath = offlineCached;
+        }
+      }
+
+      // If still not found, loop UOMs until one works
+      if (finalPath == null) {
+        final workingUom = await _imageService.findWorkingUomForImage(widget.companyCode, widget.skuNo);
+        if (workingUom != null) {
+          print('📷 SMART: Found working UOM "$workingUom" for SKU ${widget.skuNo}');
+          final imageUrl = _imageService.getImageUrl(widget.companyCode, widget.skuNo, workingUom);
+          if (imageUrl != null) {
+            final cachedPath = await _imageService.getCachedImagePath(imageUrl, widget.companyCode, widget.skuNo);
+            if (cachedPath != null) {
+              finalPath = cachedPath;
+            } else {
+              final downloadedPath = await _imageService.downloadAndCacheImage(imageUrl, widget.companyCode, widget.skuNo, workingUom);
+              if (downloadedPath != null) {
+                finalPath = downloadedPath;
+              }
+            }
+          }
+        } else {
+          print('📷 SMART: No working UOM found for SKU ${widget.skuNo}');
+        }
+      }
+
+      setState(() {
+        _cachedImagePath = finalPath;
+        _isLoading = false;
+        _hasError = false;
+      });
     } catch (e) {
       print('❌ Error loading image for Company ${widget.companyCode}, SKU ${widget.skuNo}, UOM ${widget.uom}: $e');
       // Always show placeholder instead of error state

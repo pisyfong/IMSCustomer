@@ -34,6 +34,27 @@ class InventoryImageService {
     }
   }
 
+  // Public: Find a working UOM for displaying an image (HTTP 200 on HEAD)
+  Future<String?> findWorkingUomForImage(int companyCode, int skuNo) async {
+    return await _findWorkingUomForSync(companyCode, skuNo);
+  }
+
+  // Public: Download image for a SKU using smart UOM detection and return local path
+  Future<String?> downloadImageWithSmartUom(int companyCode, int skuNo) async {
+    try {
+      final workingUom = await _findWorkingUomForSync(companyCode, skuNo);
+      if (workingUom == null) return null;
+
+      final imageUrl = getImageUrl(companyCode, skuNo, workingUom);
+      if (imageUrl == null) return null;
+
+      return await downloadAndCacheImage(imageUrl, companyCode, skuNo, workingUom);
+    } catch (e) {
+      print('❌ Error in downloadImageWithSmartUom for SKU $skuNo: $e');
+      return null;
+    }
+  }
+
   // Get image URL for an inventory item using company-specific configuration
   String? getImageUrl(int companyCode, int skuNo, String? uom) {
     return CompanyImageConfig.constructImageUrl(companyCode, skuNo, uom);
