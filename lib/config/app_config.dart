@@ -1,7 +1,7 @@
 /// Application configuration for backend endpoints
 class AppConfig {
   // Environment settings
-  static const bool _isDevelopment = true; // Set to false for production
+  static const bool _isDevelopment = false; // Set to false for production
   
   // Backend domains
   static const String _productionDomain = 'fungseng.dyndns.org';
