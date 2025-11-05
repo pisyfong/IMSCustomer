@@ -1479,12 +1479,16 @@ class EnhancedSyncService {
       print('🏷️ FULL SYNC [7/9]: Syncing customer PLU mappings...');
       await syncCustomerPlu();
       
-      // Step 8: Invoices (historical data)
-      print('🧾 FULL SYNC [8/9]: Syncing invoices...');
+      // Step 8: Invoices (historical data - headers only)
+      print('🧾 FULL SYNC [8/10]: Syncing invoice headers...');
       await preloadAllInvoices();
       
-      // Step 9: Upload unsynced quotations
-      print('📝 FULL SYNC [9/9]: Uploading unsynced quotations...');
+      // Step 9: Invoice Items (detailed line items)
+      print('📋 FULL SYNC [9/10]: Syncing invoice items...');
+      await _preloadAllInvoiceItems();
+      
+      // Step 10: Upload unsynced quotations
+      print('📝 FULL SYNC [10/10]: Uploading unsynced quotations...');
       await _syncUnsyncedQuotations();
       
       // Update sync info
@@ -1612,6 +1616,45 @@ class EnhancedSyncService {
       
     } catch (e) {
       print('❌ PRELOAD INVOICES ERROR: $e');
+    }
+  }
+  
+  /// Preload all invoice items for all invoices
+  Future<void> _preloadAllInvoiceItems() async {
+    try {
+      print('📋 PRELOAD: Loading all invoice items...');
+      
+      // Get all invoices
+      final invoices = await _isar.invoices.where().findAll();
+      int totalItems = 0;
+      int processedInvoices = 0;
+      
+      for (final invoice in invoices) {
+        try {
+          if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
+          
+          processedInvoices++;
+          if (processedInvoices % 50 == 0) {
+            print('📋 PRELOAD: Processing invoice $processedInvoices/${invoices.length}...');
+          }
+          
+          // Fetch invoice items for this invoice
+          final items = await _invoiceService.getInvoiceItems(
+            companyCode: invoice.companyCode,
+            invoicePreLabel: invoice.invoicePreLabel,
+          );
+          
+          totalItems += items.length;
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error loading items for invoice ${invoice.invoicePreLabel}: $e');
+        }
+      }
+      
+      print('✅ PRELOAD: Total invoice items loaded: $totalItems from $processedInvoices invoices');
+      
+    } catch (e) {
+      print('❌ PRELOAD INVOICE ITEMS ERROR: $e');
     }
   }
   

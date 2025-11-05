@@ -473,19 +473,47 @@ class InvoiceService {
         }
       }
       
-      // Build result list with invoice date
+      print('📋 INVOICE SERVICE: Found ${invoiceMap.length} invoices for customer $customerCode out of ${invoicePreLabels.length} invoice labels');
+      if (invoiceMap.isEmpty && invoicePreLabels.isNotEmpty) {
+        print('⚠️ INVOICE SERVICE: Invoice items exist but invoice headers not synced for customer $customerCode');
+        print('   Invoice labels needed: ${invoicePreLabels.take(3).join(", ")}...');
+        
+        // Auto-fetch missing invoice headers if connected
+        if (_signalRService.isConnected) {
+          print('🔄 INVOICE SERVICE: Auto-fetching invoice headers for customer $customerCode...');
+          try {
+            final fetchedInvoices = await fetchInvoicesFromServer(
+              companyCode: companyCode,
+              customerCode: customerCode,
+            );
+            if (fetchedInvoices.isNotEmpty) {
+              await saveInvoicesToLocal(fetchedInvoices);
+              print('✅ INVOICE SERVICE: Auto-fetched ${fetchedInvoices.length} invoice headers');
+              
+              // Rebuild invoice map with newly fetched invoices
+              for (final invoice in fetchedInvoices) {
+                if (invoicePreLabels.contains(invoice.invoicePreLabel)) {
+                  invoiceMap[invoice.invoicePreLabel] = invoice;
+                }
+              }
+            }
+          } catch (e) {
+            print('❌ INVOICE SERVICE: Auto-fetch failed: $e');
+          }
+        }
+      }
+      
+      // Build result list with invoice date (offline-first: show items even without full invoice details)
       final List<Map<String, dynamic>> results = [];
       for (final item in filteredItems) {
         final invoice = invoiceMap[item.invoicePreLabel];
-        if (invoice != null) {
-          results.add({
-            'invoiceNo': item.invoicePreLabel,
-            'date': invoice.invoiceDate,
-            'qty': item.quantity ?? 0,
-            'uom': item.uom,
-            'price': item.unitPrice ?? 0,
-          });
-        }
+        results.add({
+          'invoiceNo': item.invoicePreLabel,
+          'date': invoice?.invoiceDate ?? item.dueDate ?? DateTime.now(), // Fallback to item due date or current date
+          'qty': item.quantity ?? 0,
+          'uom': item.uom,
+          'price': item.unitPrice ?? 0,
+        });
       }
       
       // Sort by date (newest first)

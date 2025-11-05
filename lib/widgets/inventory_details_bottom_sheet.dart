@@ -419,7 +419,6 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
 
   Widget _buildPurchaseHistory() {
     if (_isLoadingData) return const Center(child: CircularProgressIndicator());
-    if (_invoicesData.isEmpty && _quotationsData.isEmpty) return const SizedBox.shrink();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,49 +427,51 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
         if (_showCostAnalysis && _userHasCostPermission) _buildCostAndProfitSection(),
         if (_showCostAnalysis && _userHasCostPermission) const SizedBox(height: 20),
 
-        // Purchase History Section
-        Row(
-          children: [
-            const Text('Purchase History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            if (_isLoadingHistory) ...[
-              const SizedBox(width: 8),
-              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-          ],
-        ),
-        const SizedBox(height: 12),
-        DefaultTabController(
-          length: 2,
-          child: Column(
+        // Purchase History Section - Only show if there's data
+        if (_invoicesData.isNotEmpty || _quotationsData.isNotEmpty) ...[
+          Row(
             children: [
-              Container(
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                child: TabBar(
-                  labelColor: Colors.blue,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: Colors.blue,
-                  tabs: [
-                    Tab(text: 'Invoices (${_invoicesData.length})'),
-                    Tab(text: 'Quotations (${_quotationsData.length})'),
-                  ],
-                ),
-              ),
-              Container(
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-                ),
-                child: TabBarView(
-                  children: [
-                    widget.inventoryPageState.buildHistoryList(_invoicesData, 'invoice'),
-                    widget.inventoryPageState.buildHistoryList(_quotationsData, 'quote'),
-                  ],
-                ),
-              ),
+              const Text('Purchase History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              if (_isLoadingHistory) ...[
+                const SizedBox(width: 8),
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                  child: TabBar(
+                    labelColor: Colors.blue,
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: Colors.blue,
+                    tabs: [
+                      Tab(text: 'Invoices (${_invoicesData.length})'),
+                      Tab(text: 'Quotations (${_quotationsData.length})'),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                  ),
+                  child: TabBarView(
+                    children: [
+                      widget.inventoryPageState.buildHistoryList(_invoicesData, 'invoice'),
+                      widget.inventoryPageState.buildHistoryList(_quotationsData, 'quote'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

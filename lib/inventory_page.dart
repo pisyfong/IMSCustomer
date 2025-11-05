@@ -3123,18 +3123,21 @@ class _InventoryPageState extends State<InventoryPage> {
       final selectedCustomer = CustomerStateService().selectedCustomer;
       final companyCodeRaw = _selectedCompany?['companyCode'];
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 0 : (companyCodeRaw as int?) ?? 0;
+      
+      print('🔎 PreviousInvoices: SKU ${item.skuNo}, companyCode=$companyCode, customer=${selectedCustomer?.code ?? "NULL"}, filterUom=$filterUom');
+      
       if (companyCode == 0) {
-        print('🔎 PreviousInvoices: companyCode is 0 or null; skipping');
+        print('❌ PreviousInvoices: companyCode is 0 or null; skipping');
         return [];
       }
 
       // If no customer selected, return empty (invoices are customer-specific)
       if (selectedCustomer == null) {
-        print('🔎 PreviousInvoices: No selected customer; skipping invoice lookup');
+        print('❌ PreviousInvoices: No selected customer; skipping invoice lookup');
         return [];
       }
 
-      print('🔎 PreviousInvoices: Using OPTIMIZED query for SKU ${item.skuNo}');
+      print('🔎 PreviousInvoices: Calling InvoiceService for customer ${selectedCustomer.code}...');
       
       // Use optimized query with online fallback to populate cache when empty
       final invoiceService = InvoiceService(SignalRService());
@@ -3147,7 +3150,10 @@ class _InventoryPageState extends State<InventoryPage> {
         fetchInvoicesLimit: 10,
       );
 
-      print('🔎 PreviousInvoices: Optimized query returned ${matchedItems.length} items');
+      print('✅ PreviousInvoices: Query returned ${matchedItems.length} items for SKU ${item.skuNo}');
+      if (matchedItems.isNotEmpty) {
+        print('📋 Sample invoice: ${matchedItems.first}');
+      }
       return matchedItems;
     } catch (e) {
       print('❌ InventoryPage: _loadPreviousInvoicesForItem error: $e');
