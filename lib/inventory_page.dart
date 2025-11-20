@@ -62,7 +62,7 @@ class _InventoryPageState extends State<InventoryPage> {
   
   // Search and Filters
   String _currentSearchQuery = '';
-  InventoryFilter _currentFilter = InventoryFilter();
+  InventoryFilter _currentFilter = InventoryFilter()..stockStatus = StockStatus.inStock;
   bool _showFilters = false;
   Map<String, List<String>> _filterOptions = {};
   bool _loadingFilterOptions = false;
@@ -99,8 +99,7 @@ class _InventoryPageState extends State<InventoryPage> {
     _loadCartCount();
     _setupScrollListener();
     _initializeServices();
-    // Setup search listeners
-    _searchController.addListener(_onSearchChanged);
+    // Setup PLU search listener only (PLU still auto-searches)
     _pluController.addListener(_onPluSearchChanged);
   }
 
@@ -159,8 +158,8 @@ class _InventoryPageState extends State<InventoryPage> {
     });
   }
 
-  // Handle regular search changes
-  void _onSearchChanged() {
+  // Handle manual search execution (called by Enter key or search button)
+  void _executeSearch() {
     final query = _searchController.text.trim();
     if (query != _currentSearchQuery) {
       final wasNonEmpty = _currentSearchQuery.isNotEmpty;
@@ -873,20 +872,26 @@ class _InventoryPageState extends State<InventoryPage> {
             // Left image (small square)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: FutureBuilder<String?>(
-                future: _getWorkingUomForImage(companyCode, item.skuNo),
-                builder: (context, snapshot) {
-                  final uom = snapshot.data ?? item.uom;
-                  print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (working UOM method)');
-                  return InventoryImageWidget(
-                    companyCode: companyCode,
-                    skuNo: item.skuNo,
-                    uom: uom,
-                    borderRadius: BorderRadius.zero,
-                    fit: BoxFit.cover,
-                    showLoadingIndicator: true,
-                  );
-                },
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: FutureBuilder<String?>(
+                  future: _getWorkingUomForImage(companyCode, item.skuNo),
+                  builder: (context, snapshot) {
+                    final uom = snapshot.data ?? item.uom;
+                    print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (working UOM method)');
+                    return InventoryImageWidget(
+                      companyCode: companyCode,
+                      skuNo: item.skuNo,
+                      uom: uom,
+                      width: 56,
+                      height: 56,
+                      borderRadius: BorderRadius.zero,
+                      fit: BoxFit.cover,
+                      showLoadingIndicator: true,
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1250,8 +1255,8 @@ class _InventoryPageState extends State<InventoryPage> {
   void _clearSearch() {
     _searchController.clear();
     _currentSearchQuery = '';
-    // Force refresh to ensure full catalog is shown after clearing search
-    _resetAndLoadInventory(forceRefresh: true);
+    // Load from local cache (no server fetch) for instant response
+    _resetAndLoadInventory();
   }
 
   Future<void> _openBarcodeScanner() async {
@@ -2156,9 +2161,15 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                       child: TextField(
                         controller: _searchController,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _executeSearch(),
                         decoration: InputDecoration(
-                          hintText: 'Search by name, SKU, brand...',
-                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          hintText: 'Search by name, SKU, brand... (Press Enter)',
+                          prefixIcon: IconButton(
+                            icon: const Icon(Icons.search, color: Colors.blue),
+                            onPressed: _executeSearch,
+                            tooltip: 'Search',
+                          ),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
                                   onPressed: _clearSearch,
@@ -2530,20 +2541,18 @@ class _InventoryPageState extends State<InventoryPage> {
                       color: Colors.grey[600],
                     ),
                   ),
-                  if (item.brand != null && item.brand!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      item.brand!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.blue[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
                   const SizedBox(height: 6),
+                  // Price
+                  Text(
+                    'RM ${(item.gstPrice ?? item.price ?? 0.0).toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Stock
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(

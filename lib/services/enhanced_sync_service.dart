@@ -67,10 +67,12 @@ class EnhancedSyncService {
   // Stream controllers for sync status
   final StreamController<bool> _syncStatusController = StreamController<bool>.broadcast();
   final StreamController<SyncStats> _syncStatsController = StreamController<SyncStats>.broadcast();
+  final StreamController<SyncProgress> _syncProgressController = StreamController<SyncProgress>.broadcast();
   
   // Getters for streams
   Stream<bool> get syncStatus => _syncStatusController.stream;
   Stream<SyncStats> get syncStats => _syncStatsController.stream;
+  Stream<SyncProgress> get syncProgress => _syncProgressController.stream;
   
   bool get isOnline => _isOnline;
   bool get isSyncing => _isSyncing;
@@ -644,6 +646,11 @@ class EnhancedSyncService {
     await _preloadCustomerPlus();
   }
   
+  /// Public method to sync role-related data (user roles and customer mappings)
+  Future<void> syncRolesAndAccess() async {
+    await _syncUserRolesAndCustomers();
+  }
+
   /// Public method to sync quotations (called from settings page)
   Future<void> syncQuotations() async {
     await _preloadAllQuotesForceSync();
@@ -1313,10 +1320,10 @@ class EnhancedSyncService {
   }
 
   /// Periodic: Sync inventory for all companies (paged)
-  Future<void> _syncInventoryPeriodically() async {
+  Future<void> _syncInventoryPeriodically({bool forceSync = false}) async {
     try {
-      // Skip if offline
-      if (!OfflineFirstService.isLikelyOnline()) {
+      // Skip if offline (unless forced during full sync)
+      if (!forceSync && !OfflineFirstService.isLikelyOnline()) {
         print('📦 PERIODIC: Skipping inventory sync (offline)');
         return;
       }
@@ -1449,47 +1456,69 @@ class EnhancedSyncService {
     _isSyncing = true;
     _syncStatusController.add(true);
     
+    const totalSteps = 10;
+    
     try {
       // Step 1: Credit Terms (needed for checkout)
-      print('📋 FULL SYNC [1/9]: Syncing credit terms...');
+      _syncProgressController.add(SyncProgress(currentStep: 1, totalSteps: totalSteps, stepName: 'Credit Terms', status: 'running'));
+      print('📋 FULL SYNC [1/$totalSteps]: Syncing credit terms...');
       await _syncCreditTerms();
+      _syncProgressController.add(SyncProgress(currentStep: 1, totalSteps: totalSteps, stepName: 'Credit Terms', status: 'completed'));
       
       // Step 2: Companies (foundation data)
-      print('🏢 FULL SYNC [2/9]: Syncing companies...');
+      _syncProgressController.add(SyncProgress(currentStep: 2, totalSteps: totalSteps, stepName: 'Companies', status: 'running'));
+      print('🏢 FULL SYNC [2/$totalSteps]: Syncing companies...');
       await syncCompaniesForUser();
+      _syncProgressController.add(SyncProgress(currentStep: 2, totalSteps: totalSteps, stepName: 'Companies', status: 'completed'));
       
       // Step 3: User Roles & Customers (access control)
-      print('👥 FULL SYNC [3/9]: Syncing user roles and customers...');
+      _syncProgressController.add(SyncProgress(currentStep: 3, totalSteps: totalSteps, stepName: 'User Roles & Customers', status: 'running'));
+      print('👥 FULL SYNC [3/$totalSteps]: Syncing user roles and customers...');
       await _syncUserRolesAndCustomers();
+      _syncProgressController.add(SyncProgress(currentStep: 3, totalSteps: totalSteps, stepName: 'User Roles & Customers', status: 'completed'));
       
       // Step 4: User App Settings (permissions)
-      print('⚙️ FULL SYNC [4/9]: Syncing user app settings...');
+      _syncProgressController.add(SyncProgress(currentStep: 4, totalSteps: totalSteps, stepName: 'User App Settings', status: 'running'));
+      print('⚙️ FULL SYNC [4/$totalSteps]: Syncing user app settings...');
       await _syncUserAppSettings();
+      _syncProgressController.add(SyncProgress(currentStep: 4, totalSteps: totalSteps, stepName: 'User App Settings', status: 'completed'));
       
       // Step 5: Inventory (products must exist before PLU)
-      print('📦 FULL SYNC [5/9]: Syncing inventory...');
-      await _syncInventoryPeriodically();
+      _syncProgressController.add(SyncProgress(currentStep: 5, totalSteps: totalSteps, stepName: 'Inventory', status: 'running'));
+      print('📦 FULL SYNC [5/$totalSteps]: Syncing inventory...');
+      await _syncInventoryPeriodically(forceSync: true);
+      _syncProgressController.add(SyncProgress(currentStep: 5, totalSteps: totalSteps, stepName: 'Inventory', status: 'completed'));
       
       // Step 6: PLU Codes (requires inventory to exist)
-      print('🏷️ FULL SYNC [6/9]: Syncing PLU codes...');
+      _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'PLU Codes', status: 'running'));
+      print('🏷️ FULL SYNC [6/$totalSteps]: Syncing PLU codes...');
       final pluService = PluService(_isar);
       await pluService.syncPlus();
+      _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'PLU Codes', status: 'completed'));
       
       // Step 7: Customer PLU (requires customers and PLU)
-      print('🏷️ FULL SYNC [7/9]: Syncing customer PLU mappings...');
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'running'));
+      print('🏷️ FULL SYNC [7/$totalSteps]: Syncing customer PLU mappings...');
       await syncCustomerPlu();
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'completed'));
       
       // Step 8: Invoices (historical data - headers only)
-      print('🧾 FULL SYNC [8/10]: Syncing invoice headers...');
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'running'));
+      print('🧾 FULL SYNC [8/$totalSteps]: Syncing invoice headers...');
       await preloadAllInvoices();
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'completed'));
       
       // Step 9: Invoice Items (detailed line items)
-      print('📋 FULL SYNC [9/10]: Syncing invoice items...');
+      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'running'));
+      print('📋 FULL SYNC [9/$totalSteps]: Syncing invoice items...');
       await _preloadAllInvoiceItems();
+      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'completed'));
       
       // Step 10: Upload unsynced quotations
-      print('📝 FULL SYNC [10/10]: Uploading unsynced quotations...');
+      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
+      print('📝 FULL SYNC [10/$totalSteps]: Uploading unsynced quotations...');
       await _syncUnsyncedQuotations();
+      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
       
       // Update sync info
       await _updateSyncInfo(
@@ -1815,4 +1844,23 @@ class SyncStats {
     required this.isConnected,
     required this.isOnline,
   });
+}
+
+/// Sync progress data class for full sync
+class SyncProgress {
+  final int currentStep;
+  final int totalSteps;
+  final String stepName;
+  final String status; // 'running', 'completed', 'failed'
+  final String? errorMessage;
+  
+  SyncProgress({
+    required this.currentStep,
+    required this.totalSteps,
+    required this.stepName,
+    required this.status,
+    this.errorMessage,
+  });
+  
+  double get progress => currentStep / totalSteps;
 }

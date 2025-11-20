@@ -3,6 +3,7 @@ import '../models/inventory_item.dart';
 import '../models/in_stock_uom.dart';
 import '../inventory_page.dart';
 import '../services/user_app_settings_service.dart';
+import 'inventory_image_widget.dart';
 
 class InventoryDetailsBottomSheet extends StatefulWidget {
   final InventoryItem item;
@@ -30,6 +31,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
   bool _isLoadingHistory = false;
   bool _canEditPrice = false;
   bool _userHasCostPermission = false;
+  bool _priceFromInvoice = false; // Track if price is from latest invoice
   
   // Cost analysis toggle state
   int _priceTapCount = 0;
@@ -47,6 +49,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
     
     localQty = ValueNotifier(widget.inventoryPageState.qtySelections[sku] ?? 1);
     remarkText = ValueNotifier('');
+    // Initialize with default price, will be updated after invoices load
     currentPrice = ValueNotifier(widget.item.gstPrice ?? widget.item.price ?? 0.0);
     
     _loadBottomSheetData();
@@ -74,14 +77,37 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
       final invoices = await widget.inventoryPageState.loadPreviousInvoicesForItem(widget.item, filterUom: filterUom);
       final quotations = await widget.inventoryPageState.loadPreviousOrdersForItem(widget.item, filterUom: filterUom);
       
+      // 5. Set price to latest invoice price if available
+      double initialPrice = widget.item.gstPrice ?? widget.item.price ?? 0.0;
+      bool fromInvoice = false;
+      
+      if (invoices.isNotEmpty) {
+        // Get the latest invoice (first item, already sorted by date descending)
+        final latestInvoice = invoices.first;
+        final latestInvoicePrice = latestInvoice['price'];
+        if (latestInvoicePrice != null && latestInvoicePrice > 0) {
+          initialPrice = (latestInvoicePrice is int) 
+              ? (latestInvoicePrice as int).toDouble() 
+              : latestInvoicePrice as double;
+          fromInvoice = true;
+          print('💰 SKU $sku: Set price to latest invoice price: RM ${initialPrice.toStringAsFixed(2)} (from invoice ${latestInvoice['invoiceNo']})');
+        } else {
+          print('⚠️ SKU $sku: Latest invoice has no valid price, using default: RM ${initialPrice.toStringAsFixed(2)}');
+        }
+      } else {
+        print('ℹ️ SKU $sku: No invoice history, using default price: RM ${initialPrice.toStringAsFixed(2)}');
+      }
+      
       // 🎯 UPDATE STATE ONCE - NO MORE REBUILDS
       if (mounted) {
+        currentPrice.value = initialPrice;
         setState(() {
           _uomOptions = options;
           _canEditPrice = canEdit;
           _userHasCostPermission = canShowCost;
           _invoicesData = invoices;
           _quotationsData = quotations;
+          _priceFromInvoice = fromInvoice;
           _isLoadingData = false;
         });
       }
@@ -133,6 +159,104 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
         });
       }
     }
+  }
+
+  void _showImageDialog(BuildContext context) async {
+    final company = await widget.inventoryPageState.authService.getSelectedCompany();
+    final companyCodeRaw = company?['companyCode'] ?? 1;
+    final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            // Large Image
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width - 40,
+                    maxHeight: MediaQuery.of(context).size.height - 100,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: InventoryImageWidget(
+                      companyCode: companyCode,
+                      skuNo: widget.item.skuNo,
+                      uom: selectedUom,
+                      fit: BoxFit.contain,
+                      borderRadius: BorderRadius.zero,
+                      showLoadingIndicator: true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Close button
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            // Product info overlay
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.item.description ?? 'Product',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'SKU: ${widget.item.skuNo} • UOM: $selectedUom',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -206,6 +330,55 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
         children: [
           Row(
             children: [
+              // Product Image (clickable)
+              GestureDetector(
+                onTap: () => _showImageDialog(context),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: FutureBuilder<dynamic>(
+                    future: widget.inventoryPageState.authService.getSelectedCompany(),
+                    builder: (context, snapshot) {
+                      final company = snapshot.data;
+                      final companyCodeRaw = company?['companyCode'] ?? 1;
+                      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+                      
+                      return Stack(
+                        children: [
+                          InventoryImageWidget(
+                            companyCode: companyCode,
+                            skuNo: widget.item.skuNo,
+                            uom: selectedUom,
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.zero,
+                            showLoadingIndicator: true,
+                          ),
+                          // Zoom indicator overlay
+                          Positioned(
+                            bottom: 4,
+                            right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Icon(
+                                Icons.zoom_in,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Product Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,12 +386,33 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
                     Text(
                       widget.item.description ?? 'Product',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'SKU: ${widget.item.skuNo}',
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
+                    if (widget.item.brand != null && widget.item.brand!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.purple.shade200),
+                        ),
+                        child: Text(
+                          widget.item.brand!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.purple.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -244,25 +438,55 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
                   children: [
                     Text('Price', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                     const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _priceTapCount++;
-                          if (_priceTapCount >= 5) {
-                            _showCostAnalysis = !_showCostAnalysis;
-                            _priceTapCount = 0; // Reset counter
-                          }
-                        });
-                      },
-                      child: ValueListenableBuilder<double>(
-                        valueListenable: currentPrice,
-                        builder: (context, price, child) {
-                          return Text(
-                            'RM ${price.toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
-                          );
-                        },
-                      ),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _priceTapCount++;
+                              if (_priceTapCount >= 5) {
+                                _showCostAnalysis = !_showCostAnalysis;
+                                _priceTapCount = 0; // Reset counter
+                              }
+                            });
+                          },
+                          child: ValueListenableBuilder<double>(
+                            valueListenable: currentPrice,
+                            builder: (context, price, child) {
+                              return Text(
+                                'RM ${price.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
+                              );
+                            },
+                          ),
+                        ),
+                        if (_priceFromInvoice) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.receipt_long, size: 12, color: Colors.blue.shade700),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Last Invoice',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

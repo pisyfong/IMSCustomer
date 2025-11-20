@@ -503,13 +503,19 @@ class InvoiceService {
         }
       }
       
-      // Build result list with invoice date (offline-first: show items even without full invoice details)
+      // Build result list with invoice date, but ONLY for invoices that belong to the specified customer
       final List<Map<String, dynamic>> results = [];
       for (final item in filteredItems) {
         final invoice = invoiceMap[item.invoicePreLabel];
+
+        // If we don't have an invoice header for this customer, skip the item to avoid leaking other customers' history
+        if (invoice == null) {
+          continue;
+        }
+
         results.add({
           'invoiceNo': item.invoicePreLabel,
-          'date': invoice?.invoiceDate ?? item.dueDate ?? DateTime.now(), // Fallback to item due date or current date
+          'date': invoice.invoiceDate, // Use only the invoice header date; may be null
           'qty': item.quantity ?? 0,
           'uom': item.uom,
           'price': item.unitPrice ?? 0,

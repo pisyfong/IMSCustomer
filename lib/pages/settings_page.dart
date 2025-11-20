@@ -134,6 +134,48 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     }
   }
   
+  Future<void> _syncRolesAndAccess() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing roles and access mappings...';
+    });
+
+    try {
+      await _syncService.syncRolesAndAccess();
+      await _loadCacheStats();
+
+      setState(() {
+        _syncStatus = 'Roles and access sync completed';
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Roles and access synced successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _syncStatus = 'Roles sync failed: $e';
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Roles sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+      });
+    }
+  }
+  
   Future<void> _loadCacheStats() async {
     try {
       // Load all statistics in parallel for better performance
@@ -195,50 +237,18 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   }
   
   Future<void> _performFullSync() async {
-    setState(() {
-      _isSyncing = true;
-      _syncStatus = 'Starting comprehensive sync...';
-    });
+    // Show progress dialog
+    if (!mounted) return;
     
-    try {
-      // Use the comprehensive full sync from EnhancedSyncService
-      await _syncService.performFullSync();
-      
-      // Reload stats
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _FullSyncProgressDialog(syncService: _syncService),
+    ).then((_) async {
+      // Reload stats after sync completes
       await _loadCacheStats();
       await _loadLastSyncTime();
-      
-      setState(() {
-        _syncStatus = 'Full sync completed!';
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Full sync completed successfully'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _syncStatus = 'Sync failed: $e';
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Sync failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isSyncing = false;
-      });
-    }
+    });
   }
   
   Future<void> _syncUomPricing() async {
@@ -800,6 +810,12 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                 label: 'Upload Quotations',
                 color: Colors.deepOrange,
                 onPressed: _isSyncing ? null : _uploadQuotations,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.admin_panel_settings,
+                label: 'Sync Roles & Access',
+                color: Colors.deepPurple,
+                onPressed: _isSyncing ? null : _syncRolesAndAccess,
               ),
             ],
           ),
@@ -1878,6 +1894,270 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                   },
                 ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full Sync Progress Dialog
+class _FullSyncProgressDialog extends StatefulWidget {
+  final EnhancedSyncService syncService;
+  
+  const _FullSyncProgressDialog({required this.syncService});
+  
+  @override
+  State<_FullSyncProgressDialog> createState() => _FullSyncProgressDialogState();
+}
+
+class _FullSyncProgressDialogState extends State<_FullSyncProgressDialog> {
+  StreamSubscription? _progressSubscription;
+  int _currentStep = 0;
+  int _totalSteps = 10;
+  String _currentStepName = 'Initializing...';
+  String _status = 'running';
+  String? _errorMessage;
+  
+  @override
+  void initState() {
+    super.initState();
+    _startSync();
+  }
+  
+  void _startSync() {
+    // Listen to progress updates
+    _progressSubscription = widget.syncService.syncProgress.listen(
+      (progress) {
+        if (mounted) {
+          setState(() {
+            _currentStep = progress.currentStep;
+            _totalSteps = progress.totalSteps;
+            _currentStepName = progress.stepName;
+            _status = progress.status;
+            _errorMessage = progress.errorMessage;
+          });
+          
+          // Close dialog when completed
+          if (progress.status == 'completed' && progress.currentStep == progress.totalSteps) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Full sync completed successfully'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            });
+          }
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _status = 'failed';
+            _errorMessage = error.toString();
+          });
+        }
+      },
+    );
+    
+    // Start the sync
+    widget.syncService.performFullSync().catchError((error) {
+      if (mounted) {
+        setState(() {
+          _status = 'failed';
+          _errorMessage = error.toString();
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync failed: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _progressSubscription?.cancel();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    final progress = _currentStep / _totalSteps;
+    
+    return WillPopScope(
+      onWillPop: () async => _status == 'failed', // Only allow back if failed
+      child: Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    _status == 'failed' ? Icons.error : Icons.sync,
+                    color: _status == 'failed' ? Colors.red : Colors.blue,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _status == 'failed' ? 'Sync Failed' : 'Syncing Data',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Progress Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: Colors.grey.shade200,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _status == 'failed' ? Colors.red : Colors.blue,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Step Info
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Step $_currentStep of $_totalSteps',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '${(progress * 100).toInt()}%',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              
+              // Current Step Name
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    if (_status == 'running') ...[
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    if (_status == 'completed') ...[
+                      Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      const SizedBox(width: 12),
+                    ],
+                    if (_status == 'failed') ...[
+                      Icon(Icons.error, color: Colors.red, size: 16),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Text(
+                        _currentStepName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Error Message
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade900,
+                    ),
+                  ),
+                ),
+              ],
+              
+              // Close Button (only show if failed)
+              if (_status == 'failed') ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Close', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+              
+              // Info Text
+              if (_status == 'running') ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Please wait while we sync your data...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
