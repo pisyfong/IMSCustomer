@@ -1181,7 +1181,7 @@ class EnhancedSyncService {
     }
   }
 
-  /// Sync user roles and customer mappings for role-based filtering
+  /// Sync user roles and customer mappings for role-based filtering (offline-first)
   Future<void> _syncUserRolesAndCustomers() async {
     try {
       print('\n👥 ROLE SYNC: Starting user roles and customer mappings sync...');
@@ -1194,51 +1194,70 @@ class EnhancedSyncService {
         return;
       }
       
-      // 1. Sync user roles
-      print('👥 ROLE SYNC: Fetching user roles from server...');
-      final roles = await _signalRService.getUserRoles();
-      if (roles != null && roles.isNotEmpty) {
-        await _roleCustomerService.syncUserRoles(roles);
-        print('✅ ROLE SYNC: Synced ${roles.length} user roles');
-      } else {
-        print('⚠️ ROLE SYNC: No user roles received from server');
+      // Check if we have existing local role mappings
+      final localMappingsCount = await _isar.collection<UserCustomer>().count();
+      final localRolesCount = await _isar.collection<UserRole>().count();
+      print('📊 ROLE SYNC: Current local storage has $localRolesCount roles and $localMappingsCount mappings');
+      
+      // If we have local data and server is unreachable, use local data
+      final isServerReachable = await OfflineFirstService.isServerReachable(timeout: Duration(seconds: 5));
+      
+      if (!isServerReachable) {
+        print('📱 ROLE SYNC: Server unreachable - using existing local role data');
+        
+        // If no local role mappings exist, create a fallback mapping for current user
+        if (localMappingsCount == 0 && user?.roleId != null) {
+          print('🔧 ROLE SYNC: No local mappings found - creating fallback access for roleId=${user!.roleId}');
+          await _createFallbackRoleMapping(user.roleId!);
+        }
+        
+        // Show diagnostic info about local data
+        await _showRoleDiagnostics();
+        return;
       }
       
-      // 2. Sync user-customer mappings
-      print('👥 ROLE SYNC: Fetching user-customer mappings from server...');
-      final mappings = await _signalRService.getUserCustomers();
-      if (mappings != null && mappings.isNotEmpty) {
-        await _roleCustomerService.syncUserCustomers(mappings);
-        print('✅ ROLE SYNC: Synced ${mappings.length} user-customer mappings');
+      print('🌐 ROLE SYNC: Server reachable - attempting to sync from server...');
+      
+      try {
+        // 1. Sync user roles
+        print('👥 ROLE SYNC: Fetching user roles from server...');
+        final roles = await _signalRService.getUserRoles();
+        if (roles != null && roles.isNotEmpty) {
+          await _roleCustomerService.syncUserRoles(roles);
+          print('✅ ROLE SYNC: Synced ${roles.length} user roles');
+        } else {
+          print('⚠️ ROLE SYNC: No user roles received from server');
+        }
         
-        // Diagnostic: Check what we have in local storage
-        final localMappingsCount = await isar.userCustomers.count();
-        final localRolesCount = await isar.userRoles.count();
-        print('📊 ROLE SYNC: Local storage now has $localRolesCount roles and $localMappingsCount mappings');
-        
-        // Show sample mapping for debugging
-        if (localMappingsCount > 0) {
-          final sampleMapping = await isar.userCustomers.where().findFirst();
-          if (sampleMapping != null) {
-            print('📋 ROLE SYNC: Sample mapping - Role ${sampleMapping.userId} -> Customer ${sampleMapping.customer} (Company ${sampleMapping.companyCode})');
+        // 2. Sync user-customer mappings
+        print('👥 ROLE SYNC: Fetching user-customer mappings from server...');
+        final mappings = await _signalRService.getUserCustomers();
+        if (mappings != null && mappings.isNotEmpty) {
+          await _roleCustomerService.syncUserCustomers(mappings);
+          print('✅ ROLE SYNC: Synced ${mappings.length} user-customer mappings');
+        } else {
+          print('⚠️ ROLE SYNC: No user-customer mappings received from server');
+          
+          // If server returns no mappings but we have a valid user, create fallback
+          if (user?.roleId != null) {
+            print('🔧 ROLE SYNC: Server returned no mappings - creating fallback access for roleId=${user!.roleId}');
+            await _createFallbackRoleMapping(user.roleId!);
           }
         }
-
-        // If current user has no roleId yet, infer from mappings ONLY if user has actual mappings
-        try {
-          final auth = AuthService();
-          final cu = auth.currentUser;
-          if (cu != null && cu.roleId == null) {
-            // Don't auto-infer roleId - let users without explicit role have no access
-            print('👥 ROLE SYNC: User ${cu.userId} has no roleId - no role access granted');
-            // Note: PI_User_Customer.User_Id is actually the role ID, not user ID
-            // Only users with explicit roleId should get customer access
-          }
-        } catch (e) {
-          print('⚠️ ROLE SYNC: Failed to infer/persist roleId - $e');
+        
+        await _showRoleDiagnostics();
+        
+      } catch (serverError) {
+        print('❌ ROLE SYNC: Server sync failed: $serverError');
+        print('📱 ROLE SYNC: Falling back to local role data');
+        
+        // If server sync fails but we have local data, use it
+        if (localMappingsCount == 0 && user?.roleId != null) {
+          print('🔧 ROLE SYNC: Creating fallback access for roleId=${user!.roleId}');
+          await _createFallbackRoleMapping(user.roleId!);
         }
-      } else {
-        print('⚠️ ROLE SYNC: No user-customer mappings received from server');
+        
+        await _showRoleDiagnostics();
       }
       
       print('✅ ROLE SYNC: User roles and customer mappings sync completed');
@@ -1246,6 +1265,71 @@ class EnhancedSyncService {
     } catch (e) {
       print('❌ ROLE SYNC ERROR: $e');
       // Don't throw - role sync failure shouldn't break the main sync
+    }
+  }
+  
+  /// Create fallback role mapping when server data is unavailable
+  Future<void> _createFallbackRoleMapping(int roleId) async {
+    try {
+      print('🔧 FALLBACK: Creating role mappings for roleId=$roleId');
+      
+      // Get all customers from local database
+      final allCustomers = await _isar.customers.where().findAll();
+      
+      if (allCustomers.isEmpty) {
+        print('⚠️ FALLBACK: No customers in local database to create mappings for');
+        return;
+      }
+      
+      // Group customers by company
+      final customersByCompany = <int, List<String>>{};
+      for (final customer in allCustomers) {
+        customersByCompany.putIfAbsent(customer.companyCode, () => []).add(customer.code);
+      }
+      
+      // Create fallback mappings - give access to all customers for this role
+      final fallbackMappings = <Map<String, dynamic>>[];
+      
+      for (final entry in customersByCompany.entries) {
+        final companyCode = entry.key;
+        final customerCodes = entry.value;
+        
+        for (final customerCode in customerCodes) {
+          fallbackMappings.add({
+            'User_ID': roleId, // This is actually roleId in the database schema
+            'Company_Code': companyCode,
+            'Customer': customerCode,
+            'Is_Default': 'N',
+          });
+        }
+      }
+      
+      if (fallbackMappings.isNotEmpty) {
+        await _roleCustomerService.syncUserCustomers(fallbackMappings);
+        print('✅ FALLBACK: Created ${fallbackMappings.length} fallback role mappings');
+      }
+      
+    } catch (e) {
+      print('❌ FALLBACK ERROR: Failed to create fallback role mapping: $e');
+    }
+  }
+  
+  /// Show diagnostic information about role mappings
+  Future<void> _showRoleDiagnostics() async {
+    try {
+      final localMappingsCount = await _isar.collection<UserCustomer>().count();
+      final localRolesCount = await _isar.collection<UserRole>().count();
+      print('📊 ROLE SYNC: Final local storage has $localRolesCount roles and $localMappingsCount mappings');
+      
+      // Show sample mapping for debugging
+      if (localMappingsCount > 0) {
+        final sampleMapping = await _isar.collection<UserCustomer>().where().findFirst();
+        if (sampleMapping != null) {
+          print('📋 ROLE SYNC: Sample mapping - Role ${sampleMapping.userId} -> Customer ${sampleMapping.customer} (Company ${sampleMapping.companyCode})');
+        }
+      }
+    } catch (e) {
+      print('❌ ROLE DIAGNOSTICS ERROR: $e');
     }
   }
 

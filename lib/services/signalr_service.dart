@@ -131,9 +131,10 @@ class SignalRService {
       _connectionStateController.add(false);
       
       print('Creating new hub connection...');
-      // Create hub connection
+      // Create hub connection with longer timeout
       _hubConnection = HubConnectionBuilder()
           .withUrl(_hubUrl)
+          .withAutomaticReconnect()
           .build();
       
       print('Setting up event listeners...');
@@ -141,8 +142,17 @@ class SignalRService {
       _setupEventListeners();
       
       print('Starting SignalR connection...');
-      // Start connection and wait for it to complete
-      await _hubConnection!.start();
+      // Start connection with timeout
+      final startFuture = _hubConnection!.start();
+      if (startFuture != null) {
+        await startFuture.timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            print('⏱️ SignalR connection timed out after 10 seconds');
+            throw TimeoutException('SignalR connection timeout', const Duration(seconds: 10));
+          },
+        );
+      }
       
       // Check connection state immediately after start
       final connectionState = _hubConnection!.state;

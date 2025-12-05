@@ -22,8 +22,8 @@ class RoleCustomerService {
       print('👤 Current User: ${currentUser?.loginName} (userId=${currentUser?.userId})');
       print('🎭 Role ID: $roleId');
       
-      if (roleId == null || roleId == 0) {
-        // Users with no roleId or roleId=0 have no customer access
+      if (roleId == null) {
+        // Users with no roleId have no customer access
         print('❌ RoleCustomerService: BLOCKED - User has no valid roleId (roleId=$roleId)');
         print('❌ Returning EMPTY customer list');
         print('================================================================\n');

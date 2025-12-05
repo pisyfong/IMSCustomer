@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:path/path.dart' as path;
 import '../models/cart_item.dart';
 import '../models/customer.dart';
+import '../models/quote_item.dart';
 import '../services/customer_service.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
@@ -357,6 +358,25 @@ class _CheckoutPageState extends State<CheckoutPage> {
         print('⚠️ Warning: Quotation items may not have been saved to database');
       }
       
+      // Retrieve saved quotation items from database for PDF generation
+      print('📋 Retrieving saved quotation items for PDF...');
+      final savedQuotationItems = await _quotationService.getQuotationItems(
+        companyCode: companyCode,
+        quotePreLabel: quoteNo,
+      );
+      
+      print('📋 Found ${savedQuotationItems.length} saved quotation items for PDF');
+      
+      // If no saved items found, fall back to cart items but log warning
+      List<dynamic> pdfItems;
+      if (savedQuotationItems.isNotEmpty) {
+        pdfItems = savedQuotationItems;
+        print('✅ Using ${savedQuotationItems.length} saved quotation items for PDF');
+      } else {
+        pdfItems = cartItemsWithPlu;
+        print('⚠️ No saved items found, using ${cartItemsWithPlu.length} cart items for PDF');
+      }
+      
       final pdf = pw.Document();
       
       pdf.addPage(
@@ -512,21 +532,50 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       ],
                     ),
                     // Item Rows
-                    ...cartItemsWithPlu.asMap().entries.map((entry) {
+                    ...pdfItems.asMap().entries.map((entry) {
                       final index = entry.key + 1;
                       final item = entry.value;
-                      print('📄 PDF Item $index: SKU=${item.skuNo}, PLU="${item.pluNo}", Desc=${item.displayDescription}, Remarks="${item.remarks}"');
+                      
+                      // Handle both QuoteItem (from database) and CartItem (fallback) types
+                      String skuNo, pluNo, description, remarks, uom, gstPrice, gstSubtotal;
+                      int quantity;
+                      
+                      if (item is QuoteItem) {
+                        // Using saved quotation items from database
+                        skuNo = item.skuNo.toString();
+                        pluNo = item.pluNo ?? '';
+                        description = item.remark ?? 'Item ${item.skuNo}'; // Use remark as description
+                        remarks = item.remark ?? '';
+                        uom = item.uom;
+                        quantity = (item.quoteQuantity ?? 0).toInt();
+                        gstPrice = (item.unitPrice ?? 0.0).toStringAsFixed(2);
+                        gstSubtotal = (item.netAmount ?? 0.0).toStringAsFixed(2);
+                        print('📄 PDF Item $index (QuoteItem): SKU=$skuNo, PLU="$pluNo", Desc=$description, Qty=$quantity');
+                      } else {
+                        // Fallback to cart items
+                        final cartItem = item as dynamic;
+                        skuNo = cartItem.skuNo.toString();
+                        pluNo = cartItem.pluNo ?? '';
+                        description = cartItem.displayDescription ?? 'Item ${cartItem.skuNo}';
+                        remarks = cartItem.remarks ?? '';
+                        uom = cartItem.displayUom ?? 'PCS';
+                        quantity = cartItem.quantity.toInt();
+                        gstPrice = cartItem.displayGstPrice ?? '0.00';
+                        gstSubtotal = cartItem.displayGstSubtotal ?? '0.00';
+                        print('📄 PDF Item $index (CartItem): SKU=$skuNo, PLU="$pluNo", Desc=$description, Qty=$quantity');
+                      }
+                      
                       return pw.TableRow(
                         children: [
                           _buildTableCell('$index', fontSize: 8),
-                          _buildBarcodeCell(item.pluNo),
-                          _buildDescriptionWithRemarksCell(item.displayDescription, item.remarks),
-                          _buildTableCell('${item.quantity.toInt()}', fontSize: 8, align: pw.TextAlign.right),
+                          _buildBarcodeCell(pluNo),
+                          _buildDescriptionWithRemarksCell(description, remarks),
+                          _buildTableCell('$quantity', fontSize: 8, align: pw.TextAlign.right),
                           _buildTableCell('', fontSize: 8),
-                          _buildTableCell(item.displayUom, fontSize: 8),
-                          _buildTableCell(item.displayGstPrice, fontSize: 8, align: pw.TextAlign.right),
+                          _buildTableCell(uom, fontSize: 8),
+                          _buildTableCell(gstPrice, fontSize: 8, align: pw.TextAlign.right),
                           _buildTableCell('', fontSize: 8),
-                          _buildTableCell(item.displayGstSubtotal, fontSize: 8, align: pw.TextAlign.right),
+                          _buildTableCell(gstSubtotal, fontSize: 8, align: pw.TextAlign.right),
                         ],
                       );
                     }).toList(),

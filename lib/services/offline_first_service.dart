@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:isar/isar.dart';
 import 'signalr_service.dart';
 import '../main.dart'; // For global isar instance
 import '../company.dart';
 import '../login_cache.dart';
+import '../current_login.dart';
 
 /// Utility class for implementing offline-first patterns consistently across the app
 /// 
@@ -273,7 +275,7 @@ class OfflineFirstService {
       final loginCache = LoginCache()
         ..username = username
         ..passwordHash = _hashPassword(password) // Store hashed password for security
-        ..userData = userData.toString() // Store as string for simplicity
+        ..userData = jsonEncode(userData) // ✅ Properly serialize as JSON (includes Role_ID!)
         ..lastLoginTime = DateTime.now();
       
       await isar.writeTxn(() async {
@@ -282,7 +284,7 @@ class OfflineFirstService {
         await isar.loginCaches.put(loginCache);
       });
       
-      print('✅ Login credentials cached for offline use');
+      print('✅ Login credentials cached for offline use (Role_ID: ${userData['Role_ID']})');
     } catch (e) {
       print('❌ Failed to cache login credentials: $e');
       // Don't throw - caching failure shouldn't break online login
@@ -301,18 +303,44 @@ class OfflineFirstService {
         // Verify password hash
         final passwordHash = _hashPassword(password);
         if (cachedLogin.passwordHash == passwordHash) {
-          // Parse stored user data
-          // Note: In a real app, you'd use proper JSON parsing
-          // For now, we'll reconstruct basic user data
-          return {
-            'User_ID': cachedLogin.userData.contains('User_ID') ? 1001 : 1001, // Simplified
-            'Login_Name': username,
-            'Full_Name': username, // Simplified
-            'Status': 'A',
-            'Designation': 'User',
-            'Email': '$username@company.com',
-            'User_Photo': '',
-          };
+          try {
+            // ✅ Parse JSON-encoded user data (includes Role_ID!)
+            final userData = jsonDecode(cachedLogin.userData) as Map<String, dynamic>;
+            print('📱 OFFLINE LOGIN: Restored user data from LoginCache (Role_ID: ${userData['Role_ID']})');
+            return userData;
+          } catch (jsonError) {
+            // Fallback for old cached data that wasn't JSON-encoded
+            print('⚠️ OFFLINE LOGIN: Failed to parse JSON, using fallback (error: $jsonError)');
+            
+            // Try to restore from CurrentLogin if available (for backward compatibility)
+            final savedCurrentLogin = await isar.collection<CurrentLogin>().get(CurrentLogin.singletonId);
+            if (savedCurrentLogin != null && savedCurrentLogin.username == username) {
+              print('📱 OFFLINE LOGIN: Fallback to CurrentLogin (roleId=${savedCurrentLogin.roleId})');
+              return {
+                'User_ID': savedCurrentLogin.userId,
+                'Login_Name': savedCurrentLogin.username,
+                'Full_Name': savedCurrentLogin.fullName,
+                'Status': 'A',
+                'Designation': savedCurrentLogin.designation,
+                'Email': savedCurrentLogin.email,
+                'User_Photo': savedCurrentLogin.userPhoto ?? '',
+                'Role_ID': savedCurrentLogin.roleId,
+              };
+            }
+            
+            // Last resort: basic user data without roleId
+            print('⚠️ OFFLINE LOGIN: No CurrentLogin available, using basic data (no role access)');
+            return {
+              'User_ID': 1001,
+              'Login_Name': username,
+              'Full_Name': username,
+              'Status': 'A',
+              'Designation': 'User',
+              'Email': '$username@company.com',
+              'User_Photo': '',
+              'Role_ID': 0,
+            };
+          }
         }
       }
       
