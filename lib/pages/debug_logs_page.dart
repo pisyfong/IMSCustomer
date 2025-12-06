@@ -46,9 +46,90 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
         _sqlScript = script;
         _isLoading = false;
       });
+      _showSuccess('SQL recovery script generated successfully');
     } catch (e) {
-      setState(() => _isLoading = false);
       _showError('Failed to generate SQL script: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resyncQuotationItems() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Re-sync Quotation Items'),
+        content: const Text(
+          'This will re-sync all quotation items for quotations that were synced before the fix was implemented. '
+          'This may take some time depending on the number of quotations.\n\n'
+          'Do you want to continue?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Re-sync'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      // Re-sync items for quotations from the last 30 days
+      final fromDate = DateTime.now().subtract(const Duration(days: 30));
+      final resyncedCount = await _quotationService.resyncQuotationItems(fromDate: fromDate);
+      
+      _showSuccess('Successfully re-synced items for $resyncedCount quotations');
+    } catch (e) {
+      _showError('Failed to re-sync quotation items: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _checkQuotationsNeedingResync() async {
+    setState(() => _isLoading = true);
+    try {
+      // Check quotations from the last 30 days
+      final beforeDate = DateTime.now();
+      final quotations = await _quotationService.getQuotationsNeedingItemResync(beforeDate: beforeDate);
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Quotations Needing Re-sync'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Found ${quotations.length} quotations that may need item re-sync:'),
+                const SizedBox(height: 8),
+                ...quotations.take(10).map((q) => Text('• ${q.quotePreLabel}')),
+                if (quotations.length > 10)
+                  Text('... and ${quotations.length - 10} more'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _showError('Failed to check quotations: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -162,6 +243,34 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
                                   label: const Text('Cleanup Old Logs'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.orange,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _checkQuotationsNeedingResync,
+                                  icon: const Icon(Icons.search),
+                                  label: const Text('Check Missing Items'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _resyncQuotationItems,
+                                  icon: const Icon(Icons.sync),
+                                  label: const Text('Re-sync Items'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
                                   ),
                                 ),

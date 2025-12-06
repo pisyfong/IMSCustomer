@@ -136,14 +136,26 @@ class QuotationService {
 
     for (final quotation in unsyncedQuotations) {
       try {
+        // Get quotation items for this quotation
+        final quotationItems = await getQuotationItems(
+          companyCode: quotation.companyCode,
+          quotePreLabel: quotation.quotePreLabel,
+        );
+        
+        // Prepare complete quotation data with items
+        final quotationData = {
+          'quotation': quotation.toJson(),
+          'items': quotationItems.map((item) => item.toJson()).toList(),
+        };
+        
         // Send to server via HTTP API
         final apiUrl = '${AppConfig.apiBaseUrl}/api/quotations';
-        print('📤 Sending quotation to: $apiUrl');
+        print('📤 Sending quotation ${quotation.quotePreLabel} with ${quotationItems.length} items to: $apiUrl');
         
         final response = await http.post(
           Uri.parse(apiUrl),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(quotation.toJson()),
+          body: jsonEncode(quotationData),
         );
 
         if (response.statusCode == 200) {
@@ -453,7 +465,7 @@ class QuotationService {
         ..taxAmount = 0.0
         ..netAmount = item['amount'] ?? (quantity * unitPrice)
         ..pluNo = item['pluNo'] ?? item['plu_no']
-        ..remark = item['remark']
+        ..remark = _buildItemRemark(item['remark'], item['remarks'])
         ..locationCode = 'FST'
         ..quoteQuantityOri = quantity
         ..unitPriceOri = unitPrice
@@ -566,6 +578,124 @@ class QuotationService {
   /// Clean up old log files (keep last 30 days)
   Future<void> cleanupOldLogs() async {
     await QuotationLogger.cleanupOldLogs();
+  }
+
+  /// Re-sync quotation items for quotations that were synced without items
+  /// This fixes quotations that were synced before the item sync fix was implemented
+  Future<int> resyncQuotationItems({DateTime? fromDate}) async {
+    try {
+      print('🔄 ITEM RESYNC: Starting re-sync of quotation items...');
+      
+      // Get all synced quotations (optionally from a specific date)
+      var query = isar.quotations.filter().isSyncedEqualTo(true);
+      
+      if (fromDate != null) {
+        query = query.and().quoteDateGreaterThan(fromDate);
+      }
+      
+      final syncedQuotations = await query.findAll();
+      
+      if (syncedQuotations.isEmpty) {
+        print('🔄 ITEM RESYNC: No synced quotations found to re-sync');
+        return 0;
+      }
+      
+      print('🔄 ITEM RESYNC: Found ${syncedQuotations.length} synced quotations to check');
+      int resyncedCount = 0;
+      
+      for (final quotation in syncedQuotations) {
+        try {
+          // Get local quotation items
+          final quotationItems = await getQuotationItems(
+            companyCode: quotation.companyCode,
+            quotePreLabel: quotation.quotePreLabel,
+          );
+          
+          if (quotationItems.isEmpty) {
+            print('⚠️ ITEM RESYNC: No local items found for ${quotation.quotePreLabel}, skipping');
+            continue;
+          }
+          
+          // Prepare items-only sync data
+          final itemsData = {
+            'quotation_id': quotation.quotePreLabel,
+            'company_code': quotation.companyCode,
+            'items': quotationItems.map((item) => item.toJson()).toList(),
+          };
+          
+          // Send items to server via dedicated endpoint
+          final apiUrl = '${AppConfig.apiBaseUrl}/api/quotations/items';
+          print('📤 Re-syncing ${quotationItems.length} items for quotation ${quotation.quotePreLabel}');
+          
+          final response = await http.post(
+            Uri.parse(apiUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(itemsData),
+          );
+          
+          if (response.statusCode == 200) {
+            resyncedCount++;
+            print('✅ ITEM RESYNC: Successfully re-synced items for ${quotation.quotePreLabel}');
+          } else {
+            print('❌ ITEM RESYNC: Failed to re-sync items for ${quotation.quotePreLabel}: ${response.statusCode} - ${response.body}');
+          }
+          
+          // Add small delay to avoid overwhelming server
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+        } catch (e) {
+          print('❌ ITEM RESYNC: Error re-syncing items for ${quotation.quotePreLabel}: $e');
+        }
+      }
+      
+      print('🔄 ITEM RESYNC: Successfully re-synced items for $resyncedCount/${syncedQuotations.length} quotations');
+      return resyncedCount;
+      
+    } catch (e) {
+      print('❌ ITEM RESYNC: Error during re-sync process: $e');
+      return 0;
+    }
+  }
+
+  /// Get quotations that might be missing items on server (synced but created before fix)
+  Future<List<Quotation>> getQuotationsNeedingItemResync({DateTime? beforeDate}) async {
+    var query = isar.quotations.filter().isSyncedEqualTo(true);
+    
+    if (beforeDate != null) {
+      query = query.and().quoteDateLessThan(beforeDate);
+    }
+    
+    final quotations = await query.findAll();
+    
+    // Filter to only include quotations that have local items
+    final quotationsWithItems = <Quotation>[];
+    
+    for (final quotation in quotations) {
+      final items = await getQuotationItems(
+        companyCode: quotation.companyCode,
+        quotePreLabel: quotation.quotePreLabel,
+      );
+      
+      if (items.isNotEmpty) {
+        quotationsWithItems.add(quotation);
+      }
+    }
+    
+    return quotationsWithItems;
+  }
+
+  /// Build item remark by combining description and user remarks
+  String _buildItemRemark(String? description, String? userRemarks) {
+    final desc = description ?? '';
+    final remarks = userRemarks?.trim() ?? '';
+    
+    if (desc.isEmpty && remarks.isEmpty) {
+      return '';
+    } else if (desc.isNotEmpty && remarks.isNotEmpty) {
+      return '$desc\n$remarks'; // Description on first line, remarks on second line
+    } else {
+      return desc.isNotEmpty ? desc : remarks;
+    }
   }
 
   /// Log duplicate quotation details to text file for manual review

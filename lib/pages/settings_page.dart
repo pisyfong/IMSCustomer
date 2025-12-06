@@ -22,6 +22,7 @@ import '../models/group_lookup.dart';
 import '../models/department_lookup.dart';
 import '../models/plu.dart';
 import '../models/customer_plu.dart';
+import 'debug_logs_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -1207,6 +1208,17 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   Widget _buildMaintenanceSection() {
     return Column(
       children: [
+        _buildMaintenanceButton(
+          'Debug Logs',
+          'View logs and recovery tools',
+          Icons.bug_report,
+          Colors.brown,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const DebugLogsPage()),
+          ),
+        ),
+        const SizedBox(height: 12),
         _buildMaintenanceButton(
           'Clear All Cache',
           'Remove all cached data',

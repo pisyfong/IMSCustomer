@@ -340,10 +340,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
         'skuNo': item.skuNo,
         'uom': item.uom,
         'quantity': item.quantity.toDouble(),
-        'unitPrice': item.unitPrice ?? 0.0,
-        'amount': (item.unitPrice ?? 0.0) * item.quantity,
+        'unitPrice': item.gstPrice ?? item.unitPrice ?? 0.0,  // Use GST-inclusive price
+        'amount': (item.gstPrice ?? item.unitPrice ?? 0.0) * item.quantity,  // Use GST-inclusive amount
         'pluNo': item.pluNo,
-        'remark': item.remarks,
+        'remark': item.displayDescription ?? item.description ?? 'Item ${item.skuNo}',  // Use actual description
+        'remarks': item.remarks,  // Keep user's additional remarks separate
       }).toList();
       
       final itemsSaved = await _quotationService.saveQuotationItems(
@@ -544,13 +545,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         // Using saved quotation items from database
                         skuNo = item.skuNo.toString();
                         pluNo = item.pluNo ?? '';
-                        description = item.remark ?? 'Item ${item.skuNo}'; // Use remark as description
-                        remarks = item.remark ?? '';
+                        // Split combined remark back into description and remarks
+                        final remarkParts = (item.remark ?? '').split('\n');
+                        description = remarkParts.isNotEmpty ? remarkParts[0] : 'Item ${item.skuNo}';
+                        remarks = remarkParts.length > 1 ? remarkParts.sublist(1).join('\n') : '';
                         uom = item.uom;
                         quantity = (item.quoteQuantity ?? 0).toInt();
+                        // Use unitPrice directly without tax reduction (should match original cart price)
                         gstPrice = (item.unitPrice ?? 0.0).toStringAsFixed(2);
                         gstSubtotal = (item.netAmount ?? 0.0).toStringAsFixed(2);
-                        print('📄 PDF Item $index (QuoteItem): SKU=$skuNo, PLU="$pluNo", Desc=$description, Qty=$quantity');
+                        print('📄 PDF Item $index (QuoteItem): SKU=$skuNo, PLU="$pluNo", Desc=$description, Qty=$quantity, Price=${gstPrice}');
                       } else {
                         // Fallback to cart items
                         final cartItem = item as dynamic;
@@ -560,9 +564,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         remarks = cartItem.remarks ?? '';
                         uom = cartItem.displayUom ?? 'PCS';
                         quantity = cartItem.quantity.toInt();
-                        gstPrice = cartItem.displayGstPrice ?? '0.00';
-                        gstSubtotal = cartItem.displayGstSubtotal ?? '0.00';
-                        print('📄 PDF Item $index (CartItem): SKU=$skuNo, PLU="$pluNo", Desc=$description, Qty=$quantity');
+                        // Use the raw price values without RM prefix to match QuoteItem format
+                        gstPrice = (cartItem.gstPrice ?? 0.0).toStringAsFixed(2);
+                        gstSubtotal = (cartItem.gstSubtotal ?? 0.0).toStringAsFixed(2);
+                        print('📄 PDF Item $index (CartItem): SKU=$skuNo, PLU="$pluNo", Desc=$description, Qty=$quantity, Price=${gstPrice}');
                       }
                       
                       return pw.TableRow(
