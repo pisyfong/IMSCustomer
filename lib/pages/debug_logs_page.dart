@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:isar/isar.dart';
 import '../services/quotation_service.dart';
 import '../services/signalr_service.dart';
+import '../models/quotation.dart';
+import '../models/quote_item.dart';
 import '../main.dart';
 
 class DebugLogsPage extends StatefulWidget {
@@ -145,6 +148,156 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
     }
   }
 
+  Future<void> _exportDatabaseToSQL() async {
+    setState(() => _isLoading = true);
+    try {
+      // Get all quotations from database using collection<T>() syntax
+      final quotationCollection = isar.collection<Quotation>();
+      final quotations = await quotationCollection.where().findAll();
+      print('📊 DATABASE EXPORT: Found ${quotations.length} quotations in database');
+      
+      if (quotations.isEmpty) {
+        setState(() => _isLoading = false);
+        _showError('No quotations found in database');
+        return;
+      }
+      
+      final buffer = StringBuffer();
+      buffer.writeln('-- Database Export SQL Script');
+      buffer.writeln('-- Generated: ${DateTime.now()}');
+      buffer.writeln('-- Total Quotations: ${quotations.length}');
+      buffer.writeln('');
+      
+      int totalItems = 0;
+      final quoteItemCollection = isar.collection<QuoteItem>();
+      
+      for (final quotation in quotations) {
+        // Export quotation header
+        buffer.writeln('-- Quotation: ${quotation.quotePreLabel}');
+        buffer.writeln('INSERT INTO quotations (');
+        buffer.writeln('  Company_Code, Quote_Pre_Label, Quote_Date, Customer,');
+        buffer.writeln('  Status, GST_Amount, Net_Amount, Is_Synced');
+        buffer.writeln(') VALUES (');
+        buffer.writeln('  ${quotation.companyCode}, \'${quotation.quotePreLabel}\',');
+        buffer.writeln('  \'${quotation.quoteDate?.toIso8601String()}\', \'${quotation.customer?.replaceAll("'", "''") ?? ""}\',');
+        buffer.writeln('  \'${quotation.status ?? ""}\', ${quotation.gstAmount ?? 0},');
+        buffer.writeln('  ${quotation.netAmount ?? 0}, ${quotation.isSynced ? 1 : 0}');
+        buffer.writeln(');');
+        buffer.writeln('');
+        
+        // Get quotation items
+        final items = await quoteItemCollection
+            .where()
+            .companyCodeEqualTo(quotation.companyCode)
+            .filter()
+            .quotePreLabelEqualTo(quotation.quotePreLabel)
+            .findAll();
+        
+        totalItems = totalItems + items.length;
+        
+        // Export quotation items
+        for (final item in items) {
+          buffer.writeln('-- Item for quotation: ${quotation.quotePreLabel}');
+          buffer.writeln('INSERT INTO quotation_items (');
+          buffer.writeln('  Company_Code, Quote_Pre_Label, Sequence_No, Sku_No,');
+          buffer.writeln('  Unit_Price, Quote_Quantity, Net_Amount, Remark, PLU_No');
+          buffer.writeln(') VALUES (');
+          buffer.writeln('  ${item.companyCode}, \'${item.quotePreLabel}\', ${item.sequenceNo},');
+          buffer.writeln('  ${item.skuNo}, ${item.unitPrice}, ${item.quoteQuantity},');
+          buffer.writeln('  ${item.netAmount}, \'${item.remark?.replaceAll("'", "''") ?? ""}\',');
+          buffer.writeln('  \'${item.pluNo ?? ""}\'');
+          buffer.writeln(');');
+          buffer.writeln('');
+        }
+      }
+      
+      buffer.writeln('-- Export Summary:');
+      buffer.writeln('-- Quotations: ${quotations.length}');
+      buffer.writeln('-- Items: $totalItems');
+      
+      setState(() {
+        _sqlScript = buffer.toString();
+      });
+      
+      _showSuccess('Database exported to SQL script (${quotations.length} quotations, $totalItems items)');
+      print('✅ DATABASE EXPORT: Generated SQL script with ${quotations.length} quotations and $totalItems items');
+      
+    } catch (e) {
+      _showError('Failed to export database: $e');
+      print('❌ DATABASE EXPORT: Error: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _showDatabaseStats() async {
+    setState(() => _isLoading = true);
+    try {
+      // Get database statistics using collection<T>() syntax
+      final quotationCollection = isar.collection<Quotation>();
+      final quoteItemCollection = isar.collection<QuoteItem>();
+      
+      final quotationCount = await quotationCollection.count();
+      final itemCount = await quoteItemCollection.count();
+      final syncedQuotations = await quotationCollection.where().filter().isSyncedEqualTo(true).count();
+      final unsyncedQuotations = quotationCount - syncedQuotations;
+      
+      // Get date range
+      final oldestQuotation = await quotationCollection.where().sortByQuoteDate().findFirst();
+      final newestQuotation = await quotationCollection.where().sortByQuoteDateDesc().findFirst();
+      
+      // Get company breakdown
+      final companies = await quotationCollection.where().distinctByCompanyCode().findAll();
+      final companyStats = <int, int>{};
+      for (final company in companies) {
+        final count = await quotationCollection.where().filter().companyCodeEqualTo(company.companyCode).count();
+        companyStats[company.companyCode] = count;
+      }
+      
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Database Statistics'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('📊 Total Quotations: $quotationCount'),
+                Text('📦 Total Items: $itemCount'),
+                const SizedBox(height: 8),
+                Text('✅ Synced: $syncedQuotations'),
+                Text('⏳ Unsynced: $unsyncedQuotations'),
+                const SizedBox(height: 8),
+                if (oldestQuotation != null)
+                  Text('📅 Oldest: ${oldestQuotation.quoteDate?.toString().split(' ')[0]}'),
+                if (newestQuotation != null)
+                  Text('📅 Newest: ${newestQuotation.quoteDate?.toString().split(' ')[0]}'),
+                const SizedBox(height: 8),
+                const Text('🏢 By Company:', style: TextStyle(fontWeight: FontWeight.bold)),
+                ...companyStats.entries.map((entry) => 
+                  Text('  Company ${entry.key}: ${entry.value} quotations')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+      
+    } catch (e) {
+      _showError('Failed to get database stats: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     _showSuccess('$label copied to clipboard');
@@ -271,6 +424,45 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
                                   label: const Text('Re-sync Items'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // Database Recovery Section
+                          const Text(
+                            'Database Recovery',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _exportDatabaseToSQL,
+                                  icon: const Icon(Icons.download),
+                                  label: const Text('Export DB to SQL'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _showDatabaseStats,
+                                  icon: const Icon(Icons.analytics),
+                                  label: const Text('Database Stats'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.purple,
                                     foregroundColor: Colors.white,
                                   ),
                                 ),

@@ -316,8 +316,15 @@ class EnhancedSyncService {
     final skuNo = pluData['SKU_No'];
     
     print('🏷️ Enhanced Sync: Real-time PLU $changeType - SKU $skuNo');
-    print('🏷️ PLU change detected - will be synced on next periodic sync');
-    // PLU data is synced during periodic inventory sync
+    print('🏷️ PLU change detected - triggering In_Stock_PLU sync');
+    
+    // Trigger In_Stock_PLU sync for offline barcode scanning
+    try {
+      await _pluService.syncInStockPlu();
+      print('✅ Enhanced Sync: In_Stock_PLU synced after real-time change');
+    } catch (e) {
+      print('❌ Enhanced Sync: Error syncing In_Stock_PLU after change: $e');
+    }
   }
 
   /// Handle real-time customer PLU change events
@@ -381,6 +388,11 @@ class EnhancedSyncService {
       print('🔄 ENHANCED SYNC: About to sync inventory (periodic)...');
       await _syncInventoryPeriodically();
       print('🔄 ENHANCED SYNC: Inventory sync completed');
+
+      // Sync In_Stock_PLU for offline barcode scanning
+      print('🔄 ENHANCED SYNC: About to sync In_Stock_PLU...');
+      await _preloadInStockPlu();
+      print('🔄 ENHANCED SYNC: In_Stock_PLU sync completed');
 
     } catch (e) {
       print('Enhanced Sync: Error during sync: $e');
@@ -1179,6 +1191,23 @@ class EnhancedSyncService {
     } catch (e) {
       print('❌ PRELOAD PLUS ERROR: $e');
     }
+  }
+
+  /// Preload In_Stock_PLU data for offline barcode scanning
+  Future<void> _preloadInStockPlu() async {
+    try {
+      print('🏷️ PRELOAD: Loading In_Stock_PLU for offline barcode scanning...');
+      await _pluService.syncInStockPlu();
+      final count = await _pluService.getInStockPluCount();
+      print('✅ PRELOAD: In_Stock_PLU synced: $count records');
+    } catch (e) {
+      print('❌ PRELOAD IN_STOCK_PLU ERROR: $e');
+    }
+  }
+
+  /// Public method to sync In_Stock_PLU (called from settings page)
+  Future<void> syncInStockPlu() async {
+    await _preloadInStockPlu();
   }
 
   /// Sync user roles and customer mappings for role-based filtering (offline-first)

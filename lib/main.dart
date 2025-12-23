@@ -27,6 +27,8 @@ import 'models/credit_term.dart';
 import 'models/group_lookup.dart';
 import 'models/department_lookup.dart';
 import 'models/customer_plu.dart';
+import 'models/in_stock_plu.dart';
+import 'models/draft_quotation.dart';
 import 'services/auth_service.dart';
 import 'services/signalr_service.dart';
 import 'services/enhanced_sync_service.dart';
@@ -86,6 +88,9 @@ Future<void> initIsar() async {
       GroupLookupSchema,
       DepartmentLookupSchema,
       CustomerPluSchema,
+      InStockPluSchema,
+      DraftQuotationSchema,
+      DraftQuotationItemSchema,
     ], directory: dir.path);
     print('Isar database opened successfully');
     

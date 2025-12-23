@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../online_status_icon.dart';
 import 'previous_order_page.dart';
 import '../inventory_page.dart';
+import 'draft_list_page.dart';
 
 class SalesQuotationMenuPage extends StatefulWidget {
   const SalesQuotationMenuPage({Key? key}) : super(key: key);
@@ -50,288 +51,261 @@ class _SalesQuotationMenuPageState extends State<SalesQuotationMenuPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: CustomScrollView(
-        slivers: [
-          // Header with Background Image
-          SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            leading: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+      backgroundColor: Colors.grey.shade100,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Compact Header
+            _buildCompactHeader(),
+            
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Customer Card (Compact)
+                    if (_selectedCustomer != null) _buildCustomerCard(),
+                    const SizedBox(height: 12),
+                    
+                    // Menu Title
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: Text(
+                        'Quick Actions',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                    
+                    // Menu Grid (2x2)
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.3,
+                      children: [
+                        _buildMenuCard(
+                          icon: Icons.inventory_2_outlined,
+                          title: 'Inventory',
+                          subtitle: 'Browse products',
+                          color: Colors.blue,
+                          onTap: () => _navigateToPage('browse_inventory'),
+                        ),
+                        _buildMenuCard(
+                          icon: Icons.local_offer_outlined,
+                          title: 'Promotions',
+                          subtitle: 'Current offers',
+                          color: Colors.orange,
+                          onTap: () => _navigateToPage('check_promotion'),
+                        ),
+                        _buildMenuCard(
+                          icon: Icons.drafts_outlined,
+                          title: 'Drafts',
+                          subtitle: 'Saved quotations',
+                          color: Colors.teal,
+                          onTap: () => _navigateToPage('drafts'),
+                        ),
+                        _buildMenuCard(
+                          icon: Icons.history,
+                          title: 'Orders',
+                          subtitle: 'View history',
+                          color: Colors.purple,
+                          onTap: () => _navigateToPage('previous_order'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/login_bg.jpg'),
-                    fit: BoxFit.cover,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.arrow_back, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sales Quotation',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                if (_selectedCompany != null)
+                  Text(
+                    _selectedCompany!['companyName'] ?? '',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          // Online status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isOnline ? Colors.green.shade50 : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isOnline ? Colors.green : Colors.orange,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(60, 0, 16, 16), // Increased left padding to avoid back button
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Page title
-                        const Text(
-                          'Sales Quotation',
+                const SizedBox(width: 4),
+                Text(
+                  _isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerCard() {
+    final customerName = _selectedCustomer!['name'] ?? '';
+    final customerCode = _selectedCustomer!['code'] ?? '';
+    final customerStatus = _selectedCustomer!['status'];
+    final contactName = _selectedCustomer!['contactName'];
+    final telNo = _selectedCustomer!['telNo'];
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _getCustomerColor(customerName),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Text(
+                _getCustomerInitials(customerName),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        customerName,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (customerStatus != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: customerStatus == 'Active' ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          customerStatus,
                           style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            color: customerStatus == 'Active' ? Colors.green.shade700 : Colors.red.shade700,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        // Company and Customer info
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Company info
-                            if (_selectedCompany != null) ...[
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.business,
-                                    size: 14,
-                                    color: Colors.white.withOpacity(0.9),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      _selectedCompany!['companyName'] ?? '',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                            ],
-                            // Customer info
-                            if (_selectedCustomer != null) ...[
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.person,
-                                    size: 14,
-                                    color: Colors.white.withOpacity(0.9),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      _selectedCustomer!['name'] ?? '',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                  ],
                 ),
-              ),
-            ),
-            actions: [
-              // Online status
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: OnlineStatusIcon(isOnline: _isOnline),
-              ),
-            ],
-          ),
-
-          // Customer Details Card
-          if (_selectedCustomer != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundColor: _getCustomerColor(_selectedCustomer!['name'] ?? ''),
-                              child: Text(
-                                _getCustomerInitials(_selectedCustomer!['name'] ?? ''),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _selectedCustomer!['name'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Code: ${_selectedCustomer!['code'] ?? ''}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Status badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _selectedCustomer!['status'] == 'Active' 
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                _selectedCustomer!['status'] ?? 'Unknown',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedCustomer!['status'] == 'Active' 
-                                      ? Colors.green[700]
-                                      : Colors.red[700],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_selectedCustomer!['contactName']?.isNotEmpty == true ||
-                            _selectedCustomer!['email']?.isNotEmpty == true ||
-                            _selectedCustomer!['telNo']?.isNotEmpty == true) ...[
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              if (_selectedCustomer!['contactName']?.isNotEmpty == true) ...[
-                                Icon(Icons.contact_page, size: 14, color: Colors.grey[600]),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _selectedCustomer!['contactName'],
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                                ),
-                                const SizedBox(width: 16),
-                              ],
-                              if (_selectedCustomer!['telNo']?.isNotEmpty == true) ...[
-                                Icon(Icons.phone, size: 14, color: Colors.grey[600]),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _selectedCustomer!['telNo'],
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ],
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        customerCode,
+                        style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Menu Options Grid
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'What would you like to do?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Menu options in 2x2 grid
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.1,
-                    children: [
-                      _buildMenuCard(
-                        icon: Icons.inventory_2,
-                        title: 'Browse Inventory',
-                        subtitle: 'Check stock levels',
-                        color: Colors.blue,
-                        onTap: () => _navigateToPage('browse_inventory'),
-                      ),
-                      _buildMenuCard(
-                        icon: Icons.local_offer,
-                        title: 'Check Promotion',
-                        subtitle: 'View current offers',
-                        color: Colors.orange,
-                        onTap: () => _navigateToPage('check_promotion'),
-                      ),
-                      _buildMenuCard(
-                        icon: Icons.new_releases,
-                        title: 'Check New Arrival',
-                        subtitle: 'Latest products',
-                        color: Colors.green,
-                        onTap: () => _navigateToPage('check_new_arrival'),
-                      ),
-                      _buildMenuCard(
-                        icon: Icons.history,
-                        title: 'Previous Order',
-                        subtitle: 'View order history',
-                        color: Colors.purple,
-                        onTap: () => _navigateToPage('previous_order'),
-                      ),
+                    if (telNo?.isNotEmpty == true) ...[
+                      const SizedBox(width: 8),
+                      Icon(Icons.phone_outlined, size: 12, color: Colors.grey.shade500),
+                      const SizedBox(width: 2),
+                      Text(telNo, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                     ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
-          ),
-
-          // Bottom padding
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 32),
           ),
         ],
       ),
@@ -345,64 +319,51 @@ class _SalesQuotationMenuPageState extends State<SalesQuotationMenuPage> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                color.withOpacity(0.1),
-                color.withOpacity(0.05),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 24, color: color),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 32,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
           ),
         ),
       ),
@@ -426,6 +387,14 @@ class _SalesQuotationMenuPageState extends State<SalesQuotationMenuPage> {
           context,
           MaterialPageRoute(
             builder: (context) => const PreviousOrderPage(),
+          ),
+        );
+        break;
+      case 'drafts':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DraftListPage(),
           ),
         );
         break;

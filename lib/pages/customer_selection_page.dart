@@ -158,169 +158,214 @@ class _CustomerSelectionPageState extends State<CustomerSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = Colors.redAccent;
-    final secondaryColor = Colors.redAccent.shade100;
-    
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Select Customer',
-          style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.3),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: primaryColor,
-        elevation: 0,
-        centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          tooltip: 'Back',
-        ),
-        actions: [
-          OnlineStatusIcon(
-            isOnline: _isOnline,
-            onTap: _checkOnlineStatus,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _refreshCustomers,
-            tooltip: 'Refresh Customers',
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Welcome message
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
-            color: Colors.white,
-            child: RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Company: ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
+      backgroundColor: Colors.grey.shade100,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Compact Header
+            _buildCompactHeader(),
+            
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _filterCustomers,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or code...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    prefixIcon: Icon(Icons.search, color: Colors.grey.shade400, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              _filterCustomers('');
+                            },
+                            child: Icon(Icons.close, color: Colors.grey.shade400, size: 18),
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
-                  TextSpan(
-                    text: widget.selectedCompany['companyName'] ?? 'Unknown',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.normal,
-                      color: primaryColor,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
 
-          // Search bar
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+            // Error message
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade600, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _error = null),
+                        child: Icon(Icons.close, color: Colors.red.shade400, size: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Debug information (if enabled)
+            if (_debugInfo != null && AppConfig.showDebugInfo)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _debugInfo!,
+                          style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _debugInfo = null),
+                        child: Icon(Icons.close, color: Colors.blue.shade400, size: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Customer list
+            Expanded(
+              child: _buildCustomerList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.arrow_back, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Select Customer',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  widget.selectedCompany['companyName'] ?? 'Unknown',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _filterCustomers,
-              decoration: InputDecoration(
-                hintText: 'Search customers by name or code...',
-                hintStyle: TextStyle(color: Colors.grey[500]),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, color: Colors.grey[400]),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterCustomers('');
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              ),
+          ),
+          // Online status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isOnline ? Colors.green.shade50 : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isOnline ? Colors.green : Colors.orange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                  ),
+                ),
+              ],
             ),
           ),
-
-          // Error message
-          if (_error != null)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red[700], size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _error!,
-                      style: TextStyle(color: Colors.red[700], fontSize: 12),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: Colors.red[700], size: 16),
-                    onPressed: () => setState(() => _error = null),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-
-          // Debug information (if enabled)
-          if (_debugInfo != null && AppConfig.showDebugInfo)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              padding: const EdgeInsets.all(12),
+          const SizedBox(width: 8),
+          // Refresh button
+          GestureDetector(
+            onTap: _isLoading ? null : _refreshCustomers,
+            child: Container(
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _debugInfo!,
-                      style: TextStyle(color: Colors.blue[700], fontSize: 12),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: Colors.blue[700], size: 16),
-                    onPressed: () => setState(() => _debugInfo = null),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
+              child: _isLoading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
+                      ),
+                    )
+                  : Icon(Icons.refresh, size: 18, color: Colors.blue.shade600),
             ),
-
-          // Customer list
-          Expanded(
-            child: _buildCustomerList(),
           ),
         ],
       ),
@@ -419,18 +464,17 @@ class _CustomerSelectionPageState extends State<CustomerSelectionPage> {
 
   Widget _buildCustomerCard(Customer customer) {
     final nameInitial = customer.displayName.isNotEmpty ? customer.displayName[0].toUpperCase() : '?';
-    final hasLocation = customer.fullAddress.isNotEmpty;
     
     // Generate a consistent color based on customer name
     final nameHash = customer.displayName.hashCode;
     final hue = (nameHash % 360).abs().toDouble();
-    final avatarColor = HSLColor.fromAHSL(1.0, hue, 0.6, 0.8).toColor();
+    final avatarColor = HSLColor.fromAHSL(1.0, hue, 0.5, 0.7).toColor();
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -441,176 +485,105 @@ class _CustomerSelectionPageState extends State<CustomerSelectionPage> {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           onTap: () => _selectCustomer(customer),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             child: Row(
               children: [
-                // Customer avatar
+                // Customer avatar (smaller)
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: avatarColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
                     child: Text(
                       nameInitial,
-                      style: const TextStyle(
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold, 
-                        color: Colors.white
-                      ),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),
                 ),
-                
-                const SizedBox(width: 12),
-                
-                // Customer details
+                const SizedBox(width: 10),
+                // Customer details (compact)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Customer name and status
+                      // Name row
                       Row(
                         children: [
                           Expanded(
                             child: Text(
                               customer.displayName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (customer.status != null) ...[
-                            const SizedBox(width: 8),
+                          if (customer.status != null)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: customer.status == 'A' ? Colors.green.shade50 : Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: customer.status == 'A' ? Colors.green.shade200 : Colors.red.shade200,
-                                ),
+                                borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 customer.status == 'A' ? 'Active' : 'Inactive',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w500,
                                   color: customer.status == 'A' ? Colors.green.shade700 : Colors.red.shade700,
                                 ),
                               ),
                             ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      // Code + Phone row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              customer.code,
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          if (customer.telNo?.isNotEmpty == true) ...[
+                            const SizedBox(width: 8),
+                            Icon(Icons.phone_outlined, size: 12, color: Colors.grey.shade500),
+                            const SizedBox(width: 2),
+                            Text(
+                              customer.telNo!,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
                           ],
                         ],
                       ),
-                      
-                      const SizedBox(height: 2),
-                      
-                      // Customer code
-                      Text(
-                        'Code: ${customer.code}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      
-                      // Location (if available)
-                      if (hasLocation) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 14,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                customer.fullAddress,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      
-                      // Contact info (if available)
-                      if (customer.contactName?.isNotEmpty == true || 
-                          customer.telNo?.isNotEmpty == true) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (customer.contactName?.isNotEmpty == true) ...[
-                              Icon(
-                                Icons.person_outline,
-                                size: 14,
-                                color: Colors.grey[500],
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  customer.contactName!,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                            if (customer.contactName?.isNotEmpty == true && 
-                                customer.telNo?.isNotEmpty == true) ...[
-                              const SizedBox(width: 12),
-                            ],
-                            if (customer.telNo?.isNotEmpty == true) ...[
-                              Icon(
-                                Icons.phone_outlined,
-                                size: 14,
-                                color: Colors.grey[500],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                customer.telNo!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ],
+                      // Address (single line)
+                      if (customer.fullAddress.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          customer.fullAddress,
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],
                   ),
                 ),
-                
-                // Arrow indicator
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
-                ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
               ],
             ),
           ),

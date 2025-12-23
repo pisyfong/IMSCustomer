@@ -62,6 +62,7 @@ class _InventoryPageState extends State<InventoryPage> {
   
   // Search and Filters
   String _currentSearchQuery = '';
+  String _scannedPluNo = ''; // Track the scanned PLU barcode for display
   InventoryFilter _currentFilter = InventoryFilter()..stockStatus = StockStatus.inStock;
   bool _showFilters = false;
   Map<String, List<String>> _filterOptions = {};
@@ -226,37 +227,55 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   // Handle PLU search submission (for Enter key and barcode scanner)
+  // Searches offline In_Stock_Plu table first, then falls back to server
   Future<void> _onPluSearchSubmitted(String pluNo) async {
     if (pluNo.trim().isEmpty) return;
 
+    final scannedPlu = pluNo.trim();
+    print('🔍 PLU SEARCH: Starting search for PLU: "$scannedPlu"');
+
     try {
-      final plu = await _pluService.getPlu(pluNo.trim());
-      if (plu != null && plu.skuNo != null) {
-        // Set the search to the SKU number
-        _currentSearchQuery = plu.skuNo.toString();
-        _resetAndLoadInventory();
-      } else {
-        // If no exact match, try partial search
-        final plus = await _pluService.searchPlus(pluNo.trim());
-        if (plus.isNotEmpty) {
-          // If we found matching PLUs, show a dialog to select one
+      // First, search the offline In_Stock_PLU table
+      print('🔍 PLU SEARCH: Searching offline In_Stock_PLU table...');
+      final offlineResults = await _pluService.searchInStockPluOffline(scannedPlu);
+      
+      if (offlineResults.isNotEmpty) {
+        print('✅ PLU SEARCH: Found ${offlineResults.length} matches in offline database');
+        
+        if (offlineResults.length == 1) {
+          // Single match - show popup directly (faster, no filter tag)
+          final skuNo = offlineResults[0].skuNo;
+          if (skuNo != null) {
+            print('✅ PLU SEARCH: Single match - SKU: $skuNo, showing popup directly');
+            // Show bottom sheet directly without filter tag or inventory reload
+            await _showItemDetailsForSku(skuNo);
+            return;
+          }
+        } else {
+          // Multiple matches - show selection dialog
           if (!mounted) return;
           
-          final selectedPlu = await showDialog<Plu>(
+          final selectedItem = await showDialog<int>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Select PLU'),
+              title: const Text('Select Item'),
               content: SizedBox(
                 width: double.maxFinite,
+                height: 400,
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: plus.length,
+                  itemCount: offlineResults.length,
                   itemBuilder: (context, index) {
-                    final plu = plus[index];
+                    final item = offlineResults[index];
+                    final skuNo = item.skuNo;
+                    final plu = item.pluNo;
+                    final desc = item.desc1 ?? 'Item $skuNo';
+                    final uom = item.uom ?? '';
+                    
                     return ListTile(
-                      title: Text('${plu.pluNo} - ${plu.desc1 ?? ''}'),
-                      subtitle: plu.skuNo != null ? Text('SKU: ${plu.skuNo}') : null,
-                      onTap: () => Navigator.pop(context, plu),
+                      title: Text(desc),
+                      subtitle: Text('SKU: $skuNo | PLU: $plu | UOM: $uom'),
+                      onTap: () => Navigator.pop(context, skuNo),
                     );
                   },
                 ),
@@ -270,20 +289,33 @@ class _InventoryPageState extends State<InventoryPage> {
             ),
           );
 
-          if (selectedPlu != null && selectedPlu.skuNo != null) {
-            _currentSearchQuery = selectedPlu.skuNo.toString();
-            _resetAndLoadInventory();
+          if (selectedItem != null) {
+            // Show bottom sheet directly without filter tag or inventory reload
+            await _showItemDetailsForSku(selectedItem);
           }
-        } else {
-          // If no PLU match, search directly by the entered text
-          _currentSearchQuery = pluNo.trim();
-          _resetAndLoadInventory();
+          return;
         }
       }
+      
+      // No offline match found - show dialog message
+      print('❌ PLU SEARCH: No PLU match found for barcode: "$scannedPlu"');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('PLU Not Found'),
+            content: Text('No item found for barcode:\n$scannedPlu'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
-      // On error, search directly by the entered text
-      _currentSearchQuery = pluNo.trim();
-      _resetAndLoadInventory();
+      print('❌ PLU SEARCH: Error during search: $e');
     }
   }
 
@@ -1259,14 +1291,24 @@ class _InventoryPageState extends State<InventoryPage> {
     _resetAndLoadInventory();
   }
 
+  void _clearScannedPlu() {
+    setState(() {
+      _scannedPluNo = '';
+      _pluController.clear();
+      _currentSearchQuery = '';
+    });
+    _resetAndLoadInventory();
+  }
+
   Future<void> _openBarcodeScanner() async {
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(builder: (context) => const BarcodeScannerPage()),
     );
     if (result != null && result.isNotEmpty) {
-      _pluController.text = result;
-      // The _onPluSearchChanged listener will handle the search automatically
+      print('🔍 BARCODE SCANNER: Scanned barcode: $result');
+      // Directly show popup, no text field update needed
+      await _onPluSearchSubmitted(result);
     }
   }
 
@@ -1475,13 +1517,26 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _buildFilterChips() {
-    if (!_currentFilter.hasActiveFilters) return const SizedBox.shrink();
+    final hasFilters = _currentFilter.hasActiveFilters || _scannedPluNo.isNotEmpty;
+    if (!hasFilters) return const SizedBox.shrink();
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Wrap(
         spacing: 8,
         children: [
+          // Scanned PLU Tag
+          if (_scannedPluNo.isNotEmpty)
+            FilterChip(
+              label: Text('PLU: $_scannedPluNo'),
+              selected: true,
+              onSelected: (_) => _clearScannedPlu(),
+              deleteIcon: const Icon(Icons.close, size: 16),
+              onDeleted: _clearScannedPlu,
+              selectedColor: Colors.green.shade100,
+              checkmarkColor: Colors.green.shade700,
+              avatar: const Icon(Icons.qr_code_scanner, size: 16),
+            ),
           // Stock Status
           if (_currentFilter.stockStatus != null)
             FilterChip(
@@ -1977,184 +2032,31 @@ class _InventoryPageState extends State<InventoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.grey.shade100,
       drawer: _buildSideFilterDrawer(),
-      body: Stack(
-        children: [
-          CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          // Header with Background Image
-          SliverAppBar(
-            expandedHeight: 100,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            automaticallyImplyLeading: false,
-            leading: BackButton(
-              color: Colors.white,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/login_bg.jpg'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Page title
-                        const Text(
-                          'Inventory',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        // Company info
-                        if (_selectedCompany != null) ...[
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.business,
-                                size: 12,
-                                color: Colors.white.withOpacity(0.9),
-                              ),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  _selectedCompany!['companyName'] ?? '',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 12,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              // Online status
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: OnlineStatusIcon(isOnline: _isOnline),
-              ),
-              // Filter button
-              IconButton(
-                onPressed: _toggleFilters,
-                icon: Icon(
-                  _showFilters ? Icons.filter_list_off : Icons.filter_list,
-                  color: Colors.white,
-                ),
-                tooltip: _showFilters ? 'Hide Filters' : 'Show Filters',
-              ),
-              // Grid/List toggle
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    _isGridView = !_isGridView;
-                  });
-                },
-                icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, color: Colors.white),
-                tooltip: _isGridView ? 'Switch to List View' : 'Switch to Grid View',
-              ),
-              // Cart button with badge
-              Stack(
-                children: [
-                  IconButton(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const CartPage()),
-                      );
-                      if (result == true) {
-                        _loadCartCount(); // Refresh cart count
-                      }
-                    },
-                    icon: const Icon(Icons.shopping_cart, color: Colors.white),
-                    tooltip: 'View Cart',
-                  ),
-                  if (_cartItemCount > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '$_cartItemCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              // Clear cache button
-              IconButton(
-                onPressed: _showClearCacheDialog,
-                icon: const Icon(Icons.cleaning_services, color: Colors.white),
-                tooltip: 'Clear Inventory Cache',
-              ),
-              // Refresh button
-              IconButton(
-                onPressed: _refreshInventory,
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                tooltip: 'Refresh Inventory',
-              ),
-            ],
-          ),
-
-          // Filter Panel (now above search bar)
-          SliverToBoxAdapter(
-            child: _buildFilterPanel(),
-          ),
-
-          // Search Bar with PLU input
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Compact Header
+            _buildCompactHeader(),
+            
+            // Filter Panel (collapsible)
+            _buildFilterPanel(),
+            
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: Row(
                 children: [
-                  // Regular search field
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 4,
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
                         ],
@@ -2163,249 +2065,331 @@ class _InventoryPageState extends State<InventoryPage> {
                         controller: _searchController,
                         textInputAction: TextInputAction.search,
                         onSubmitted: (_) => _executeSearch(),
+                        style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Search by name, SKU, brand... (Press Enter)',
-                          prefixIcon: IconButton(
-                            icon: const Icon(Icons.search, color: Colors.blue),
-                            onPressed: _executeSearch,
-                            tooltip: 'Search',
+                          hintText: 'Search products...',
+                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                          prefixIcon: GestureDetector(
+                            onTap: _executeSearch,
+                            child: Icon(Icons.search, color: Colors.grey.shade400, size: 20),
                           ),
                           suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  onPressed: _clearSearch,
-                                  icon: const Icon(Icons.clear, color: Colors.grey),
+                              ? GestureDetector(
+                                  onTap: _clearSearch,
+                                  child: Icon(Icons.close, color: Colors.grey.shade400, size: 18),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // PLU search with scanner
-                  Container(
-                    width: 180,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _pluController,
-                            decoration: InputDecoration(
-                              hintText: 'Search by PLU...',
-                              prefixIcon: const Icon(Icons.tag, color: Colors.blue, size: 20),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                            ),
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: _onPluSearchSubmitted,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: _openBarcodeScanner,
-                          icon: const Icon(Icons.qr_code_scanner, color: Colors.blue),
-                          tooltip: 'Scan Barcode',
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Secondary Grid/List toggle for discoverability
-                  Tooltip(
-                    message: _isGridView ? 'Switch to List View' : 'Switch to Grid View',
+                  const SizedBox(width: 8),
+                  // PLU/Barcode scanner button
+                  GestureDetector(
+                    onTap: _openBarcodeScanner,
                     child: Container(
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 4,
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: IconButton(
-                        icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, color: Colors.blue),
-                        onPressed: () {
-                          setState(() {
-                            _isGridView = !_isGridView;
-                          });
-                        },
+                      child: Icon(Icons.qr_code_scanner, color: Colors.blue.shade600, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Grid/List toggle
+                  GestureDetector(
+                    onTap: () => setState(() => _isGridView = !_isGridView),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _isGridView ? Icons.view_list : Icons.grid_view,
+                        color: Colors.blue.shade600,
+                        size: 20,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
 
-          // Active Filter Chips
-          SliverToBoxAdapter(
-            child: _buildFilterChips(),
-          ),
+            // Active Filter Chips
+            _buildFilterChips(),
 
-
-
-          // Error Message
-          if (_errorMessage.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+            // Error Message
+            if (_errorMessage.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade600),
+                      Icon(Icons.error_outline, color: Colors.red.shade600, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage,
-                          style: TextStyle(color: Colors.red.shade700),
+                          style: TextStyle(color: Colors.red.shade700, fontSize: 12),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
 
-          // Loading Indicator
-          if (_isLoading)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Center(
-                  child: CircularProgressIndicator(),
+            // Inventory Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _inventoryItems.isEmpty && _errorMessage.isEmpty
+                      ? _buildEmptyState()
+                      : _isGridView
+                          ? _buildGridView()
+                          : _buildListView(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.arrow_back, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Inventory',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
+                if (_selectedCompany != null)
+                  Text(
+                    _selectedCompany!['companyName'] ?? '',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          // Online status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isOnline ? Colors.green.shade50 : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isOnline ? Colors.green : Colors.orange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Filter button
+          GestureDetector(
+            onTap: _toggleFilters,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _showFilters ? Colors.blue.shade50 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.filter_list,
+                size: 18,
+                color: _showFilters ? Colors.blue.shade600 : Colors.grey.shade700,
               ),
             ),
-
-          // Inventory items (Grid/List toggle)
-          if (!_isLoading && _inventoryItems.isNotEmpty)
-            (_isGridView
-                ? SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.72,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = _inventoryItems[index];
-                        return _buildInventorySquareCard(item);
-                      },
-                      childCount: _inventoryItems.length,
-                    ),
-                  )
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = _inventoryItems[index];
-                        return _buildInventoryListItem(item);
-                      },
-                      childCount: _inventoryItems.length,
-                    ),
-                  )),
-
-          // No Results Message
-          if (!_isLoading && _inventoryItems.isEmpty && _errorMessage.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 64,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _currentSearchQuery.isEmpty
-                          ? 'No inventory items found'
-                          : 'No items match your search',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (_currentSearchQuery.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Try adjusting your search terms',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
+          ),
+          const SizedBox(width: 8),
+          // Cart button with badge
+          GestureDetector(
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CartPage()),
+              );
+              if (result == true) {
+                _loadCartCount();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(Icons.shopping_cart, size: 18, color: Colors.blue.shade600),
+                  if (_cartItemCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$_cartItemCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
                         ),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
-
-          // Load More Indicator
-          if (_isLoadingMore)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            ),
-
-          // Bottom padding
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 16),
           ),
-        ],
-      ),
-          // Invisible gesture detector for left edge swipe
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 30,
-            child: GestureDetector(
-              onPanEnd: (details) {
-                if (details.velocity.pixelsPerSecond.dx > 300) {
-                  _scaffoldKey.currentState?.openDrawer();
-                }
-              },
-              child: Container(color: Colors.transparent),
+          const SizedBox(width: 8),
+          // Refresh button
+          GestureDetector(
+            onTap: _refreshInventory,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.refresh, size: 18, color: Colors.grey.shade700),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.shade400),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _currentSearchQuery.isEmpty ? 'No inventory items' : 'No items match your search',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+          ),
+          if (_currentSearchQuery.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Try adjusting your search',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 0.75, // Card uses Expanded so any ratio works without overflow
+      ),
+      itemCount: _inventoryItems.length + (_isLoadingMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= _inventoryItems.length) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return _buildInventorySquareCard(_inventoryItems[index]);
+      },
+    );
+  }
+
+  Widget _buildListView() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(12),
+      itemCount: _inventoryItems.length + (_isLoadingMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= _inventoryItems.length) {
+          return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+        }
+        return _buildInventoryListItem(_inventoryItems[index]);
+      },
     );
   }
 
@@ -2481,19 +2465,18 @@ class _InventoryPageState extends State<InventoryPage> {
   // Build individual inventory square card for grid layout
   Widget _buildInventorySquareCard(InventoryItem item) {
     return Card(
-      margin: EdgeInsets.zero, // Remove card margin to eliminate gaps
+      margin: EdgeInsets.zero,
       elevation: 1,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showInventoryDetails(item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // Image section: full-width square image
-            AspectRatio(
-              aspectRatio: 1.0,
+            // Image section: flexible height image
+            Expanded(
+              flex: 3,
               child: FutureBuilder<String?>(
                 future: _getWorkingUomForImage(
                   _selectedCompany?['companyCode'] is String
@@ -2503,7 +2486,6 @@ class _InventoryPageState extends State<InventoryPage> {
                 ),
                 builder: (context, snapshot) {
                   final uom = snapshot.data ?? item.uom;
-                  print('📷 GRID IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (working UOM method)');
                   return InventoryImageWidget(
                     companyCode: _selectedCompany?['companyCode'] is String
                         ? int.parse(_selectedCompany!['companyCode'])
@@ -2517,61 +2499,54 @@ class _InventoryPageState extends State<InventoryPage> {
                 },
               ),
             ),
-            // Details section: compact padding, no Expanded/Spacer to avoid overflow
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    item.displayName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+            // Details section: fixed content
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Product name
+                    Text(
+                      item.displayName,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'SKU: ${item.skuNo}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
+                    // SKU
+                    Text(
+                      'SKU: ${item.skuNo}',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Price
-                  Text(
-                    'RM ${(item.gstPrice ?? item.price ?? 0.0).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
+                    // Price and Stock row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'RM ${(item.gstPrice ?? item.price ?? 0.0).toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[50] : Colors.red[50],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${item.displayQtyOnHand}',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[700] : Colors.red[700],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Stock
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[50] : Colors.red[50],
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[200]! : Colors.red[200]!,
-                      ),
-                    ),
-                    child: Text(
-                      'Stock: ${item.displayQtyOnHand}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[700] : Colors.red[700],
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -2949,6 +2924,44 @@ class _InventoryPageState extends State<InventoryPage> {
         inventoryPageState: this,
       ),
     );
+  }
+
+  /// Show inventory details bottom sheet for a specific SKU number
+  Future<void> _showItemDetailsForSku(int skuNo) async {
+    if (!mounted) return;
+    
+    // Find the item in the loaded inventory list
+    InventoryItem? item;
+    try {
+      item = _inventoryItems.firstWhere((i) => i.skuNo == skuNo);
+    } catch (_) {
+      item = null; // Not found in list
+    }
+    
+    // If item not found in list, try to fetch from service
+    if (item == null) {
+      try {
+        final companyCode = int.tryParse(_selectedCompany?['companyCode']?.toString() ?? '0') ?? 0;
+        if (companyCode > 0) {
+          final items = await _inventoryService.getInventory(
+            companyCode: companyCode,
+            searchQuery: skuNo.toString(),
+            limit: 1,
+            offset: 0,
+          );
+          if (items.isNotEmpty) {
+            item = items.first;
+          }
+        }
+      } catch (e) {
+        print('❌ Error fetching item for SKU $skuNo: $e');
+      }
+    }
+    
+    // Show bottom sheet if we have a valid item
+    if (item != null && item.skuNo != null && item.skuNo != 0 && mounted) {
+      _showInventoryDetails(item);
+    }
   }
 
   Widget _buildHistoryList(List<Map<String, dynamic>> data, String type) {

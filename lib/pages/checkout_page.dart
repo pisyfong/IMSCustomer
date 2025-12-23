@@ -20,6 +20,7 @@ import '../services/quotation_service.dart';
 import '../services/credit_term_service.dart';
 import '../services/offline_first_service.dart';
 import '../services/plu_service.dart';
+import '../services/draft_service.dart';
 import '../models/credit_term.dart';
 import '../main.dart'; // For isar instance
 
@@ -38,6 +39,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   late final CreditTermService _creditTermService;
   final CartService _cartService = CartService();
   final AuthService _authService = AuthService();
+  final DraftService _draftService = DraftService();
   
   Map<String, dynamic>? _selectedCustomer;
   List<Customer> _customers = [];
@@ -50,6 +52,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   CreditTerm? _selectedCreditTerm;
   bool _isLoadingCreditTerms = true;
   bool _isCreatingQuotation = false;
+  bool _isSavingDraft = false;
   
   double _totalAmount = 0.0;
   double _gstAmount = 0.0;
@@ -793,6 +796,93 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
+  Future<void> _saveAsDraft() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save as Draft'),
+        content: const Text('Save these items as a draft? You can edit and convert to quotation later.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            child: const Text('Save Draft', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSavingDraft = true);
+
+    try {
+      final selectedCompany = await _authService.getSelectedCompany();
+      final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String 
+          ? int.tryParse(companyCodeRaw) ?? 1 
+          : companyCodeRaw as int;
+
+      final user = _authService.currentUser;
+
+      // Create draft
+      final draft = await _draftService.createDraft(
+        companyCode: companyCode,
+        customerCode: _selectedCustomer?['code']?.toString(),
+        customerName: _selectedCustomer?['name']?.toString(),
+        salespersonCode: user?.loginName,
+        salespersonName: user?.fullName,
+        remarks: _remarksController.text,
+      );
+
+      // Add all cart items to draft
+      for (final cartItem in widget.cartItems) {
+        await _draftService.addDraftItem(
+          draftId: draft.id,
+          companyCode: companyCode,
+          skuNo: cartItem.skuNo,
+          uom: cartItem.uom ?? 'PCS',
+          quantity: cartItem.quantity.toDouble(),
+          unitPrice: cartItem.gstPrice ?? cartItem.unitPrice ?? 0,
+          pluNo: cartItem.pluNo,
+          description: cartItem.displayDescription,
+          remark: cartItem.remarks,
+        );
+      }
+
+      // Clear cart after saving draft
+      await _cartService.clearCart();
+
+      setState(() => _isSavingDraft = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Draft saved with ${widget.cartItems.length} items'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+
+        // Navigate back to previous page
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      setState(() => _isSavingDraft = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving draft: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _completeCheckout() async {
     // If no customer is selected, use a default customer or show error
     if (_selectedCustomer == null) {
@@ -885,350 +975,538 @@ class _CheckoutPageState extends State<CheckoutPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Checkout'),
-        backgroundColor: Colors.green.shade600,
-        foregroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade100,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Compact Header
+            _buildCompactHeader(),
+            
+            // Main Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Customer Card (Compact)
+                    _buildCustomerCard(),
+                    const SizedBox(height: 8),
+                    
+                    // Order Items (Compact List)
+                    _buildOrderItemsCard(),
+                    const SizedBox(height: 8),
+                    
+                    // Payment & Remarks Row
+                    _buildPaymentRemarksRow(),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Modern Bottom Bar
+            _buildModernBottomBar(),
+          ],
+        ),
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildCompactHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Customer Selection
-                  _buildCustomerSection(),
-                  const SizedBox(height: 20),
-                  
-                  // Order Summary
-                  _buildOrderSummary(),
-                  const SizedBox(height: 20),
-                  
-                  // Credit Term
-                  _buildCreditTermSection(),
-                  const SizedBox(height: 20),
-                  
-                  // Remarks
-                  _buildRemarksSection(),
-                ],
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.arrow_back, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Checkout',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          
-          // Bottom Actions
-          _buildBottomActions(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shopping_cart, size: 14, color: Colors.green.shade700),
+                const SizedBox(width: 4),
+                Text(
+                  '${widget.cartItems.length} items',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCustomerSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Customer',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            
-            // Customer selection removed - customer is pre-selected from previous screen
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.blue.shade600, size: 16),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Customer is pre-selected from previous screen',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Selected Customer Display
-            if (_selectedCustomer != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.person, color: Colors.blue.shade600),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Customer: ${_selectedCustomer!['displayName'] ?? 'N/A'}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    if (_selectedCustomer!['fullAddress']?.isNotEmpty ?? false)
-                      Text(_selectedCustomer!['fullAddress']!),
-                    Text('Email: ${_selectedCustomer?['email'] ?? 'N/A'}'),
-                    Text('Phone: ${_selectedCustomer?['telNo'] ?? 'N/A'}'),
-                    const SizedBox(height: 12),
-                    // Customer PLU Toggle
-                    Row(
-                      children: [
-                        Icon(Icons.qr_code, color: Colors.blue.shade600, size: 20),
-                        const SizedBox(width: 8),
-                        const Text('Use Customer PLU:', style: TextStyle(fontWeight: FontWeight.w500)),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: _useCustomerPlu,
-                          onChanged: (value) {
-                            setState(() {
-                              _useCustomerPlu = value;
-                            });
-                          },
-                          activeColor: Colors.blue.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _useCustomerPlu ? 'ON' : 'OFF',
-                          style: TextStyle(
-                            color: _useCustomerPlu ? Colors.blue.shade600 : Colors.grey,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange.shade600),
-                    const SizedBox(width: 8),
-                    const Text('No customer selected'),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
+  Widget _buildCustomerCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildOrderSummary() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Order Summary',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            
-            ...widget.cartItems.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${item.skuNo} - ${item.displayDescription}',
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          '${item.quantity} x ${item.displayGstPrice}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    item.displayGstSubtotal,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            )).toList(),
-            
-            const Divider(),
-            
-            // Grand Total (GST Inclusive)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: _selectedCustomer != null
+          ? Row(
               children: [
-                const Text('Total (GST Inclusive):', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('RM ${_totalAmount.toStringAsFixed(2)}', 
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCreditTermSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Payment Terms',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            if (_isLoadingCreditTerms)
-              const Center(child: CircularProgressIndicator())
-            else if (_creditTerms.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.person, color: Colors.blue.shade600, size: 22),
                 ),
-                child: Row(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedCustomer!['displayName'] ?? 'N/A',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _selectedCustomer!['code'] ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Customer PLU Toggle (Compact)
+                Column(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Credit terms unavailable offline. Using default: 30 days',
-                        style: TextStyle(color: Colors.orange.shade900),
+                    Text(
+                      'PLU',
+                      style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                    ),
+                    Transform.scale(
+                      scale: 0.8,
+                      child: Switch(
+                        value: _useCustomerPlu,
+                        onChanged: (value) => setState(() => _useCustomerPlu = value),
+                        activeColor: Colors.blue.shade600,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     ),
                   ],
                 ),
-              )
-            else
-              DropdownButtonFormField<CreditTerm>(
-                value: _selectedCreditTerm,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Select Payment Term',
-                  prefixIcon: Icon(Icons.calendar_today),
+              ],
+            )
+          : Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange.shade600, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'No customer selected',
+                  style: TextStyle(color: Colors.orange.shade700, fontSize: 13),
                 ),
-                items: _creditTerms.map((term) {
-                  return DropdownMenuItem<CreditTerm>(
-                    value: term,
-                    child: Text(term.displayFull),
-                  );
-                }).toList(),
-                onChanged: (CreditTerm? newValue) {
-                  setState(() {
-                    _selectedCreditTerm = newValue;
-                  });
-                },
-              ),
-          ],
-        ),
-      ),
+              ],
+            ),
     );
   }
 
-  Widget _buildRemarksSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Remarks (Optional)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _remarksController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Enter any additional notes or remarks...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomActions() {
+  Widget _buildOrderItemsCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: Row(
+              children: [
+                Icon(Icons.receipt_long, size: 18, color: Colors.grey.shade700),
+                const SizedBox(width: 8),
+                const Text(
+                  'Order Items',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Compact Item List
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: widget.cartItems.length,
+            separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
+            itemBuilder: (context, index) {
+              final item = widget.cartItems[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    // Quantity Badge
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${item.quantity.toInt()}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Item Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.displayDescription ?? 'Item ${item.skuNo}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${item.displayUom} @ ${item.displayGstPrice}',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Amount
+                    Text(
+                      item.displayGstSubtotal,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentRemarksRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Payment Terms (Compact)
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Payment',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_isLoadingCreditTerms)
+                  const SizedBox(
+                    height: 36,
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                else if (_creditTerms.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '30 Days (Default)',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<CreditTerm>(
+                        value: _selectedCreditTerm,
+                        isExpanded: true,
+                        isDense: true,
+                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                        items: _creditTerms.map((term) {
+                          return DropdownMenuItem<CreditTerm>(
+                            value: term,
+                            child: Text(term.displayDescription, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (value) => setState(() => _selectedCreditTerm = value),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Remarks (Compact)
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.note_alt_outlined, size: 16, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Remarks',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _remarksController,
+                  maxLines: 2,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: InputDecoration(
+                    hintText: 'Add notes...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.blue.shade400),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModernBottomBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: Row(
         children: [
+          // Total Section
           Expanded(
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Back to Cart'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Total (GST Inc.)',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'RM ${_totalAmount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _isCreatingQuotation ? null : _completeCheckout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey,
+          // Action Buttons
+          Row(
+            children: [
+              // Back Button (Icon only)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  color: Colors.grey.shade700,
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                ),
               ),
-              child: _isCreatingQuotation
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        SizedBox(
+              const SizedBox(width: 10),
+              // Save Draft Button
+              SizedBox(
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: (_isSavingDraft || _isCreatingQuotation) ? null : _saveAsDraft,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade400,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  icon: _isSavingDraft
+                      ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
-                        ),
-                        SizedBox(width: 8),
-                        Text('Creating...'),
-                      ],
-                    )
-                  : const Text('Create Quotation'),
-            ),
+                        )
+                      : const Icon(Icons.drafts_outlined, size: 18),
+                  label: Text(
+                    _isSavingDraft ? 'Saving...' : 'Draft',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Create Quotation Button
+              SizedBox(
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: (_isCreatingQuotation || _isSavingDraft) ? null : _completeCheckout,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade400,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  icon: _isCreatingQuotation
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(
+                    _isCreatingQuotation ? 'Creating...' : 'Quote',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

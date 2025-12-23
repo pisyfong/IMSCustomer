@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/plu.dart';
 import '../models/customer_plu.dart';
+import '../models/in_stock_plu.dart';
 import 'auth_service.dart';
 import 'signalr_service.dart';
 import '../config/app_config.dart';
@@ -12,6 +13,9 @@ class PluService {
   final Isar _isar;
   final AuthService _authService = AuthService();
   final SignalRService _signalRService = SignalRService();
+  
+  // Track last sync time for In_Stock_PLU
+  DateTime? _lastInStockPluSync;
 
   PluService(this._isar);
 
@@ -56,7 +60,7 @@ class PluService {
     }
   }
 
-  // Search PLUs by partial PLU number
+  // Search PLUs by partial PLU number (local database)
   Future<List<Plu>> searchPlus(String query) async {
     try {
       final companyCode = await _getCurrentCompanyCode();
@@ -68,6 +72,69 @@ class PluService {
           .findAll();
     } catch (e) {
       print('Error searching PLUS: $e');
+      return [];
+    }
+  }
+
+  /// Search inventory by PLU number via server's In_Stock_Plu table
+  /// Returns list of matching SKUs with inventory details
+  /// Multiple PLUs can be assigned to 1 SKU, so this handles that case
+  Future<List<Map<String, dynamic>>> searchByPluFromServer(String pluNo) async {
+    try {
+      final companyCode = await _getCurrentCompanyCode();
+      print('🔍 PLU SERVICE: Searching In_Stock_Plu for PLU: $pluNo in company: $companyCode');
+      print('🔍 PLU SERVICE: SignalR connected: ${_signalRService.isConnected}');
+      
+      // Try SignalR first if connected
+      if (_signalRService.isConnected) {
+        try {
+          print('📡 PLU SERVICE: Using SignalR searchByPlu...');
+          final response = await _signalRService.invoke('searchByPlu', [companyCode, pluNo]);
+          print('🔍 PLU SERVICE: SignalR searchByPlu response type: ${response?.runtimeType}');
+          print('🔍 PLU SERVICE: SignalR searchByPlu response: $response');
+          
+          if (response is List) {
+            print('✅ PLU SERVICE: Found ${response.length} SKUs matching PLU $pluNo');
+            final results = response.map((item) {
+              if (item is Map) {
+                return Map<String, dynamic>.from(item);
+              }
+              return <String, dynamic>{};
+            }).where((m) => m.isNotEmpty).toList();
+            print('✅ PLU SERVICE: Converted ${results.length} results');
+            return results;
+          } else if (response != null) {
+            print('⚠️ PLU SERVICE: Unexpected response type: ${response.runtimeType}');
+          }
+        } catch (e) {
+          print('⚠️ PLU SERVICE: SignalR searchByPlu failed: $e');
+        }
+      } else {
+        print('⚠️ PLU SERVICE: SignalR not connected, skipping to HTTP fallback');
+      }
+      
+      // HTTP Fallback - call REST API endpoint
+      print('🌐 PLU SERVICE: Using HTTP fallback for searchByPlu...');
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/plu/search?companyCode=$companyCode&pluNo=${Uri.encodeComponent(pluNo)}');
+      print('📡 PLU SERVICE: GET $url');
+      
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        print('✅ PLU SERVICE: HTTP found ${data.length} SKUs matching PLU $pluNo');
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        print('❌ PLU SERVICE: HTTP error ${response.statusCode}: ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ PLU SERVICE: Error searching by PLU from server: $e');
       return [];
     }
   }
@@ -324,5 +391,160 @@ class PluService {
     return company['companyCode'] is int 
         ? company['companyCode'] as int 
         : int.tryParse(company['companyCode'].toString()) ?? 1;
+  }
+
+  // ============== In_Stock_PLU Offline Sync Methods ==============
+
+  /// Sync In_Stock_PLU data from server to local database
+  Future<void> syncInStockPlu() async {
+    try {
+      final companyCode = await _getCurrentCompanyCode();
+      print('🔄 PLU SERVICE: Syncing In_Stock_PLU for company: $companyCode');
+      
+      // Try SignalR first
+      if (_signalRService.isConnected) {
+        try {
+          print('📡 PLU SERVICE: Using SignalR getInStockPlu...');
+          final response = await _signalRService.invoke('getInStockPlu', [companyCode]);
+          
+          if (response is List) {
+            print('✅ PLU SERVICE: Received ${response.length} In_Stock_PLU records from server');
+            await _saveInStockPluToLocal(response, companyCode);
+            _lastInStockPluSync = DateTime.now();
+            return;
+          }
+        } catch (e) {
+          print('⚠️ PLU SERVICE: SignalR getInStockPlu failed: $e');
+        }
+      }
+      
+      // HTTP Fallback
+      print('🌐 PLU SERVICE: Using HTTP fallback for getInStockPlu...');
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/in-stock-plu?companyCode=$companyCode');
+      
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        print('✅ PLU SERVICE: HTTP received ${data.length} In_Stock_PLU records');
+        await _saveInStockPluToLocal(data, companyCode);
+        _lastInStockPluSync = DateTime.now();
+      } else {
+        print('❌ PLU SERVICE: HTTP error ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ PLU SERVICE: Error syncing In_Stock_PLU: $e');
+    }
+  }
+
+  /// Save In_Stock_PLU records to local Isar database
+  Future<void> _saveInStockPluToLocal(List<dynamic> records, int companyCode) async {
+    try {
+      final pluList = records.map((item) {
+        final map = item is Map<String, dynamic> 
+            ? item 
+            : Map<String, dynamic>.from(item as Map);
+        return InStockPlu.fromMap(map);
+      }).where((plu) => plu.companyCode == companyCode).toList();
+
+      print('🔄 PLU SERVICE: Saving ${pluList.length} In_Stock_PLU records to local database');
+
+      await _isar.writeTxn(() async {
+        // Delete existing records for this company
+        await _isar.inStockPlus
+            .where()
+            .companyCodeEqualTo(companyCode)
+            .deleteAll();
+        
+        // Save new records
+        await _isar.inStockPlus.putAll(pluList);
+      });
+
+      print('✅ PLU SERVICE: Successfully saved ${pluList.length} In_Stock_PLU records');
+    } catch (e) {
+      print('❌ PLU SERVICE: Error saving In_Stock_PLU to local: $e');
+    }
+  }
+
+  /// Search In_Stock_PLU by PLU number (offline - local database)
+  /// Returns list of matching InStockPlu records (exact match only)
+  Future<List<InStockPlu>> searchInStockPluOffline(String pluNo) async {
+    try {
+      final companyCode = await _getCurrentCompanyCode();
+      print('🔍 PLU SERVICE: Searching offline In_Stock_PLU for exact match: $pluNo in company: $companyCode');
+      
+      // Exact match only - no partial/similar matches
+      final results = await _isar.inStockPlus
+          .where()
+          .companyCodeEqualTo(companyCode)
+          .filter()
+          .pluNoEqualTo(pluNo)
+          .findAll();
+      
+      print('✅ PLU SERVICE: Found ${results.length} exact matches for PLU: $pluNo');
+      return results;
+    } catch (e) {
+      print('❌ PLU SERVICE: Error searching offline In_Stock_PLU: $e');
+      return [];
+    }
+  }
+
+  /// Get SKU number from PLU barcode (offline)
+  /// Returns the SKU number if found, null otherwise
+  Future<int?> getSkuFromPluOffline(String pluNo) async {
+    try {
+      final results = await searchInStockPluOffline(pluNo);
+      if (results.isNotEmpty) {
+        // Return the first match's SKU (prefer default PLU if available)
+        final defaultPlu = results.where((p) => p.isDefault).firstOrNull;
+        return defaultPlu?.skuNo ?? results.first.skuNo;
+      }
+      return null;
+    } catch (e) {
+      print('❌ PLU SERVICE: Error getting SKU from PLU offline: $e');
+      return null;
+    }
+  }
+
+  /// Get count of In_Stock_PLU records in local database
+  Future<int> getInStockPluCount() async {
+    try {
+      final companyCode = await _getCurrentCompanyCode();
+      return await _isar.inStockPlus
+          .where()
+          .companyCodeEqualTo(companyCode)
+          .count();
+    } catch (e) {
+      print('❌ PLU SERVICE: Error getting In_Stock_PLU count: $e');
+      return 0;
+    }
+  }
+
+  /// Check if In_Stock_PLU sync is needed
+  bool needsInStockPluSync() {
+    if (_lastInStockPluSync == null) return true;
+    // Re-sync if last sync was more than 1 hour ago
+    return DateTime.now().difference(_lastInStockPluSync!).inHours >= 1;
+  }
+
+  /// Clear all In_Stock_PLU records for current company
+  Future<void> clearInStockPlu() async {
+    try {
+      final companyCode = await _getCurrentCompanyCode();
+      await _isar.writeTxn(() async {
+        await _isar.inStockPlus
+            .where()
+            .companyCodeEqualTo(companyCode)
+            .deleteAll();
+      });
+      print('✅ PLU SERVICE: Cleared In_Stock_PLU for company $companyCode');
+    } catch (e) {
+      print('❌ PLU SERVICE: Error clearing In_Stock_PLU: $e');
+    }
   }
 }

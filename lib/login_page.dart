@@ -100,138 +100,172 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/login_bg.jpg',
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            ),
-          ),
-          Positioned.fill(
+      backgroundColor: Colors.grey.shade100,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Container(
-              color: Colors.black.withOpacity(0.45), // dark overlay for readability
-            ),
-          ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Card(
-                elevation: 7,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: Colors.white.withOpacity(0.95),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 30.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GestureDetector(
-                        onLongPress: () async {
-                          // DEV/Support: reset activation and navigate to ActivationPage
-                          try {
-                            await ActivationService().resetActivation();
-                            if (mounted) {
-                              Navigator.of(context).pushReplacementNamed('/activate');
-                            }
-                          } catch (_) {}
-                        },
+              constraints: const BoxConstraints(maxWidth: 360),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Logo
+                    GestureDetector(
+                      onLongPress: () async {
+                        try {
+                          await ActivationService().resetActivation();
+                          if (mounted) {
+                            Navigator.of(context).pushReplacementNamed('/activate');
+                          }
+                        } catch (_) {}
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: Image.asset(
                           'assets/images/ims.png',
-                          width: 56,
-                          height: 56,
+                          width: 48,
+                          height: 48,
                           fit: BoxFit.contain,
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      Text('IMS Customer',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[900],
-                          letterSpacing: 1.1,
-                        ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'IMS Customer',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
-                      const SizedBox(height: 4),
-                      Text('Sign in to continue',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sign in to continue',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 24),
+                    // Username field
+                    TextField(
+                      controller: _usernameController,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Username',
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
+                        prefixIcon: Icon(Icons.person_outline, color: Colors.grey.shade400, size: 20),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.red.shade300, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                       ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline, color: Colors.redAccent.shade100, size: 20),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.redAccent, width: 2),
-                            borderRadius: BorderRadius.circular(12),
+                    ),
+                    const SizedBox(height: 12),
+                    // Password field
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscureText,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Password',
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
+                        prefixIcon: Icon(Icons.lock_outline, color: Colors.grey.shade400, size: 20),
+                        suffixIcon: GestureDetector(
+                          onTap: () => setState(() => _obscureText = !_obscureText),
+                          child: Icon(
+                            _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            color: Colors.grey.shade400,
+                            size: 20,
                           ),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                         ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.red.shade300, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                       ),
-                      const SizedBox(height: 18),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscureText,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline, color: Colors.redAccent.shade100, size: 20),
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off, color: Colors.redAccent, size: 20),
-                            onPressed: () {
-                              setState(() {
-                                _obscureText = !_obscureText;
-                              });
-                            },
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.redAccent, width: 2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Text(_error!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 13)),
-                        ),
-                      SizedBox(
+                    ),
+                    const SizedBox(height: 16),
+                    // Error message
+                    if (_error != null)
+                      Container(
                         width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 2,
-                            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Login'),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red.shade600, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    // Login button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

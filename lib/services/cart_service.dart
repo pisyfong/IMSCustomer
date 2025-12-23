@@ -136,6 +136,27 @@ class CartService {
     }
   }
 
+  // Update item remarks
+  Future<void> updateRemarks(int cartItemId, String newRemarks) async {
+    try {
+      final existingItem = await isar.cartItems.get(cartItemId);
+      if (existingItem == null) {
+        print('❌ CART ERROR: Item with ID $cartItemId not found');
+        throw Exception('Cart item not found');
+      }
+      
+      await isar.writeTxn(() async {
+        existingItem.remarks = newRemarks.isEmpty ? null : newRemarks;
+        await isar.cartItems.put(existingItem);
+      });
+      
+      print('📦 CART: Updated remarks for item ID $cartItemId');
+    } catch (e) {
+      print('❌ CART ERROR: Failed to update remarks: $e');
+      throw Exception('Failed to update remarks: $e');
+    }
+  }
+
   // Remove item from cart
   Future<void> removeFromCart(int cartItemId) async {
     try {

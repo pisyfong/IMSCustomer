@@ -142,15 +142,15 @@ class QuotationService {
           quotePreLabel: quotation.quotePreLabel,
         );
         
-        // Prepare complete quotation data with items
-        final quotationData = {
-          'quotation': quotation.toJson(),
-          'items': quotationItems.map((item) => item.toJson()).toList(),
-        };
+        // Prepare quotation data - flatten structure (Node.js expects fields directly in req.body)
+        final quotationData = quotation.toJson();
         
         // Send to server via HTTP API
         final apiUrl = '${AppConfig.apiBaseUrl}/api/quotations';
+        final jsonBody = jsonEncode(quotationData);
         print('📤 Sending quotation ${quotation.quotePreLabel} with ${quotationItems.length} items to: $apiUrl');
+        print('📦 Request body (first 500 chars): ${jsonBody.length > 500 ? jsonBody.substring(0, 500) : jsonBody}');
+        print('📦 Body length: ${jsonBody.length} chars, Company_Code: ${quotationData['Company_Code']}');
         
         final response = await http.post(
           Uri.parse(apiUrl),
@@ -159,6 +159,29 @@ class QuotationService {
         );
 
         if (response.statusCode == 200) {
+          // Now sync the quotation items
+          if (quotationItems.isNotEmpty) {
+            print('📤 Syncing ${quotationItems.length} items for quotation ${quotation.quotePreLabel}');
+            
+            final itemsApiUrl = '${AppConfig.apiBaseUrl}/api/quotation-items';
+            final itemsData = {
+              'items': quotationItems.map((item) => item.toJson()).toList(),
+            };
+            
+            final itemsResponse = await http.post(
+              Uri.parse(itemsApiUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(itemsData),
+            );
+            
+            if (itemsResponse.statusCode == 200) {
+              print('✅ QUOTATION SYNC: Synced ${quotationItems.length} items for ${quotation.quotePreLabel}');
+            } else {
+              print('⚠️ QUOTATION SYNC: Failed to sync items for ${quotation.quotePreLabel}: ${itemsResponse.statusCode} - ${itemsResponse.body}');
+              // Don't fail the whole sync if items fail - quotation header is already saved
+            }
+          }
+          
           // Mark as synced
           quotation.isSynced = true;
           quotation.lastSyncAttempt = DateTime.now();
@@ -298,6 +321,210 @@ class QuotationService {
     } catch (e) {
       print('❌ QUOTATION ITEMS: Error getting items: $e');
       return [];
+    }
+  }
+
+  /// Update a quotation item
+  Future<void> updateQuotationItem(QuoteItem item) async {
+    try {
+      await isar.writeTxn(() async {
+        await isar.quoteItems.put(item);
+      });
+      
+      // Mark the parent quotation as unsynced
+      final quotation = await isar.quotations
+          .filter()
+          .companyCodeEqualTo(item.companyCode)
+          .quotePreLabelEqualTo(item.quotePreLabel)
+          .findFirst();
+      
+      if (quotation != null) {
+        quotation.isSynced = false;
+        quotation.lastWriteTimeStamp = DateTime.now();
+        await isar.writeTxn(() async {
+          await isar.quotations.put(quotation);
+        });
+      }
+      
+      print('📝 QUOTATION ITEM: Updated item ${item.sequenceNo} for ${item.quotePreLabel}');
+    } catch (e) {
+      print('❌ QUOTATION ITEM: Error updating item: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a quotation item
+  Future<void> deleteQuotationItem(QuoteItem item) async {
+    try {
+      await isar.writeTxn(() async {
+        await isar.quoteItems.delete(item.id);
+      });
+      
+      // Mark the parent quotation as unsynced and update totals
+      final quotation = await isar.quotations
+          .filter()
+          .companyCodeEqualTo(item.companyCode)
+          .quotePreLabelEqualTo(item.quotePreLabel)
+          .findFirst();
+      
+      if (quotation != null) {
+        quotation.isSynced = false;
+        quotation.lastWriteTimeStamp = DateTime.now();
+        
+        // Recalculate totals
+        final remainingItems = await getQuotationItems(
+          companyCode: item.companyCode,
+          quotePreLabel: item.quotePreLabel,
+        );
+        
+        double totalQty = 0;
+        double netAmount = 0;
+        for (final i in remainingItems) {
+          totalQty += i.quoteQuantity ?? 0;
+          netAmount += i.netAmount ?? 0;
+        }
+        
+        quotation.totalQuoteQuantity = totalQty;
+        quotation.totalQuoteItem = remainingItems.length;
+        quotation.netAmount = netAmount;
+        quotation.grossAmount = netAmount;
+        
+        await isar.writeTxn(() async {
+          await isar.quotations.put(quotation);
+        });
+      }
+      
+      print('📝 QUOTATION ITEM: Deleted item ${item.sequenceNo} from ${item.quotePreLabel}');
+    } catch (e) {
+      print('❌ QUOTATION ITEM: Error deleting item: $e');
+      rethrow;
+    }
+  }
+
+  /// Add a new item to an existing quotation
+  Future<void> addQuotationItem({
+    required int companyCode,
+    required String quotePreLabel,
+    required int skuNo,
+    required String uom,
+    required double quantity,
+    required double unitPrice,
+    String? pluNo,
+    String? remark,
+  }) async {
+    try {
+      // Get existing items to determine next sequence number
+      final existingItems = await getQuotationItems(
+        companyCode: companyCode,
+        quotePreLabel: quotePreLabel,
+      );
+      
+      final nextSequence = existingItems.isEmpty 
+          ? 1 
+          : existingItems.map((i) => i.sequenceNo).reduce((a, b) => a > b ? a : b) + 1;
+      
+      final netAmount = quantity * unitPrice;
+      
+      final newItem = QuoteItem()
+        ..companyCode = companyCode
+        ..quotePreLabel = quotePreLabel
+        ..sequenceNo = nextSequence
+        ..skuNo = skuNo
+        ..uom = uom
+        ..quoteQuantity = quantity
+        ..unitPrice = unitPrice
+        ..netAmount = netAmount
+        ..pluNo = pluNo
+        ..remark = remark
+        ..status = 'A'
+        ..addedDate = DateTime.now();
+      
+      await isar.writeTxn(() async {
+        await isar.quoteItems.put(newItem);
+      });
+      
+      // Mark the parent quotation as unsynced and update totals
+      final quotation = await isar.quotations
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .quotePreLabelEqualTo(quotePreLabel)
+          .findFirst();
+      
+      if (quotation != null) {
+        quotation.isSynced = false;
+        quotation.lastWriteTimeStamp = DateTime.now();
+        
+        // Recalculate totals
+        final allItems = await getQuotationItems(
+          companyCode: companyCode,
+          quotePreLabel: quotePreLabel,
+        );
+        
+        double totalQty = 0;
+        double totalNetAmount = 0;
+        for (final i in allItems) {
+          totalQty += i.quoteQuantity ?? 0;
+          totalNetAmount += i.netAmount ?? 0;
+        }
+        
+        quotation.totalQuoteQuantity = totalQty;
+        quotation.totalQuoteItem = allItems.length;
+        quotation.netAmount = totalNetAmount;
+        quotation.grossAmount = totalNetAmount;
+        
+        await isar.writeTxn(() async {
+          await isar.quotations.put(quotation);
+        });
+      }
+      
+      print('📝 QUOTATION ITEM: Added new item SKU $skuNo to $quotePreLabel');
+    } catch (e) {
+      print('❌ QUOTATION ITEM: Error adding item: $e');
+      rethrow;
+    }
+  }
+
+  /// Recalculate and update quotation totals based on items
+  Future<void> recalculateQuotationTotals({
+    required int companyCode,
+    required String quotePreLabel,
+  }) async {
+    try {
+      final items = await getQuotationItems(
+        companyCode: companyCode,
+        quotePreLabel: quotePreLabel,
+      );
+      
+      double totalQty = 0;
+      double netAmount = 0;
+      for (final item in items) {
+        totalQty += item.quoteQuantity ?? 0;
+        netAmount += item.netAmount ?? 0;
+      }
+      
+      final quotation = await isar.quotations
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .quotePreLabelEqualTo(quotePreLabel)
+          .findFirst();
+      
+      if (quotation != null) {
+        quotation.totalQuoteQuantity = totalQty;
+        quotation.totalQuoteItem = items.length;
+        quotation.netAmount = netAmount;
+        quotation.grossAmount = netAmount;
+        quotation.isSynced = false;
+        quotation.lastWriteTimeStamp = DateTime.now();
+        
+        await isar.writeTxn(() async {
+          await isar.quotations.put(quotation);
+        });
+        
+        print('📝 QUOTATION: Recalculated totals for $quotePreLabel - ${items.length} items, RM $netAmount');
+      }
+    } catch (e) {
+      print('❌ QUOTATION: Error recalculating totals: $e');
+      rethrow;
     }
   }
 
@@ -624,7 +851,7 @@ class QuotationService {
           };
           
           // Send items to server via dedicated endpoint
-          final apiUrl = '${AppConfig.apiBaseUrl}/api/quotations/items';
+          final apiUrl = '${AppConfig.apiBaseUrl}/api/quotation-items';
           print('📤 Re-syncing ${quotationItems.length} items for quotation ${quotation.quotePreLabel}');
           
           final response = await http.post(

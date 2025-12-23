@@ -476,107 +476,68 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text('Sync & Storage'),
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: AnimatedBuilder(
-              animation: _rotationAnimation,
-              builder: (context, child) {
-                return Transform.rotate(
-                  angle: _rotationAnimation.value,
-                  child: Icon(
-                    Icons.refresh,
-                    color: _isSyncing ? Colors.white70 : Colors.white,
-                  ),
-                );
-              },
-            ),
-            onPressed: _isSyncing ? null : () async {
-              await _checkConnectionStatus();
-              await _loadCacheStats();
-            },
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _checkConnectionStatus();
-          await _loadCacheStats();
-          await _loadLastSyncTime();
-        },
-        child: CustomScrollView(
-          slivers: [
-            // Connection Status Header
-            SliverToBoxAdapter(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      theme.primaryColor,
-                      theme.primaryColor.withOpacity(0.8),
+      backgroundColor: Colors.grey.shade100,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Compact Header
+            _buildCompactHeader(),
+            
+            // Main Content
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await _checkConnectionStatus();
+                  await _loadCacheStats();
+                  await _loadLastSyncTime();
+                },
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Connection Status Card
+                      _buildConnectionStatus(),
+                      
+                      // Sync Progress (if syncing)
+                      if (_isSyncing) ...[
+                        const SizedBox(height: 8),
+                        _buildSyncProgress(),
+                      ],
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Quick Actions
+                      _buildSectionTitle('Quick Actions'),
+                      const SizedBox(height: 8),
+                      _buildActionButtons(),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Storage Overview
+                      _buildSectionTitle('Storage Overview'),
+                      const SizedBox(height: 8),
+                      _buildStorageOverview(),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Detailed Statistics
+                      _buildSectionTitle('Detailed Statistics'),
+                      const SizedBox(height: 8),
+                      _buildDetailedStats(),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Maintenance
+                      _buildSectionTitle('Maintenance'),
+                      const SizedBox(height: 8),
+                      _buildMaintenanceSection(),
+                      
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        _buildConnectionStatus(),
-                        const SizedBox(height: 16),
-                        if (_isSyncing) _buildSyncProgress(),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            
-            // Main Content
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Quick Actions
-                  _buildSectionTitle('Quick Actions'),
-                  const SizedBox(height: 12),
-                  _buildActionButtons(),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Storage Overview
-                  _buildSectionTitle('Storage Overview'),
-                  const SizedBox(height: 12),
-                  _buildStorageOverview(),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Detailed Statistics
-                  _buildSectionTitle('Detailed Statistics'),
-                  const SizedBox(height: 12),
-                  _buildDetailedStats(),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Maintenance
-                  _buildSectionTitle('Maintenance'),
-                  const SizedBox(height: 12),
-                  _buildMaintenanceSection(),
-                  
-                  const SizedBox(height: 80), // Bottom padding
-                ]),
               ),
             ),
           ],
@@ -584,80 +545,164 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       ),
     );
   }
+
+  Widget _buildCompactHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.arrow_back, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Sync & Storage',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          // Online status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isOnline ? Colors.green.shade50 : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isOnline ? Colors.green : Colors.orange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: _isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Refresh button
+          GestureDetector(
+            onTap: _isSyncing ? null : () async {
+              await _checkConnectionStatus();
+              await _loadCacheStats();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: AnimatedBuilder(
+                animation: _rotationAnimation,
+                builder: (context, child) {
+                  return Transform.rotate(
+                    angle: _isSyncing ? _rotationAnimation.value : 0,
+                    child: Icon(Icons.refresh, size: 18, color: Colors.blue.shade600),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   
   Widget _buildConnectionStatus() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 60,
-            height: 60,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: _isOnline ? Colors.green.shade50 : Colors.grey.shade100,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               _isOnline ? Icons.cloud_done : Icons.cloud_off,
-              size: 32,
+              size: 24,
               color: _isOnline ? Colors.green.shade600 : Colors.grey.shade600,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isOnline ? 'Online' : 'Offline Mode',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  _isOnline ? 'Connected' : 'Offline Mode',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 4),
                 Text(
                   'Last sync: ${_formatLastSync()}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade700,
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
-                if (_signalRConnected)
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'SignalR Connected',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
               ],
             ),
           ),
+          if (_signalRConnected)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 4),
+                  Text('SignalR', style: TextStyle(fontSize: 10, color: Colors.green.shade700)),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -667,7 +712,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -676,17 +721,15 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: _syncProgress > 0 ? _syncProgress : null,
-              minHeight: 6,
-              backgroundColor: Colors.grey.shade200,
+              minHeight: 4,
+              backgroundColor: Colors.blue.shade100,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             _syncStatus,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
           ),
         ],
       ),
@@ -694,12 +737,11 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   }
   
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
       ),
     );
   }
@@ -805,6 +847,12 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                 label: 'Sync Customer PLU',
                 color: Colors.indigo,
                 onPressed: _isSyncing ? null : _syncCustomerPLU,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.qr_code_scanner,
+                label: 'Sync Barcode PLU (In_Stock_PLU)',
+                color: Colors.deepOrange,
+                onPressed: _isSyncing ? null : _syncInStockPLU,
               ),
               _buildCompactActionButton(
                 icon: Icons.cloud_upload,
@@ -1695,6 +1743,43 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Customer PLU sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = 'Ready';
+      });
+    }
+  }
+
+  Future<void> _syncInStockPLU() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing In_Stock_PLU for barcode scanning...';
+    });
+    
+    try {
+      // Call the enhanced sync service method for In_Stock_PLU
+      await _syncService.syncInStockPlu();
+      
+      await _loadCacheStats();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Synced In_Stock_PLU for offline barcode scanning'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ In_Stock_PLU sync failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
