@@ -148,27 +148,37 @@ class QuoteService {
     }
   }
 
-  // Save quotes to local database with deduplication
+  // Save quotes to local database with upsert (insert or update)
+  // Uses quotePreLabel as unique key to avoid duplicates
   Future<void> saveQuotesToLocal(List<Quote> quotes) async {
     try {
+      int inserted = 0;
+      int updated = 0;
+      
       await isar.writeTxn(() async {
-        // Clear existing quotes for this company/customer to avoid duplicates
-        final companyCode = quotes.isNotEmpty ? quotes.first.companyCode : null;
-        final customerCode = quotes.isNotEmpty ? quotes.first.customer : null;
-        
-        if (companyCode != null && customerCode != null) {
-          await isar.quotes
+        for (final quote in quotes) {
+          if (quote.companyCode == null || quote.quotePreLabel == null) continue;
+          
+          // Check if quote already exists
+          final existing = await isar.quotes
               .filter()
-              .companyCodeEqualTo(companyCode)
+              .companyCodeEqualTo(quote.companyCode!)
               .and()
-              .customerEqualTo(customerCode)
-              .deleteAll();
+              .quotePreLabelEqualTo(quote.quotePreLabel)
+              .findFirst();
+          
+          if (existing != null) {
+            // Update existing - preserve Isar ID
+            quote.id = existing.id;
+            updated++;
+          } else {
+            inserted++;
+          }
+          
+          await isar.quotes.put(quote);
         }
-        
-        // Save new quotes
-        await isar.quotes.putAll(quotes);
       });
-      print('💾 QUOTE SERVICE: Saved ${quotes.length} quotes to local database (duplicates removed)');
+      print('💾 QUOTE SERVICE: Saved ${quotes.length} quotes (inserted: $inserted, updated: $updated)');
     } catch (e) {
       print('❌ QUOTE SERVICE SAVE ERROR: $e');
       throw Exception('Failed to save quotes to local database: $e');

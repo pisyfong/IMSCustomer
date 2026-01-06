@@ -709,26 +709,49 @@ class InventoryService {
     }
   }
 
-  // Save inventory items to local database
-  Future<void> saveInventoryToLocal(List<InventoryItem> items, {int? companyCode}) async {
+  // Save inventory items to local database with upsert (insert or update)
+  // Uses skuNo + companyCode as unique key to avoid duplicates
+  Future<void> saveInventoryToLocal(List<InventoryItem> items, {int? companyCode, bool fullReplace = false}) async {
     try {
-      print('💾 INVENTORY SERVICE: Saving ${items.length} items to local database...');
+      print('💾 INVENTORY SERVICE: Saving ${items.length} items to local database (fullReplace=$fullReplace)...');
+      
+      int inserted = 0;
+      int updated = 0;
       
       await isar.writeTxn(() async {
-        // If companyCode is provided, clear existing items for that company first
-        if (companyCode != null) {
+        // If fullReplace is true, delete all existing items for the company first (legacy behavior)
+        if (fullReplace && companyCode != null) {
           await isar.inventoryItems
               .filter()
               .companyCodeEqualTo(companyCode)
               .deleteAll();
-          print('💾 INVENTORY SERVICE: Cleared existing items for company $companyCode');
+          print('💾 INVENTORY SERVICE: Cleared existing items for company $companyCode (full replace)');
+          inserted = items.length;
+          await isar.inventoryItems.putAll(items);
+        } else {
+          // Upsert pattern: check each item and update if exists, insert if new
+          for (final item in items) {
+            final existing = await isar.inventoryItems
+                .filter()
+                .companyCodeEqualTo(item.companyCode)
+                .and()
+                .skuNoEqualTo(item.skuNo)
+                .findFirst();
+            
+            if (existing != null) {
+              // Update existing - preserve Isar ID
+              item.id = existing.id;
+              updated++;
+            } else {
+              inserted++;
+            }
+            
+            await isar.inventoryItems.put(item);
+          }
         }
-        
-        // Save new items
-        await isar.inventoryItems.putAll(items);
       });
 
-      print('💾 INVENTORY SERVICE: Successfully saved ${items.length} items to local database');
+      print('💾 INVENTORY SERVICE: Saved ${items.length} items (inserted: $inserted, updated: $updated)');
     } catch (e) {
       print('❌ INVENTORY SERVICE SAVE ERROR: $e');
       rethrow;
@@ -794,13 +817,21 @@ class InventoryService {
       
       // Apply search filter if provided
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchLower = searchQuery.toLowerCase();
+        // Split search query by spaces for wildcard matching
+        final searchTerms = searchQuery.toLowerCase().split(' ').where((term) => term.isNotEmpty).toList();
+        
         filteredItems = filteredItems.where((item) {
-          return (item.description?.toLowerCase().contains(searchLower) ?? false) ||
-                 (item.articleNo?.toLowerCase().contains(searchLower) ?? false) ||
-                 (item.articleDesc?.toLowerCase().contains(searchLower) ?? false) ||
-                 (item.brand?.toLowerCase().contains(searchLower) ?? false) ||
-                 item.skuNo.toString().contains(searchQuery);
+          // Combine all searchable fields into one string
+          final searchableText = [
+            item.description?.toLowerCase() ?? '',
+            item.articleNo?.toLowerCase() ?? '',
+            item.articleDesc?.toLowerCase() ?? '',
+            item.brand?.toLowerCase() ?? '',
+            item.skuNo.toString(),
+          ].join(' ');
+          
+          // Check if all search terms are present (wildcard matching like %A%BAT%PA%)
+          return searchTerms.every((term) => searchableText.contains(term));
         }).toList();
       }
 
@@ -1111,13 +1142,21 @@ class InventoryService {
       }
       
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchLower = searchQuery.toLowerCase();
+        // Split search query by spaces for wildcard matching
+        final searchTerms = searchQuery.toLowerCase().split(' ').where((term) => term.isNotEmpty).toList();
+        
         filteredItems = filteredItems.where((item) {
-          return (item.description?.toLowerCase().contains(searchLower) ?? false) ||
-                 (item.articleNo?.toLowerCase().contains(searchLower) ?? false) ||
-                 (item.articleDesc?.toLowerCase().contains(searchLower) ?? false) ||
-                 (item.brand?.toLowerCase().contains(searchLower) ?? false) ||
-                 item.skuNo.toString().contains(searchQuery);
+          // Combine all searchable fields into one string
+          final searchableText = [
+            item.description?.toLowerCase() ?? '',
+            item.articleNo?.toLowerCase() ?? '',
+            item.articleDesc?.toLowerCase() ?? '',
+            item.brand?.toLowerCase() ?? '',
+            item.skuNo.toString(),
+          ].join(' ');
+          
+          // Check if all search terms are present (wildcard matching like %A%BAT%PA%)
+          return searchTerms.every((term) => searchableText.contains(term));
         }).toList();
       }
       

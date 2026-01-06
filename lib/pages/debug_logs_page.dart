@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import '../services/quotation_service.dart';
 import '../services/signalr_service.dart';
+import '../services/data_integrity_service.dart';
 import '../models/quotation.dart';
 import '../models/quote_item.dart';
 import '../main.dart';
@@ -16,15 +17,25 @@ class DebugLogsPage extends StatefulWidget {
 
 class _DebugLogsPageState extends State<DebugLogsPage> {
   late QuotationService _quotationService;
+  final DataIntegrityService _integrityService = DataIntegrityService();
   Map<String, String> _logPaths = {};
   String _sqlScript = '';
   bool _isLoading = false;
+  IntegrityReport? _integrityReport;
+  String _integrityProgress = '';
 
   @override
   void initState() {
     super.initState();
     _quotationService = QuotationService(signalRService);
     _loadLogPaths();
+    
+    // Listen to integrity check progress
+    _integrityService.progressStream.listen((message) {
+      if (mounted) {
+        setState(() => _integrityProgress = message);
+      }
+    });
   }
 
   Future<void> _loadLogPaths() async {
@@ -298,6 +309,74 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
     }
   }
 
+  Future<void> _runIntegrityCheck() async {
+    setState(() {
+      _isLoading = true;
+      _integrityProgress = 'Starting integrity check...';
+      _integrityReport = null;
+    });
+    
+    try {
+      final report = await _integrityService.runFullIntegrityCheck();
+      setState(() {
+        _integrityReport = report;
+        _integrityProgress = '';
+      });
+      
+      if (report.allInSync) {
+        _showSuccess('All data is in sync!');
+      } else {
+        _showError('Found ${report.totalDiscrepancies} discrepancies');
+      }
+    } catch (e) {
+      _showError('Integrity check failed: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _forceResync() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Force Resync'),
+        content: const Text(
+          'This will clear local cached data and force a fresh sync from the server.\n\n'
+          'This may take some time and requires an internet connection.\n\n'
+          'Do you want to continue?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Force Resync', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _integrityService.forceResync(
+        companyCode: _integrityReport?.companyCode ?? 1,
+        syncInventory: true,
+        syncCustomers: true,
+        syncPlu: true,
+      );
+      _showSuccess('Local data cleared. Will resync on next access.');
+    } catch (e) {
+      _showError('Force resync failed: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     _showSuccess('$label copied to clipboard');
@@ -528,6 +607,146 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
                   
                   const SizedBox(height: 16),
                   
+                  // Data Integrity Check Section
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.verified_user, color: Colors.teal),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Data Integrity Check',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Compare local offline data with server to detect discrepancies',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Progress indicator
+                          if (_integrityProgress.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                children: [
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _integrityProgress,
+                                      style: const TextStyle(fontSize: 12, color: Colors.blue),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _isLoading ? null : _runIntegrityCheck,
+                                  icon: const Icon(Icons.fact_check),
+                                  label: const Text('Run Check'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: (_isLoading || _integrityReport == null) ? null : _forceResync,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Force Resync'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          // Integrity Report Results
+                          if (_integrityReport != null) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: _integrityReport!.allInSync 
+                                    ? Colors.green.shade50 
+                                    : Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _integrityReport!.allInSync 
+                                      ? Colors.green.shade300 
+                                      : Colors.orange.shade300,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _integrityReport!.allInSync 
+                                            ? Icons.check_circle 
+                                            : Icons.warning,
+                                        color: _integrityReport!.allInSync 
+                                            ? Colors.green 
+                                            : Colors.orange,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _integrityReport!.allInSync 
+                                            ? 'All Data In Sync' 
+                                            : '${_integrityReport!.totalDiscrepancies} Discrepancies Found',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: _integrityReport!.allInSync 
+                                              ? Colors.green.shade700 
+                                              : Colors.orange.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Company: ${_integrityReport!.companyCode} | Checked: ${_integrityReport!.reportTime.toString().split('.')[0]}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  
+                                  // Individual entity results
+                                  ..._integrityReport!.results.map((result) => _buildIntegrityResultRow(result)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Instructions Section
                   Card(
                     child: Padding(
@@ -548,7 +767,9 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
                             '2. Each quotation and its items are logged before database operations\n'
                             '3. Use "Generate SQL Script" to create recovery commands\n'
                             '4. Copy the SQL script and run it on your database if needed\n'
-                            '5. Use "Cleanup Old Logs" to remove files older than 30 days',
+                            '5. Use "Cleanup Old Logs" to remove files older than 30 days\n'
+                            '6. Use "Run Check" to compare local and server data\n'
+                            '7. Use "Force Resync" to clear local cache and refresh from server',
                             style: TextStyle(fontSize: 14),
                           ),
                         ],
@@ -558,6 +779,65 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
                 ],
               ),
             ),
+    );
+  }
+  
+  Widget _buildIntegrityResultRow(IntegrityCheckResult result) {
+    final isOk = result.isInSync;
+    final hasError = result.hasErrors;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasError 
+                    ? Icons.error_outline 
+                    : (isOk ? Icons.check_circle_outline : Icons.warning_amber),
+                size: 16,
+                color: hasError 
+                    ? Colors.red 
+                    : (isOk ? Colors.green : Colors.orange),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  result.entityType,
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                ),
+              ),
+              Text(
+                'Local: ${result.localCount}',
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Server: ${result.serverCount}',
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
+          if (hasError)
+            Padding(
+              padding: const EdgeInsets.only(left: 22, top: 2),
+              child: Text(
+                result.errorMessage ?? 'Unknown error',
+                style: const TextStyle(fontSize: 10, color: Colors.red),
+              ),
+            ),
+          if (!hasError && result.discrepancies.isNotEmpty)
+            ...result.discrepancies.map((d) => Padding(
+              padding: const EdgeInsets.only(left: 22, top: 2),
+              child: Text(
+                '• $d',
+                style: TextStyle(fontSize: 10, color: Colors.orange.shade700),
+              ),
+            )),
+        ],
+      ),
     );
   }
 

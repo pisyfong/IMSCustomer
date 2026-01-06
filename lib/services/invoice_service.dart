@@ -173,13 +173,35 @@ class InvoiceService {
     }
   }
 
-  /// Save invoices to local database
+  /// Save invoices to local database with upsert (insert or update)
+  /// Uses invoicePreLabel as unique key to avoid duplicates
   Future<void> saveInvoicesToLocal(List<Invoice> invoices) async {
     try {
+      int inserted = 0;
+      int updated = 0;
+      
       await isar.writeTxn(() async {
-        await isar.invoices.putAll(invoices);
+        for (final invoice in invoices) {
+          // Check if invoice already exists
+          final existing = await isar.invoices
+              .filter()
+              .companyCodeEqualTo(invoice.companyCode)
+              .and()
+              .invoicePreLabelEqualTo(invoice.invoicePreLabel)
+              .findFirst();
+          
+          if (existing != null) {
+            // Delete existing and insert new (Invoice has final fields)
+            await isar.invoices.delete(existing.id);
+            updated++;
+          } else {
+            inserted++;
+          }
+          
+          await isar.invoices.put(invoice);
+        }
       });
-      print('💾 INVOICE SERVICE: Saved ${invoices.length} invoices to local database');
+      print('💾 INVOICE SERVICE: Saved ${invoices.length} invoices (inserted: $inserted, updated: $updated)');
     } catch (e) {
       print('❌ INVOICE SERVICE: Error saving to local: $e');
     }

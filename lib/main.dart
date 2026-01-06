@@ -29,6 +29,7 @@ import 'models/department_lookup.dart';
 import 'models/customer_plu.dart';
 import 'models/in_stock_plu.dart';
 import 'models/draft_quotation.dart';
+import 'models/sync_metadata.dart';
 import 'services/auth_service.dart';
 import 'services/signalr_service.dart';
 import 'services/enhanced_sync_service.dart';
@@ -91,6 +92,7 @@ Future<void> initIsar() async {
       InStockPluSchema,
       DraftQuotationSchema,
       DraftQuotationItemSchema,
+      SyncMetadataSchema,
     ], directory: dir.path);
     print('Isar database opened successfully');
     

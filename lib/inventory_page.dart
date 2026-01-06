@@ -3102,19 +3102,19 @@ class _InventoryPageState extends State<InventoryPage> {
       var matched = items.where((qi) => qi.quotePreLabel != null && quoteByLabel.containsKey(qi.quotePreLabel)).toList();
       print('🔎 PreviousOrders: Matched ${matched.length} quote items to parent quotes after join');
 
-      // If customer is selected, ensure we prefer their quotes first
+      // Filter to only show quotes for the selected customer
       if (selectedCustomer != null) {
         final custLabels = quotes
             .where((q) => q.customer == selectedCustomer.code)
             .map((q) => q.quotePreLabel)
             .whereType<String>()
             .toSet();
-        final custMatched = matched.where((qi) => qi.quotePreLabel != null && custLabels.contains(qi.quotePreLabel)).toList();
-        // Prefer customer-specific; fallback to company-wide if empty
-        if (custMatched.isNotEmpty) {
-          matched = custMatched;
-        }
-        print('🔎 PreviousOrders: After customer preference, ${matched.length} items remain');
+        matched = matched.where((qi) => qi.quotePreLabel != null && custLabels.contains(qi.quotePreLabel)).toList();
+        print('🔎 PreviousOrders: Filtered to customer ${selectedCustomer.code} only - ${matched.length} items');
+      } else {
+        // This shouldn't happen since customer selection is required for inventory access
+        print('⚠️ PreviousOrders: No customer selected - this should not happen');
+        return [];
       }
 
       // Build compact view model and sort by parent quote date desc
