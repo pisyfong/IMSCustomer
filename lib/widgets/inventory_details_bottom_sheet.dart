@@ -553,10 +553,18 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
               ValueListenableBuilder<int>(
                 valueListenable: localQty,
                 builder: (context, qty, child) {
-                  return Container(
-                    constraints: const BoxConstraints(minWidth: 50),
-                    alignment: Alignment.center,
-                    child: Text(qty.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  return GestureDetector(
+                    onTap: () => _showQtyInputDialog(),
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 50),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(qty.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
                   );
                 },
               ),
@@ -973,6 +981,58 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
       customGstPrice: currentPrice.value,
     );
     Navigator.pop(context);
+  }
+
+  Future<void> _showQtyInputDialog() async {
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(text: localQty.value.toString());
+        return AlertDialog(
+          title: const Text('Enter Quantity'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Quantity',
+              hintText: 'Enter quantity (1-999)',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (value) {
+              final qty = int.tryParse(value);
+              if (qty != null && qty >= 1 && qty <= 999) {
+                Navigator.pop(context, qty);
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final qty = int.tryParse(controller.text);
+                if (qty != null && qty >= 1 && qty <= 999) {
+                  Navigator.pop(context, qty);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid quantity (1-999)')),
+                  );
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (result != null && mounted) {
+      localQty.value = result;
+      widget.inventoryPageState.qtySelections[sku] = result;
+    }
   }
 
   @override

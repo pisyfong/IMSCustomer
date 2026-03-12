@@ -8,6 +8,7 @@ import 'services/auth_service.dart';
 import 'services/enhanced_sync_service.dart';
 import 'services/signalr_service.dart';
 import 'services/offline_first_service.dart';
+import 'services/invoice_service.dart';
 import 'config/app_config.dart';
 import 'dart:math' as math;
 import 'pages/customer_selection_page.dart';
@@ -913,6 +914,26 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
                 'companyName': company.companyName,
                 'companyCode': company.companyCode,
               });
+              
+              // Trigger incremental invoice sync for this company (silent background sync)
+              print('🔄 Company selected: ${company.companyName} (${company.companyCode})');
+              print('🔄 Starting incremental invoice sync...');
+              
+              // Import invoice service and trigger sync in background
+              final invoiceService = InvoiceService(signalRService);
+              final companyCodeInt = int.tryParse(company.companyCode) ?? 0;
+              if (companyCodeInt > 0) {
+                invoiceService.syncNewInvoices(companyCodeInt).then((result) {
+                  print('✅ Incremental invoice sync completed for company ${company.companyCode}');
+                  print('   Invoices: ${result['invoicesInserted']} inserted, ${result['invoicesUpdated']} updated');
+                  print('   Items: ${result['itemsInserted']} inserted, ${result['itemsUpdated']} updated');
+                }).catchError((e) {
+                  print('⚠️ Incremental invoice sync failed: $e');
+                });
+              } else {
+                print('⚠️ Invalid company code: ${company.companyCode}');
+              }
+              
             } catch (e) {
               print('Error saving selected company: $e');
             }

@@ -47,8 +47,12 @@ class AppConfig {
   static bool get showDebugInfo => _showDebugInfo;
   
   // Sync configuration
+  static const bool _enableAutoSync = false; // Set to false to disable all automatic syncing
   static const int _periodicSyncMinutes = 1; // Set to 1 minute for testing, 5 for production
   static const int _databaseMonitorSeconds = 5; // Server-side database monitoring interval
+  
+  /// Whether automatic syncing is enabled (periodic sync, real-time updates, etc.)
+  static bool get enableAutoSync => _enableAutoSync;
   
   /// Get periodic sync interval in minutes
   static int get periodicSyncMinutes => _periodicSyncMinutes;

@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/inventory_service.dart';
 import '../services/invoice_service.dart';
 import '../services/inventory_image_service.dart';
+import '../services/quotation_service.dart';
 import '../services/offline_first_service.dart';
 import '../main.dart';
 import '../sync_info.dart';
@@ -861,6 +862,12 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                 onPressed: _isSyncing ? null : _uploadQuotations,
               ),
               _buildCompactActionButton(
+                icon: Icons.bug_report,
+                label: 'Debug Quotation Sync',
+                color: Colors.purple,
+                onPressed: _isSyncing ? null : _showQuotationSyncDebug,
+              ),
+              _buildCompactActionButton(
                 icon: Icons.admin_panel_settings,
                 label: 'Sync Roles & Access',
                 color: Colors.deepPurple,
@@ -1332,6 +1339,105 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     );
   }
   
+  Future<void> _showQuotationSyncDebug() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Loading debug info...';
+    });
+    
+    try {
+      final quotationService = QuotationService(signalRService);
+      final debugInfo = await quotationService.getSyncDebugInfo();
+      
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Quotation Sync Debug'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Unsynced Quotations: ${debugInfo['totalUnsynced']}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const Divider(),
+                    ...((debugInfo['quotations'] as List).map((q) {
+                      final status = q['status'] as String;
+                      final color = status == 'OK' ? Colors.green : Colors.red;
+                      
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    status == 'OK' ? Icons.check_circle : Icons.error,
+                                    color: color,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      q['quoteLabel'],
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text('Company: ${q['companyCode']}'),
+                              Text('Customer: ${q['customer']}'),
+                              Text('Items Found: ${q['itemsFound']}', 
+                                style: TextStyle(
+                                  color: q['itemsFound'] == 0 ? Colors.red : Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                )),
+                              Text('Total Items in DB: ${q['totalItemsInDb']}'),
+                              Text('Company Items: ${q['companyItemsCount']}'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList()),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Debug failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = '';
+      });
+    }
+  }
+
   Future<void> _uploadQuotations() async {
     setState(() {
       _isSyncing = true;
@@ -1339,19 +1445,82 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     });
     
     try {
-      // Call performSync which includes uploading unsynced quotations
-      await _syncService.performSync();
+      final quotationService = QuotationService(signalRService);
+      final results = await quotationService.syncUnsyncedQuotationsWithDetails();
       await _loadCacheStats();
       
       setState(() {
-        _syncStatus = 'Quotations uploaded successfully!';
+        _syncStatus = 'Upload completed';
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Quotations uploaded successfully'),
-            backgroundColor: Colors.green,
+        // Show detailed results dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Quotation Sync Results'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total: ${results['total']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('✅ Synced: ${results['synced']}', style: TextStyle(color: Colors.green)),
+                    Text('⚠️ Skipped: ${results['skipped']}', style: TextStyle(color: Colors.orange)),
+                    Text('❌ Failed: ${results['failed']}', style: TextStyle(color: Colors.red)),
+                    Divider(),
+                    ...((results['details'] as List).map((detail) {
+                      final status = detail['status'] as String;
+                      Color color = Colors.grey;
+                      IconData icon = Icons.info;
+                      
+                      if (status == 'SUCCESS') {
+                        color = Colors.green;
+                        icon = Icons.check_circle;
+                      } else if (status == 'SKIPPED') {
+                        color = Colors.orange;
+                        icon = Icons.warning;
+                      } else if (status == 'FAILED') {
+                        color = Colors.red;
+                        icon = Icons.error;
+                      }
+                      
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(icon, color: color),
+                          title: Text(detail['quote']),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Status: $status'),
+                              if (detail['reason'] != null) 
+                                Text('Reason: ${detail['reason']}', style: TextStyle(color: Colors.red)),
+                              if (detail['totalItemsInDb'] != null)
+                                Text('Total items in DB: ${detail['totalItemsInDb']}'),
+                              if (detail['itemsSynced'] != null)
+                                Text('Items synced: ${detail['itemsSynced']}'),
+                              if (detail['itemDebug'] != null)
+                                Text('${detail['itemDebug']}', style: TextStyle(fontSize: 11, color: Colors.blue)),
+                              if (detail['error'] != null)
+                                Text('Error: ${detail['error']}', style: TextStyle(color: Colors.red, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList()),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close'),
+              ),
+            ],
           ),
         );
       }
@@ -1409,41 +1578,38 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
             .companyCodeEqualTo(companyCode)
             .findAll();
         
-        // Download images in batches
+        // Download images in batches using smart UOM detection
         final List<Future<String?>> downloadTasks = [];
         int processedCount = 0;
         int successCount = 0;
         
         for (final item in inventoryItems) {
-          final imageUrl = imageService.getImageUrl(companyCode, item.skuNo, item.uom);
-          if (imageUrl != null) {
-            // Check if already cached
-            final isCached = await imageService.isImageCached(imageUrl, companyCode, item.skuNo);
-            if (!isCached) {
-              // Queue download
-              downloadTasks.add(
-                imageService.downloadAndCacheImage(imageUrl, companyCode, item.skuNo, item.uom)
-                  .timeout(const Duration(seconds: 10), onTimeout: () {
-                    print('⏱️ Timeout downloading: $imageUrl');
-                    return null;
-                  })
-              );
+          // Check if already cached (check for any cached image for this SKU)
+          final cachedImage = await imageService.findAnyCachedImageForSku(companyCode, item.skuNo);
+          if (cachedImage == null) {
+            // Queue download with smart UOM detection
+            downloadTasks.add(
+              imageService.downloadImageWithSmartUom(companyCode, item.skuNo)
+                .timeout(const Duration(seconds: 30), onTimeout: () {
+                  print('⏱️ Timeout downloading SKU ${item.skuNo}');
+                  return null;
+                })
+            );
+            
+            // Process in batches of 10 (reduced from 20 for better stability)
+            if (downloadTasks.length >= 10) {
+              final results = await Future.wait(downloadTasks);
+              final successful = results.where((path) => path != null).length;
+              processedCount += downloadTasks.length;
+              successCount += successful;
+              totalImagesDownloaded += successful;
+              downloadTasks.clear();
               
-              // Process in batches of 20
-              if (downloadTasks.length >= 20) {
-                final results = await Future.wait(downloadTasks);
-                final successful = results.where((path) => path != null).length;
-                processedCount += downloadTasks.length;
-                successCount += successful;
-                totalImagesDownloaded += successful;
-                downloadTasks.clear();
-                
-                setState(() {
-                  _syncStatus = '${company.companyName}: $successCount successful, $processedCount processed';
-                });
-                
-                print('📊 Batch complete: $successful/$processedCount successful');
-              }
+              setState(() {
+                _syncStatus = '${company.companyName}: $successCount successful, $processedCount processed';
+              });
+              
+              print('📊 Batch complete: $successful/$processedCount successful');
             }
           }
         }

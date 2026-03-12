@@ -20,6 +20,7 @@ subprojects { project ->
         project.afterEvaluate {
             project.android {
                 namespace = "dev.isar.isar_flutter_libs"
+                compileSdk = 34
             }
         }
     }

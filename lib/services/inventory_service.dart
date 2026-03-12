@@ -391,41 +391,15 @@ class InventoryService {
         return {};
       }
 
+      // OPTIMIZED: Use fixed method name instead of probing 10 different variations
       dynamic result;
-      // Try a few likely hub method names to maximize compatibility
-      // Target SQL: SELECT DISTINCT company_code, grp, description FROM RMS.dbo.PI_Group
-      final List<String> methodCandidates = [
-        'getGroupLookup',
-        'getGroups',
-        'GetGroups',
-        'getPiGroups',
-        'GetPI_Group',
-      ];
-      // First, try with company code argument
-      for (final method in methodCandidates) {
-        try {
-          result = await _signalRService.invoke(method, [effectiveCompanyCode]);
-          if (result != null) {
-            print('🟦 InventoryService.getGroupMap: Received result from "$method" with companyCode');
-            break;
-          }
-        } catch (e) {
-          // try next candidate
-        }
-      }
-      // If still null, try without arguments
-      if (result == null) {
-        for (final method in methodCandidates) {
-          try {
-            result = await _signalRService.invoke(method, []);
-            if (result != null) {
-              print('🟦 InventoryService.getGroupMap: Received result from "$method" without args');
-              break;
-            }
-          } catch (e) {
-            // try next candidate
-          }
-        }
+      try {
+        result = await _signalRService.invoke('getGroupLookup', [effectiveCompanyCode])
+            .timeout(const Duration(seconds: 10));
+        print('🟦 InventoryService.getGroupMap: Received result from getGroupLookup');
+      } catch (e) {
+        print('❌ InventoryService.getGroupMap: Failed to fetch groups: $e');
+        return {};
       }
 
       final serverMap = <String, String>{};
@@ -585,39 +559,15 @@ class InventoryService {
         return {};
       }
 
+      // OPTIMIZED: Use fixed method name instead of probing multiple variations
       dynamic result;
-      // Try a few likely hub method names to maximize compatibility
-      final List<String> methodCandidates = [
-        'getDepartmentLookup',
-        'getDepartments',
-        'GetDepartments',
-        'getDeptDescriptions',
-      ];
-      // First, try with company code argument
-      for (final method in methodCandidates) {
-        try {
-          result = await _signalRService.invoke(method, [effectiveCompanyCode]);
-          if (result != null) {
-            print('🟦 InventoryService.getDepartmentMap: Received result from "$method" with companyCode');
-            break;
-          }
-        } catch (e) {
-          // try next candidate
-        }
-      }
-      // If still null, try without arguments
-      if (result == null) {
-        for (final method in methodCandidates) {
-          try {
-            result = await _signalRService.invoke(method, []);
-            if (result != null) {
-              print('🟦 InventoryService.getDepartmentMap: Received result from "$method" without args');
-              break;
-            }
-          } catch (e) {
-            // try next candidate
-          }
-        }
+      try {
+        result = await _signalRService.invoke('getDepartmentLookup', [effectiveCompanyCode])
+            .timeout(const Duration(seconds: 10));
+        print('🟦 InventoryService.getDepartmentMap: Received result from getDepartmentLookup');
+      } catch (e) {
+        print('❌ InventoryService.getDepartmentMap: Failed to fetch departments: $e');
+        return {};
       }
 
       final serverMap = <String, String>{};
@@ -1022,19 +972,30 @@ class InventoryService {
         searchQuery: null,
       );
 
-      // Save to local database
+      // Save to local database (exclude flag3='N' items before saving)
       if (serverItems.isNotEmpty) {
+        // Filter out flag3='N' items before saving to prevent them from appearing in local cache
+        final itemsToSave = serverItems
+            .where((it) => (it.flag3 == null || it.flag3!.toUpperCase() != 'N'))
+            .toList();
+        
+        print('🧹 INVENTORY SERVICE: Filtered ${serverItems.length - itemsToSave.length} items with flag3=N before saving');
+        
         // Full sync is always true here; clear-and-replace the company's cache
         final isFullSync = true;
         if (isFullSync) {
-          await saveInventoryToLocal(serverItems, companyCode: companyCode);
+          await saveInventoryToLocal(itemsToSave, companyCode: companyCode);
         } else {
-          await saveInventoryToLocal(serverItems);
+          await saveInventoryToLocal(itemsToSave);
         }
       }
 
       // Apply local search and filters to server results
-      List<InventoryItem> filteredItems = serverItems;
+      // First, filter out flag3='N' items from the returned list
+      List<InventoryItem> filteredItems = serverItems
+          .where((it) => (it.flag3 == null || it.flag3!.toUpperCase() != 'N'))
+          .toList();
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final q = searchQuery.toLowerCase();
         filteredItems = filteredItems.where((it) {

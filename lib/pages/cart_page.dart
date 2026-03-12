@@ -98,9 +98,62 @@ class _CartPageState extends State<CartPage> {
       await _cartService.updateQuantity(item.id, newQuantity);
       await _loadCart(); // Refresh cart
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating quantity: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update quantity: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _showQtyInputDialog(CartItem item) async {
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(text: item.quantity.toInt().toString());
+        return AlertDialog(
+          title: const Text('Enter Quantity'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Quantity',
+              hintText: 'Enter quantity (1-999)',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (value) {
+              final qty = int.tryParse(value);
+              if (qty != null && qty >= 1 && qty <= 999) {
+                Navigator.pop(context, qty);
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final qty = int.tryParse(controller.text);
+                if (qty != null && qty >= 1 && qty <= 999) {
+                  Navigator.pop(context, qty);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid quantity (1-999)')),
+                  );
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (result != null && mounted) {
+      await _updateQuantity(item, result);
     }
   }
 
@@ -776,13 +829,20 @@ class _CartPageState extends State<CartPage> {
                                     child: Icon(Icons.remove, size: 14, color: item.quantity > 1 ? Colors.grey.shade700 : Colors.grey.shade300),
                                   ),
                                 ),
-                                Container(
-                                  width: 36,
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Text(
-                                    '${item.quantity.toInt()}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                GestureDetector(
+                                  onTap: () => _showQtyInputDialog(item),
+                                  child: Container(
+                                    width: 36,
+                                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '${item.quantity.toInt()}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
                                   ),
                                 ),
                                 GestureDetector(

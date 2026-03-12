@@ -207,6 +207,41 @@ class InvoiceService {
     }
   }
 
+  /// Save invoices to local database and return statistics
+  Future<Map<String, int>> saveInvoicesToLocalWithStats(List<Invoice> invoices) async {
+    try {
+      int inserted = 0;
+      int updated = 0;
+      
+      await isar.writeTxn(() async {
+        for (final invoice in invoices) {
+          // Check if invoice already exists
+          final existing = await isar.invoices
+              .filter()
+              .companyCodeEqualTo(invoice.companyCode)
+              .and()
+              .invoicePreLabelEqualTo(invoice.invoicePreLabel)
+              .findFirst();
+          
+          if (existing != null) {
+            // Delete existing and insert new (Invoice has final fields)
+            await isar.invoices.delete(existing.id);
+            updated++;
+          } else {
+            inserted++;
+          }
+          
+          await isar.invoices.put(invoice);
+        }
+      });
+      print('💾 INVOICE SERVICE: Saved ${invoices.length} invoices (inserted: $inserted, updated: $updated)');
+      return {'inserted': inserted, 'updated': updated};
+    } catch (e) {
+      print('❌ INVOICE SERVICE: Error saving to local: $e');
+      return {'inserted': 0, 'updated': 0};
+    }
+  }
+
   /// Get invoices from local database
   Future<List<Invoice>> getLocalInvoices({
     int? companyCode,
@@ -416,15 +451,91 @@ class InvoiceService {
     }
   }
 
-  /// Save invoice items to local database
+  /// Save invoice items to local database with upsert (insert or update)
+  /// Uses composite key: Company_Code + Invoice_PreLabel + Sequence_No (ignoring DO_PreLabel variations)
   Future<void> saveInvoiceItemsToLocal(List<InvoiceItem> items) async {
     try {
+      int inserted = 0;
+      int updated = 0;
+      int deleted = 0;
+      
       await isar.writeTxn(() async {
-        await isar.invoiceItems.putAll(items);
+        for (final item in items) {
+          // Find ALL existing items with same Company_Code + Invoice_PreLabel + Sequence_No
+          // (regardless of DO_PreLabel to handle null/empty variations)
+          final existingItems = await isar.invoiceItems
+              .filter()
+              .companyCodeEqualTo(item.companyCode)
+              .and()
+              .invoicePreLabelEqualTo(item.invoicePreLabel)
+              .and()
+              .sequenceNoEqualTo(item.sequenceNo)
+              .findAll();
+          
+          // Delete ALL existing items for this key to prevent duplicates
+          if (existingItems.isNotEmpty) {
+            for (final existing in existingItems) {
+              await isar.invoiceItems.delete(existing.id);
+              deleted++;
+            }
+            updated++;
+          } else {
+            inserted++;
+          }
+          
+          // Insert the new/updated item
+          await isar.invoiceItems.put(item);
+        }
       });
-      print('💾 INVOICE SERVICE: Saved ${items.length} invoice items to local database');
+      print('💾 INVOICE SERVICE: Saved ${items.length} invoice items (inserted: $inserted, updated: $updated, old records deleted: $deleted)');
     } catch (e) {
       print('❌ INVOICE SERVICE: Error saving items to local: $e');
+    }
+  }
+
+  /// Save invoice items to local database and return statistics
+  Future<Map<String, int>> saveInvoiceItemsToLocalWithStats(List<InvoiceItem> items) async {
+    try {
+      int inserted = 0;
+      int updated = 0;
+      int deleted = 0;
+      
+      await isar.writeTxn(() async {
+        for (final item in items) {
+          // Normalize doPreLabel (treat null and empty string as equivalent)
+          final normalizedDoPreLabel = (item.doPreLabel ?? '').isEmpty ? '' : item.doPreLabel!;
+          
+          // Find ALL existing items with same Company_Code + Invoice_PreLabel + Sequence_No
+          // (regardless of DO_PreLabel to handle null/empty variations)
+          final existingItems = await isar.invoiceItems
+              .filter()
+              .companyCodeEqualTo(item.companyCode)
+              .and()
+              .invoicePreLabelEqualTo(item.invoicePreLabel)
+              .and()
+              .sequenceNoEqualTo(item.sequenceNo)
+              .findAll();
+          
+          // Delete ALL existing items for this key to prevent duplicates
+          if (existingItems.isNotEmpty) {
+            for (final existing in existingItems) {
+              await isar.invoiceItems.delete(existing.id);
+              deleted++;
+            }
+            updated++;
+          } else {
+            inserted++;
+          }
+          
+          // Insert the new/updated item
+          await isar.invoiceItems.put(item);
+        }
+      });
+      print('💾 INVOICE SERVICE: Saved ${items.length} invoice items (inserted: $inserted, updated: $updated, old records deleted: $deleted)');
+      return {'inserted': inserted, 'updated': updated};
+    } catch (e) {
+      print('❌ INVOICE SERVICE: Error saving items to local: $e');
+      return {'inserted': 0, 'updated': 0};
     }
   }
 
@@ -453,6 +564,110 @@ class InvoiceService {
     }
   }
   
+  /// OPTIMIZED: Fetch invoice items for multiple invoices in a single batch call
+  /// Eliminates N+1 query pattern by fetching items for up to 100 invoices at once
+  Future<List<InvoiceItem>> fetchInvoiceItemsBatch({
+    required int companyCode,
+    required List<String> invoicePreLabels,
+  }) async {
+    try {
+      if (invoicePreLabels.isEmpty) return [];
+      
+      print('🔍 INVOICE SERVICE: Batch fetching items for ${invoicePreLabels.length} invoices...');
+
+      final response = await _signalRService.invoke('getInvoiceItemsBatch', [
+        companyCode,
+        invoicePreLabels,
+      ]);
+
+      if (response == null) {
+        print('⚠️ INVOICE SERVICE: Null response for batch invoice items');
+        return [];
+      }
+
+      List<dynamic> itemList;
+      if (response is List) {
+        itemList = response;
+      } else if (response is Map && response.containsKey('items')) {
+        itemList = response['items'] as List;
+      } else {
+        print('⚠️ INVOICE SERVICE: Unexpected batch response format: ${response.runtimeType}');
+        return [];
+      }
+
+      print('📋 INVOICE SERVICE: Processing ${itemList.length} invoice items from batch');
+
+      final items = itemList
+          .map((json) {
+            try {
+              return InvoiceItem.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              print('❌ INVOICE SERVICE: Error parsing batch invoice item: $e');
+              return null;
+            }
+          })
+          .whereType<InvoiceItem>()
+          .toList();
+
+      print('✅ INVOICE SERVICE: Successfully parsed ${items.length} invoice items from batch');
+      return items;
+    } catch (e) {
+      print('❌ INVOICE SERVICE: Batch fetch error: $e');
+      return [];
+    }
+  }
+
+  /// OPTIMIZED: Fetch ALL invoice items for a company with pagination
+  /// Used for full sync instead of fetching invoice-by-invoice
+  Future<List<InvoiceItem>> fetchAllInvoiceItems({
+    required int companyCode,
+    int limit = 5000,
+    int offset = 0,
+  }) async {
+    try {
+      print('🔍 INVOICE SERVICE: Fetching all invoice items (limit: $limit, offset: $offset)...');
+
+      final response = await _signalRService.invoke('getAllInvoiceItems', [
+        companyCode,
+        limit,
+        offset,
+      ]);
+
+      if (response == null) {
+        print('⚠️ INVOICE SERVICE: Null response for all invoice items');
+        return [];
+      }
+
+      List<dynamic> itemList;
+      if (response is List) {
+        itemList = response;
+      } else {
+        print('⚠️ INVOICE SERVICE: Unexpected response format: ${response.runtimeType}');
+        return [];
+      }
+
+      print('📋 INVOICE SERVICE: Processing ${itemList.length} invoice items');
+
+      final items = itemList
+          .map((json) {
+            try {
+              return InvoiceItem.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              print('❌ INVOICE SERVICE: Error parsing invoice item: $e');
+              return null;
+            }
+          })
+          .whereType<InvoiceItem>()
+          .toList();
+
+      print('✅ INVOICE SERVICE: Successfully parsed ${items.length} invoice items');
+      return items;
+    } catch (e) {
+      print('❌ INVOICE SERVICE: fetchAllInvoiceItems error: $e');
+      return [];
+    }
+  }
+
   /// Get invoice items for a specific SKU across all invoices (OPTIMIZED)
   /// This is much faster than loading all items per invoice then filtering
   Future<List<Map<String, dynamic>>> getInvoiceItemsBySku({
@@ -560,5 +775,163 @@ class InvoiceService {
       print('❌ INVOICE SERVICE: Error in optimized SKU query: $e');
       return [];
     }
+  }
+
+  /// INCREMENTAL SYNC: Sync new/modified invoices for a company since last sync
+  /// Returns a map with sync results for display
+  Future<Map<String, dynamic>> syncNewInvoices(int companyCode) async {
+    try {
+      print('🔄 INVOICE SERVICE: Starting incremental sync for company $companyCode');
+      
+      if (!_signalRService.isConnected) {
+        print('⚠️ INVOICE SERVICE: Not connected, skipping sync');
+        return {
+          'success': false,
+          'error': 'Not connected to server',
+          'invoicesInserted': 0,
+          'invoicesUpdated': 0,
+          'itemsInserted': 0,
+          'itemsUpdated': 0,
+        };
+      }
+      
+      // Get last sync timestamp from local storage
+      final lastSync = await _getLastInvoiceSyncTimestamp(companyCode);
+      print('📅 Last sync timestamp: ${lastSync?.toIso8601String() ?? "never"}');
+      
+      // Fetch new/modified invoices from server
+      final response = await _signalRService.invoke('getNewInvoices', [
+        companyCode,
+        lastSync?.toIso8601String(),
+      ]);
+      
+      if (response == null || (response is List && response.isEmpty)) {
+        print('✅ INVOICE SERVICE: No new invoices to sync');
+        await _updateLastInvoiceSyncTimestamp(companyCode, DateTime.now());
+        return {
+          'success': true,
+          'invoicesInserted': 0,
+          'invoicesUpdated': 0,
+          'itemsInserted': 0,
+          'itemsUpdated': 0,
+        };
+      }
+      
+      final invoiceList = response is List ? response : [];
+      print('📦 INVOICE SERVICE: Received ${invoiceList.length} new/modified invoices');
+      
+      // Parse invoices
+      final invoices = invoiceList
+          .map((json) {
+            try {
+              return Invoice.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              print('❌ Error parsing invoice: $e');
+              return null;
+            }
+          })
+          .whereType<Invoice>()
+          .toList();
+      
+      if (invoices.isEmpty) {
+        print('⚠️ INVOICE SERVICE: No valid invoices parsed');
+        await _updateLastInvoiceSyncTimestamp(companyCode, DateTime.now());
+        return {
+          'success': false,
+          'error': 'Failed to parse invoices',
+          'invoicesInserted': 0,
+          'invoicesUpdated': 0,
+          'itemsInserted': 0,
+          'itemsUpdated': 0,
+        };
+      }
+      
+      // Save invoices to local DB and get counts
+      final invoiceStats = await saveInvoicesToLocalWithStats(invoices);
+      
+      // Extract invoice prelabels for fetching items
+      final prelabels = invoices.map((inv) => inv.invoicePreLabel).toList();
+      print('📋 INVOICE SERVICE: Fetching items for ${prelabels.length} invoices');
+      
+      int itemsInserted = 0;
+      int itemsUpdated = 0;
+      
+      // Fetch invoice items for new invoices
+      final itemsResponse = await _signalRService.invoke('getNewInvoiceItems', [
+        companyCode,
+        prelabels,
+      ]);
+      
+      if (itemsResponse != null && itemsResponse is List && itemsResponse.isNotEmpty) {
+        print('📦 INVOICE SERVICE: Received ${itemsResponse.length} invoice items');
+        
+        final items = itemsResponse
+            .map((json) {
+              try {
+                return InvoiceItem.fromJson(json as Map<String, dynamic>);
+              } catch (e) {
+                print('❌ Error parsing invoice item: $e');
+                return null;
+              }
+            })
+            .whereType<InvoiceItem>()
+            .toList();
+        
+        if (items.isNotEmpty) {
+          final itemStats = await saveInvoiceItemsToLocalWithStats(items);
+          itemsInserted = itemStats['inserted'] ?? 0;
+          itemsUpdated = itemStats['updated'] ?? 0;
+          print('✅ INVOICE SERVICE: Saved ${items.length} invoice items');
+        }
+      }
+      
+      // Update last sync timestamp
+      await _updateLastInvoiceSyncTimestamp(companyCode, DateTime.now());
+      print('✅ INVOICE SERVICE: Incremental sync completed');
+      
+      return {
+        'success': true,
+        'invoicesInserted': invoiceStats['inserted'] ?? 0,
+        'invoicesUpdated': invoiceStats['updated'] ?? 0,
+        'itemsInserted': itemsInserted,
+        'itemsUpdated': itemsUpdated,
+      };
+    } catch (e, stackTrace) {
+      print('❌ INVOICE SERVICE: Incremental sync failed: $e');
+      print('Stack trace: $stackTrace');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'invoicesInserted': 0,
+        'invoicesUpdated': 0,
+        'itemsInserted': 0,
+        'itemsUpdated': 0,
+      };
+    }
+  }
+  
+  /// Get last invoice sync timestamp for a company
+  Future<DateTime?> _getLastInvoiceSyncTimestamp(int companyCode) async {
+    try {
+      // Store sync metadata in a simple key-value format in Isar
+      // For now, we'll use a simple approach: check the newest invoice's LastWriteTimeStamp
+      final newestInvoice = await isar.invoices
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .sortByLastWriteTimeStampDesc()
+          .findFirst();
+      
+      return newestInvoice?.lastWriteTimeStamp;
+    } catch (e) {
+      print('⚠️ Error getting last sync timestamp: $e');
+      return null;
+    }
+  }
+  
+  /// Update last invoice sync timestamp for a company
+  Future<void> _updateLastInvoiceSyncTimestamp(int companyCode, DateTime timestamp) async {
+    // Timestamp is implicitly tracked by the newest invoice's LastWriteTimeStamp
+    // No explicit action needed - just for logging
+    print('📅 Updated last sync timestamp for company $companyCode to ${timestamp.toIso8601String()}');
   }
 }

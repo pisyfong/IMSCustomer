@@ -123,24 +123,66 @@ class QuotationService {
   }
 
   /// Sync unsynced quotations to server
-  Future<int> syncUnsyncedQuotations() async {
+  /// Returns a map with sync results for UI display
+  Future<Map<String, dynamic>> syncUnsyncedQuotationsWithDetails() async {
     final unsyncedQuotations = await getUnsyncedQuotations();
+    final results = <String, dynamic>{
+      'total': unsyncedQuotations.length,
+      'synced': 0,
+      'skipped': 0,
+      'failed': 0,
+      'details': <Map<String, dynamic>>[],
+    };
     
     if (unsyncedQuotations.isEmpty) {
-      print('📝 QUOTATION SYNC: No unsynced quotations to sync');
-      return 0;
+      return results;
     }
 
-    print('📝 QUOTATION SYNC: Found ${unsyncedQuotations.length} unsynced quotations');
     int syncedCount = 0;
 
     for (final quotation in unsyncedQuotations) {
       try {
-        // Get quotation items for this quotation
-        final quotationItems = await getQuotationItems(
-          companyCode: quotation.companyCode,
-          quotePreLabel: quotation.quotePreLabel,
-        );
+        print('🔍 QUOTATION SYNC: Processing quotation ${quotation.quotePreLabel} (Company: ${quotation.companyCode})');
+        
+        // Query items using where() to avoid filter() caching issues
+        // Get ALL items first, then filter in memory for guaranteed fresh data
+        final allItemsForCompany = await isar.quoteItems
+            .where()
+            .findAll();
+        
+        // Debug: Show what's actually in the database
+        print('🔍 DEBUG: All items in DB: ${allItemsForCompany.length}');
+        if (allItemsForCompany.isNotEmpty) {
+          final sampleItems = allItemsForCompany.take(3);
+          for (final item in sampleItems) {
+            print('   Sample: Company=${item.companyCode}, Quote="${item.quotePreLabel}", SKU=${item.skuNo}');
+          }
+        }
+        
+        // Filter in memory to avoid Isar query cache issues
+        final quotationItems = allItemsForCompany
+            .where((item) => 
+                item.companyCode == quotation.companyCode && 
+                item.quotePreLabel == quotation.quotePreLabel)
+            .toList();
+        
+        // Sort by sequence number
+        quotationItems.sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
+        
+        print('🔍 QUOTATION SYNC: Found ${quotationItems.length} items for ${quotation.quotePreLabel} (Total in DB: ${allItemsForCompany.length})');
+        print('🔍 QUOTATION SYNC: Looking for Company=${quotation.companyCode}, Quote="${quotation.quotePreLabel}"');
+        
+        if (quotationItems.isEmpty) {
+          results['skipped']++;
+          results['details'].add({
+            'quote': quotation.quotePreLabel,
+            'status': 'SKIPPED',
+            'reason': 'No items found in database',
+            'totalItemsInDb': allItemsForCompany.length,
+            'companyCode': quotation.companyCode,
+          });
+          continue; // Skip to next quotation instead of syncing header without items
+        }
         
         // Prepare quotation data - flatten structure (Node.js expects fields directly in req.body)
         final quotationData = quotation.toJson();
@@ -159,27 +201,38 @@ class QuotationService {
         );
 
         if (response.statusCode == 200) {
+          print('✅ QUOTATION SYNC: Quotation header synced successfully for ${quotation.quotePreLabel}');
+          
           // Now sync the quotation items
           if (quotationItems.isNotEmpty) {
-            print('📤 Syncing ${quotationItems.length} items for quotation ${quotation.quotePreLabel}');
+            print('📤 QUOTATION SYNC: Now syncing ${quotationItems.length} items for quotation ${quotation.quotePreLabel}');
             
             final itemsApiUrl = '${AppConfig.apiBaseUrl}/api/quotation-items';
             final itemsData = {
               'items': quotationItems.map((item) => item.toJson()).toList(),
             };
             
+            print('📦 QUOTATION SYNC: Items payload: ${jsonEncode(itemsData).substring(0, 200)}...');
+            
+            final itemsPayload = jsonEncode(itemsData);
+            
             final itemsResponse = await http.post(
               Uri.parse(itemsApiUrl),
               headers: {'Content-Type': 'application/json'},
-              body: jsonEncode(itemsData),
+              body: itemsPayload,
             );
             
             if (itemsResponse.statusCode == 200) {
-              print('✅ QUOTATION SYNC: Synced ${quotationItems.length} items for ${quotation.quotePreLabel}');
+              print('✅ QUOTATION SYNC: Successfully synced ${quotationItems.length} items for ${quotation.quotePreLabel}');
+              print('📦 Server response: ${itemsResponse.body}');
             } else {
-              print('⚠️ QUOTATION SYNC: Failed to sync items for ${quotation.quotePreLabel}: ${itemsResponse.statusCode} - ${itemsResponse.body}');
+              print('❌ QUOTATION SYNC: Failed to sync items for ${quotation.quotePreLabel}');
+              print('❌ Status: ${itemsResponse.statusCode}');
+              print('❌ Response: ${itemsResponse.body}');
               // Don't fail the whole sync if items fail - quotation header is already saved
             }
+          } else {
+            print('⚠️ QUOTATION SYNC: Skipping item sync - no items found in local database for ${quotation.quotePreLabel}');
           }
           
           // Mark as synced
@@ -192,11 +245,32 @@ class QuotationService {
           });
 
           syncedCount++;
+          results['synced']++;
+          
+          // Get first item details for debugging
+          String itemDebug = '';
+          if (quotationItems.isNotEmpty) {
+            final firstItem = quotationItems.first;
+            itemDebug = 'First item: SKU=${firstItem.skuNo}, Qty=${firstItem.quoteQuantity}, Price=${firstItem.unitPrice}';
+          }
+          
+          results['details'].add({
+            'quote': quotation.quotePreLabel,
+            'status': 'SUCCESS',
+            'itemsSynced': quotationItems.length,
+            'itemDebug': itemDebug,
+          });
           print('✅ QUOTATION SYNC: Synced quotation ${quotation.quotePreLabel}');
         } else {
           throw Exception('Server returned ${response.statusCode}: ${response.body}');
         }
       } catch (e) {
+        results['failed']++;
+        results['details'].add({
+          'quote': quotation.quotePreLabel,
+          'status': 'FAILED',
+          'error': e.toString(),
+        });
         print('❌ QUOTATION SYNC: Failed to sync quotation ${quotation.quotePreLabel}: $e');
         
         // Check if this is a duplicate key violation (PRIMARY KEY constraint)
@@ -229,7 +303,13 @@ class QuotationService {
     }
 
     print('📝 QUOTATION SYNC: Successfully synced $syncedCount/${unsyncedQuotations.length} quotations');
-    return syncedCount;
+    return results;
+  }
+  
+  /// Legacy method for backward compatibility
+  Future<int> syncUnsyncedQuotations() async {
+    final results = await syncUnsyncedQuotationsWithDetails();
+    return results['synced'] as int;
   }
 
   /// Fetch quotations from server and store locally
@@ -703,6 +783,9 @@ class QuotationService {
     }).toList();
 
     // STEP 3: Save to local database (after logging)
+    print('💾 QUOTATION ITEMS: Saving ${quoteItems.length} items to database for $quotePreLabel');
+    print('💾 QUOTATION ITEMS: Company=$companyCode, Quote=$quotePreLabel');
+    
     await isar.writeTxn(() async {
       // Clear existing items for this quotation to avoid duplicates
       final existingItems = await isar.quoteItems
@@ -712,13 +795,28 @@ class QuotationService {
           .findAll();
       
       if (existingItems.isNotEmpty) {
+        print('💾 QUOTATION ITEMS: Deleting ${existingItems.length} existing items first');
         final idsToDelete = existingItems.map((item) => item.id).toList();
         await isar.quoteItems.deleteAll(idsToDelete);
       }
       
       // Save new items
+      print('💾 QUOTATION ITEMS: Inserting ${quoteItems.length} new items');
       await isar.quoteItems.putAll(quoteItems);
+      print('✅ QUOTATION ITEMS: Items saved to database');
     });
+    
+    // STEP 4: Verify items were saved
+    final verifyItems = await isar.quoteItems
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .quotePreLabelEqualTo(quotePreLabel)
+        .findAll();
+    print('✅ QUOTATION ITEMS: Verification - Found ${verifyItems.length} items in database for $quotePreLabel');
+    
+    if (verifyItems.length != quoteItems.length) {
+      print('⚠️ QUOTATION ITEMS: WARNING - Expected ${quoteItems.length} items but found ${verifyItems.length}!');
+    }
   }
 
   /// Save quotation items to server
@@ -790,6 +888,40 @@ class QuotationService {
       print('📱 QUOTATION ITEMS: Offline mode - items saved locally, will sync when online');
       return false;
     }
+  }
+
+  /// Get sync debug information for UI display
+  Future<Map<String, dynamic>> getSyncDebugInfo() async {
+    final unsyncedQuotations = await getUnsyncedQuotations();
+    final debugInfo = <String, dynamic>{
+      'totalUnsynced': unsyncedQuotations.length,
+      'quotations': [],
+    };
+    
+    for (final quotation in unsyncedQuotations) {
+      final items = await getQuotationItems(
+        companyCode: quotation.companyCode,
+        quotePreLabel: quotation.quotePreLabel,
+      );
+      
+      final totalItemsInDb = await isar.quoteItems.count();
+      final companyItems = await isar.quoteItems
+          .filter()
+          .companyCodeEqualTo(quotation.companyCode)
+          .findAll();
+      
+      debugInfo['quotations'].add({
+        'quoteLabel': quotation.quotePreLabel,
+        'companyCode': quotation.companyCode,
+        'customer': quotation.customer,
+        'itemsFound': items.length,
+        'totalItemsInDb': totalItemsInDb,
+        'companyItemsCount': companyItems.length,
+        'status': items.isEmpty ? 'NO ITEMS' : 'OK',
+      });
+    }
+    
+    return debugInfo;
   }
 
   /// Get log file paths for debugging or manual recovery

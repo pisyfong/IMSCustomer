@@ -511,6 +511,47 @@ class PluService {
     }
   }
 
+  /// Search Customer_PLU by PLU number for a specific customer (offline - local database)
+  /// Returns list of matching CustomerPlu records (exact match only)
+  Future<List<CustomerPlu>> searchCustomerPluOffline(String pluNo, String customerCode) async {
+    try {
+      final companyCode = await _getCurrentCompanyCode();
+      print('🔍 PLU SERVICE: Searching offline Customer_PLU for exact match: $pluNo, customer: $customerCode in company: $companyCode');
+      
+      // Exact match only - no partial/similar matches
+      final results = await _isar.customerPlus
+          .where()
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .and()
+          .customerCodeEqualTo(customerCode)
+          .and()
+          .pluNoEqualTo(pluNo)
+          .findAll();
+      
+      print('✅ PLU SERVICE: Found ${results.length} exact matches for Customer PLU: $pluNo');
+      return results;
+    } catch (e) {
+      print('❌ PLU SERVICE: Error searching offline Customer_PLU: $e');
+      return [];
+    }
+  }
+
+  /// Get SKU number from Customer PLU barcode (offline)
+  /// Returns the SKU number if found, null otherwise
+  Future<int?> getSkuFromCustomerPluOffline(String pluNo, String customerCode) async {
+    try {
+      final results = await searchCustomerPluOffline(pluNo, customerCode);
+      if (results.isNotEmpty) {
+        return results.first.skuNo;
+      }
+      return null;
+    } catch (e) {
+      print('❌ PLU SERVICE: Error getting SKU from Customer PLU offline: $e');
+      return null;
+    }
+  }
+
   /// Get count of In_Stock_PLU records in local database
   Future<int> getInStockPluCount() async {
     try {
@@ -530,6 +571,101 @@ class PluService {
     if (_lastInStockPluSync == null) return true;
     // Re-sync if last sync was more than 1 hour ago
     return DateTime.now().difference(_lastInStockPluSync!).inHours >= 1;
+  }
+
+  /// OPTIMIZED: Sync ALL customer PLU records for a company in one go
+  /// Instead of fetching customer-by-customer, fetch entire AR_Customer_Item table
+  Future<void> syncAllCustomerPlu({required int companyCode}) async {
+    try {
+      print('🏷️ PLU SERVICE: Syncing ALL customer PLU for company $companyCode...');
+      
+      // Ensure SignalR connection
+      if (!_signalRService.isConnected) {
+        try {
+          await _signalRService.connect().timeout(const Duration(seconds: 5));
+        } catch (e) {
+          print('📱 PLU SERVICE: Cannot connect SignalR, skipping full customer PLU sync');
+          return;
+        }
+      }
+
+      int totalSynced = 0;
+      int offset = 0;
+      const int batchSize = 5000;
+      
+      while (true) {
+        print('🏷️ PLU SERVICE: Fetching customer PLU batch at offset $offset...');
+        
+        dynamic response;
+        try {
+          response = await _signalRService.invoke('getAllCustomerPlu', [
+            companyCode,
+            batchSize,
+            offset,
+          ]).timeout(const Duration(seconds: 30));
+        } catch (e) {
+          print('❌ PLU SERVICE: getAllCustomerPlu failed at offset $offset: $e');
+          break;
+        }
+
+        if (response is! List || response.isEmpty) {
+          print('🏷️ PLU SERVICE: No more customer PLU records at offset $offset');
+          break;
+        }
+
+        print('🏷️ PLU SERVICE: Received ${response.length} customer PLU records');
+
+        // Convert and save to local database
+        final records = response
+            .cast<Map<String, dynamic>>()
+            .map((m) => CustomerPlu.fromMap(m))
+            .where((cp) => cp.companyCode == companyCode && cp.customerCode.isNotEmpty)
+            .toList();
+
+        if (records.isNotEmpty) {
+          // Batch upsert to local database
+          await _isar.writeTxn(() async {
+            final col = _isar.collection<CustomerPlu>();
+            // Use putAll for efficiency - Isar handles upsert by id
+            for (int i = 0; i < records.length; i += 500) {
+              final batch = records.skip(i).take(500).toList();
+              for (final r in batch) {
+                // Find existing record to preserve ID
+                final existing = await col
+                    .where()
+                    .filter()
+                    .companyCodeEqualTo(r.companyCode)
+                    .and()
+                    .customerCodeEqualTo(r.customerCode)
+                    .and()
+                    .skuNoEqualTo(r.skuNo)
+                    .findFirst();
+                if (existing != null) {
+                  r.id = existing.id;
+                }
+              }
+              await col.putAll(batch);
+            }
+          });
+          totalSynced += records.length;
+          print('🏷️ PLU SERVICE: Saved ${records.length} customer PLU records (total: $totalSynced)');
+        }
+
+        // Check if we got less than batch size (last page)
+        if (response.length < batchSize) {
+          break;
+        }
+
+        offset += batchSize;
+        
+        // Small delay to avoid overwhelming the server
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      print('✅ PLU SERVICE: Completed full customer PLU sync - total: $totalSynced records');
+    } catch (e) {
+      print('❌ PLU SERVICE: Error in syncAllCustomerPlu: $e');
+    }
   }
 
   /// Clear all In_Stock_PLU records for current company

@@ -210,19 +210,182 @@ class _InventoryPageState extends State<InventoryPage> {
         return;
       }
 
-      print('🔍 PLU SEARCH: No PLU found, searching by text: $pluQuery');
-      // If no exact match, search by PLU number as text (fallback)
-      if (pluQuery != _currentSearchQuery) {
-        _currentSearchQuery = pluQuery;
-        _resetAndLoadInventory();
-      }
+      print('🔍 PLU SEARCH: No PLU found - not searching by text to avoid confusion');
+      // Don't fallback to text search - it could match wrong items
     } catch (e) {
       print('🔍 PLU SEARCH: Error during PLU lookup: $e');
-      // On error, search by PLU number as text (fallback)
-      if (pluQuery != _currentSearchQuery) {
-        _currentSearchQuery = pluQuery;
-        _resetAndLoadInventory();
+      // Don't fallback to text search - it could match wrong items
+    }
+  }
+
+  // Handle Customer PLU search submission (for barcode scanner)
+  // Searches offline Customer_PLU table for customer-specific codes
+  Future<void> _onCustomerPluSearchSubmitted(String pluNo) async {
+    if (pluNo.trim().isEmpty) return;
+
+    final scannedPlu = pluNo.trim();
+    print('🔍 CUSTOMER PLU SEARCH: Starting search for Customer PLU: "$scannedPlu"');
+
+    // Get selected customer code
+    final selectedCustomer = await _authService.getCurrentCustomer();
+    final customerCode = selectedCustomer?['code']?.toString();
+    
+    if (customerCode == null || customerCode.isEmpty) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('No Customer Selected'),
+            content: const Text('Please select a customer first to scan customer-specific barcodes.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
+      return;
+    }
+
+    try {
+      // Search the offline Customer_PLU table
+      print('🔍 CUSTOMER PLU SEARCH: Searching offline Customer_PLU table for customer: $customerCode...');
+      final offlineResults = await _pluService.searchCustomerPluOffline(scannedPlu, customerCode);
+      
+      if (offlineResults.isNotEmpty) {
+        print('✅ CUSTOMER PLU SEARCH: Found ${offlineResults.length} matches in offline database');
+        
+        if (offlineResults.length == 1) {
+          // Single match - show popup directly
+          final skuNo = offlineResults[0].skuNo;
+          print('✅ CUSTOMER PLU SEARCH: Single match - SKU: $skuNo, showing popup directly');
+          await _showItemDetailsForSku(skuNo);
+          return;
+        } else {
+          // Multiple matches - show selection dialog
+          if (!mounted) return;
+          
+          final companyCode = int.tryParse(_selectedCompany?['companyCode']?.toString() ?? '0') ?? 0;
+          
+          final selectedItem = await showDialog<int>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Select Item'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 500,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: offlineResults.length,
+                  itemBuilder: (context, index) {
+                    final item = offlineResults[index];
+                    final skuNo = item.skuNo;
+                    final plu = item.pluNo;
+                    final uom = item.uom ?? '';
+                    
+                    // Skip if SKU is null
+                    if (skuNo == null) return const SizedBox.shrink();
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context, skuNo),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Product Image
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: InventoryImageWidget(
+                                  companyCode: companyCode,
+                                  skuNo: skuNo,
+                                  uom: uom,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Product Details - Fetch description from inventory
+                              Expanded(
+                                child: FutureBuilder<String>(
+                                  future: _getItemDescription(companyCode, skuNo),
+                                  builder: (context, snapshot) {
+                                    final description = snapshot.data ?? 'SKU $skuNo';
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Description (larger)
+                                        Text(
+                                          description,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // SKU, PLU and UOM (smaller)
+                                        Text(
+                                          'SKU: $skuNo | PLU: $plu | UOM: $uom',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          );
+
+          if (selectedItem != null) {
+            await _showItemDetailsForSku(selectedItem);
+          }
+          return;
+        }
+      }
+      
+      // No offline match found - show dialog message
+      print('❌ CUSTOMER PLU SEARCH: No Customer PLU match found for barcode: "$scannedPlu"');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Customer PLU Not Found'),
+            content: Text('No customer-specific item found for barcode:\n$scannedPlu\n\nCustomer: $customerCode'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ CUSTOMER PLU SEARCH: Error during search: $e');
     }
   }
 
@@ -250,10 +413,31 @@ class _InventoryPageState extends State<InventoryPage> {
             // Show bottom sheet directly without filter tag or inventory reload
             await _showItemDetailsForSku(skuNo);
             return;
+          } else {
+            // PLU found but no SKU - show error
+            print('❌ PLU SEARCH: PLU found but SKU is null');
+            if (mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Invalid PLU'),
+                  content: Text('PLU "$scannedPlu" found but has no SKU assigned.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return;
           }
         } else {
           // Multiple matches - show selection dialog
           if (!mounted) return;
+          
+          final companyCode = int.tryParse(_selectedCompany?['companyCode']?.toString() ?? '0') ?? 0;
           
           final selectedItem = await showDialog<int>(
             context: context,
@@ -261,7 +445,7 @@ class _InventoryPageState extends State<InventoryPage> {
               title: const Text('Select Item'),
               content: SizedBox(
                 width: double.maxFinite,
-                height: 400,
+                height: 500,
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: offlineResults.length,
@@ -272,10 +456,62 @@ class _InventoryPageState extends State<InventoryPage> {
                     final desc = item.desc1 ?? 'Item $skuNo';
                     final uom = item.uom ?? '';
                     
-                    return ListTile(
-                      title: Text(desc),
-                      subtitle: Text('SKU: $skuNo | PLU: $plu | UOM: $uom'),
-                      onTap: () => Navigator.pop(context, skuNo),
+                    // Skip if SKU is null
+                    if (skuNo == null) return const SizedBox.shrink();
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context, skuNo),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Product Image
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: InventoryImageWidget(
+                                  companyCode: companyCode,
+                                  skuNo: skuNo,
+                                  uom: uom,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Product Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Description (larger)
+                                    Text(
+                                      desc,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    // SKU, PLU and UOM (smaller)
+                                    Text(
+                                      'SKU: $skuNo | PLU: $plu | UOM: $uom',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                            ],
+                          ),
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -444,15 +680,75 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> _refreshInventory() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.refresh, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Refresh Inventory'),
+          ],
+        ),
+        content: const Text(
+          'This will clear the local cache and fetch fresh inventory data from the server. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Refresh'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    // Clear inventory and show loading state
     setState(() {
+      _inventoryItems = [];
+      _isLoading = true;
       _currentOffset = 0;
       _hasMoreData = true;
+      _debugInfo = 'Refreshing inventory from server...';
     });
+    
+    // Show feedback to user
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🔄 Clearing cache and refreshing from server...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
 
     try {
       final companyCodeRaw = _selectedCompany?['companyCode'];
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) : companyCodeRaw as int?;
       
+      // Clear local database first to remove old flag3='N' items
+      await isar.writeTxn(() async {
+        if (companyCode != null) {
+          await isar.inventoryItems.filter().companyCodeEqualTo(companyCode).deleteAll();
+        }
+      });
+      
+      // Force sync from server (clears cache and refetches)
+      await _inventoryService.syncInventory(
+        companyCode: companyCode,
+        searchQuery: _currentSearchQuery.isEmpty ? null : _currentSearchQuery,
+        filter: _currentFilter,
+      );
+      
+      // Fetch fresh data
       final items = await _inventoryService.getInventory(
         companyCode: companyCode,
         searchQuery: _currentSearchQuery.isEmpty ? null : _currentSearchQuery,
@@ -462,21 +758,44 @@ class _InventoryPageState extends State<InventoryPage> {
         forceRefresh: true,
       );
 
-      setState(() {
-        _inventoryItems = _dedupeByCompanySku(items);
-        _currentOffset = _inventoryItems.length;
-        _hasMoreData = items.length == _pageSize;
-        _isOnline = true;
-        _debugInfo = 'Refreshed: ${items.length} inventory items';
-        _errorMessage = '';
-      });
+      if (mounted) {
+        setState(() {
+          _inventoryItems = _dedupeByCompanySku(items);
+          _currentOffset = _inventoryItems.length;
+          _hasMoreData = items.length == _pageSize;
+          _isOnline = true;
+          _isLoading = false;
+          _debugInfo = 'Refreshed: ${items.length} inventory items';
+          _errorMessage = '';
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Refreshed ${items.length} items from server'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
 
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to refresh inventory: $e';
-        _debugInfo = 'Refresh error: $e';
-        _isOnline = false;
-      });
+      print('❌ Error refreshing inventory: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to refresh inventory: $e';
+          _debugInfo = 'Refresh error: $e';
+          _isOnline = false;
+          _isLoading = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to refresh: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -1092,7 +1411,17 @@ class _InventoryPageState extends State<InventoryPage> {
             splashRadius: 18,
             onPressed: () => _updateQty(item, -1),
           ),
-          Text('$qty', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          GestureDetector(
+            onTap: () => _showQtyInputDialog(item),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text('$qty', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.add, size: 18),
             splashRadius: 18,
@@ -1111,6 +1440,62 @@ class _InventoryPageState extends State<InventoryPage> {
       _qtySelections[sku] = next;
     });
   }
+  
+  Future<void> _showQtyInputDialog(InventoryItem item) async {
+    final int sku = item.skuNo;
+    final int current = _qtySelections[sku] ?? 1;
+    
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(text: current.toString());
+        return AlertDialog(
+          title: const Text('Enter Quantity'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Quantity',
+              hintText: 'Enter quantity (1-999)',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (value) {
+              final qty = int.tryParse(value);
+              if (qty != null && qty >= 1 && qty <= 999) {
+                Navigator.pop(context, qty);
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final qty = int.tryParse(controller.text);
+                if (qty != null && qty >= 1 && qty <= 999) {
+                  Navigator.pop(context, qty);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid quantity (1-999)')),
+                  );
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (result != null && mounted) {
+      setState(() {
+        _qtySelections[sku] = result;
+      });
+    }
+  }
 
   void _addToCart(InventoryItem item, {String? remark, String? uom, double? customGstPrice}) async {
     try {
@@ -1118,6 +1503,25 @@ class _InventoryPageState extends State<InventoryPage> {
       final selectedCompany = await _authService.getSelectedCompany();
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+      
+      // Determine final UOM - fetch from database if not provided
+      String finalUom = uom ?? item.uom ?? '';
+      if (finalUom.trim().isEmpty) {
+        // Try to get default UOM from InStockUom table
+        final uomOptions = await isar.inStockUoms
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .skuNoEqualTo(item.skuNo)
+            .findAll();
+        
+        if (uomOptions.isNotEmpty) {
+          // Use the first UOM option as default
+          finalUom = uomOptions.first.uom ?? 'PCS';
+        } else {
+          // Fallback to PCS if no UOM options found
+          finalUom = 'PCS';
+        }
+      }
       
       // Use custom price if provided, otherwise use item's default price
       final double finalGstPrice = customGstPrice ?? item.gstPrice ?? 0.0;
@@ -1128,7 +1532,7 @@ class _InventoryPageState extends State<InventoryPage> {
         skuNo: item.skuNo,
         pluNo: item.pluNo != null ? item.pluNo.toString() : null,
         description: item.description ?? '',
-        uom: uom ?? item.uom ?? '',
+        uom: finalUom,
         unitPrice: finalUnitPrice,
         gstPrice: finalGstPrice,
         factor: 1.0,
@@ -1263,11 +1667,10 @@ class _InventoryPageState extends State<InventoryPage> {
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to clear all cache: $e';
-        _debugInfo = 'All cache clear error: $e';
+        _debugInfo = 'Cache clear error: $e';
         _isOnline = false;
       });
 
-      // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1284,32 +1687,77 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  void _clearSearch() {
-    _searchController.clear();
-    _currentSearchQuery = '';
-    // Load from local cache (no server fetch) for instant response
-    _resetAndLoadInventory();
+  Future<void> _openBarcodeScanner() async {
+    // Show selection dialog for PLU type
+    final pluType = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Barcode Type'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.qr_code_2, color: Colors.blue),
+              title: const Text('Regular PLU'),
+              subtitle: const Text('Scan general product barcode'),
+              onTap: () => Navigator.pop(context, 'plu'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.person_pin, color: Colors.green),
+              title: const Text('Customer PLU'),
+              subtitle: const Text('Scan customer-specific barcode'),
+              onTap: () => Navigator.pop(context, 'customer_plu'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (pluType == null) return;
+
+    // Open barcode scanner
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const BarcodeScannerPage()),
+    );
+    
+    if (result != null && result.isNotEmpty) {
+      print('🔍 BARCODE SCANNER: Scanned barcode: $result (type: $pluType)');
+      
+      if (pluType == 'customer_plu') {
+        await _onCustomerPluSearchSubmitted(result);
+      } else {
+        await _onPluSearchSubmitted(result);
+      }
+    }
+  }
+
+  Future<String> _getItemDescription(int companyCode, int skuNo) async {
+    try {
+      final item = await _inventoryService.getInventoryItemBySku(companyCode, skuNo);
+      return item?.description ?? 'SKU $skuNo';
+    } catch (e) {
+      return 'SKU $skuNo';
+    }
   }
 
   void _clearScannedPlu() {
     setState(() {
       _scannedPluNo = '';
-      _pluController.clear();
-      _currentSearchQuery = '';
     });
-    _resetAndLoadInventory();
+    _resetAndLoadInventory(forceRefresh: true);
   }
 
-  Future<void> _openBarcodeScanner() async {
-    final result = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (context) => const BarcodeScannerPage()),
-    );
-    if (result != null && result.isNotEmpty) {
-      print('🔍 BARCODE SCANNER: Scanned barcode: $result');
-      // Directly show popup, no text field update needed
-      await _onPluSearchSubmitted(result);
-    }
+  void _clearSearch() {
+    _searchController.clear();
+    _executeSearch();
   }
 
   void _toggleFilters() {
@@ -2270,6 +2718,23 @@ class _InventoryPageState extends State<InventoryPage> {
             ),
           ),
           const SizedBox(width: 8),
+          // Refresh button
+          GestureDetector(
+            onTap: _refreshInventory,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.refresh,
+                size: 18,
+                color: Colors.green.shade600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           // Cart button with badge
           GestureDetector(
             onTap: () async {
@@ -2309,19 +2774,6 @@ class _InventoryPageState extends State<InventoryPage> {
                     ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Refresh button
-          GestureDetector(
-            onTap: _refreshInventory,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.refresh, size: 18, color: Colors.grey.shade700),
             ),
           ),
         ],
@@ -2938,20 +3390,13 @@ class _InventoryPageState extends State<InventoryPage> {
       item = null; // Not found in list
     }
     
-    // If item not found in list, try to fetch from service
+    // If item not found in list, try to fetch from service using exact SKU lookup
     if (item == null) {
       try {
         final companyCode = int.tryParse(_selectedCompany?['companyCode']?.toString() ?? '0') ?? 0;
         if (companyCode > 0) {
-          final items = await _inventoryService.getInventory(
-            companyCode: companyCode,
-            searchQuery: skuNo.toString(),
-            limit: 1,
-            offset: 0,
-          );
-          if (items.isNotEmpty) {
-            item = items.first;
-          }
+          // Use exact SKU lookup instead of text search to avoid matching descriptions
+          item = await _inventoryService.getInventoryItemBySku(companyCode, skuNo);
         }
       } catch (e) {
         print('❌ Error fetching item for SKU $skuNo: $e');
