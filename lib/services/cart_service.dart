@@ -19,6 +19,10 @@ class CartService {
     required double factor,
     int quantity = 1,
     String? remarks,
+    double? balanceQuantity,
+    double? balanceQuantityLoose,
+    double? balanceFoc,
+    double? balanceFocLoose,
   }) async {
     try {
       await isar.writeTxn(() async {

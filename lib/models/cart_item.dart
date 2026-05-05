@@ -22,6 +22,12 @@ class CartItem {
   String? remarks;
   DateTime addedDate = DateTime.now();
 
+  // Balance quantity fields from inventory
+  double? balanceQuantity;
+  double? balanceQuantityLoose;
+  double? balanceFoc;
+  double? balanceFocLoose;
+
   // Calculated fields
   double get subtotal => (unitPrice ?? 0) * quantity;
   double get gstSubtotal => (gstPrice ?? 0) * quantity;
@@ -46,6 +52,10 @@ class CartItem {
     required double factor,
     int quantity = 1,
     String? remarks,
+    double? balanceQuantity,
+    double? balanceQuantityLoose,
+    double? balanceFoc,
+    double? balanceFocLoose,
   }) {
     return CartItem()
       ..companyCode = companyCode
@@ -58,6 +68,10 @@ class CartItem {
       ..factor = factor
       ..quantity = quantity
       ..remarks = remarks
+      ..balanceQuantity = balanceQuantity
+      ..balanceQuantityLoose = balanceQuantityLoose
+      ..balanceFoc = balanceFoc
+      ..balanceFocLoose = balanceFocLoose
       ..addedDate = DateTime.now();
   }
 

@@ -111,6 +111,23 @@ class QuoteItemService {
 
       final items = itemsData.map((data) => QuoteItem.fromJson(data as Map<String, dynamic>)).toList();
       
+      // Debug: Check if balance quantities are being populated
+      if (items.isNotEmpty) {
+        final sampleItem = items.first;
+        print('📊 BALANCE QTY DEBUG: Sample item data:');
+        print('   SKU: ${sampleItem.skuNo}');
+        print('   Balance Quantity: ${sampleItem.balanceQuantity}');
+        print('   Balance Quantity Loose: ${sampleItem.balanceQuantityLoose}');
+        print('   Balance FOC: ${sampleItem.balanceFoc}');
+        print('   Balance FOC Loose: ${sampleItem.balanceFocLoose}');
+        
+        // Count items with balance data
+        final withBalanceQty = items.where((i) => i.balanceQuantity != null && i.balanceQuantity! > 0).length;
+        final withBalanceQtyLoose = items.where((i) => i.balanceQuantityLoose != null && i.balanceQuantityLoose! > 0).length;
+        print('📊 BALANCE QTY SUMMARY: ${withBalanceQty}/${items.length} items have balance quantity');
+        print('📊 BALANCE QTY LOOSE SUMMARY: ${withBalanceQtyLoose}/${items.length} items have loose balance quantity');
+      }
+      
       // Converted ${items.length} quote items
       return items;
     } catch (e) {

@@ -326,6 +326,11 @@ class _EditDraftPageState extends State<EditDraftPage> {
           factor: 1.0,
           quantity: item.quantity.toInt(),
           remarks: item.remark,
+          // Set balance quantities to order quantities for quotation creation
+          balanceQuantity: item.quantity,
+          balanceQuantityLoose: 0.0,
+          balanceFoc: 0.0,
+          balanceFocLoose: 0.0,
         );
       }
 

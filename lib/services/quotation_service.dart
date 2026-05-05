@@ -777,7 +777,12 @@ class QuotationService {
         ..quoteQuantityOri = quantity
         ..unitPriceOri = unitPrice
         ..quantityOriginal = quantity
-        ..addedDate = DateTime.now();
+        ..addedDate = DateTime.now()
+        // Set balance quantities to order quantities for tracking
+        ..balanceQuantity = quantity
+        ..balanceQuantityLoose = 0.0
+        ..balanceFoc = 0.0
+        ..balanceFocLoose = 0.0;
       
       return quoteItem;
     }).toList();
