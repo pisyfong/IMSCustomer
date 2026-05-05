@@ -32,7 +32,6 @@ import 'offline_first_service.dart';
 import 'inventory_image_service.dart';
 import '../models/credit_term.dart';
 import '../models/invoice.dart';
-import '../models/customer_plu.dart';
 
 /// Enhanced sync service that combines your existing sync with SignalR real-time updates
 class EnhancedSyncService {
@@ -110,13 +109,9 @@ class EnhancedSyncService {
     _pluChangedSubscription = _signalRService.pluChanged.listen(_onPluChanged);
     _customerPluChangedSubscription = _signalRService.customerPluChanged.listen(_onCustomerPluChanged);
     
-    // Start periodic sync using configured interval (only if auto sync is enabled)
-    if (AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Starting periodic sync every ${AppConfig.periodicSyncMinutes} minutes');
-      _periodicSyncTimer = Timer.periodic(Duration(minutes: AppConfig.periodicSyncMinutes), (_) => performSync());
-    } else {
-      print('Enhanced Sync: Auto sync is DISABLED - periodic sync will not run');
-    }
+    // Start periodic sync using configured interval
+    print('Enhanced Sync: Starting periodic sync every ${AppConfig.periodicSyncMinutes} minutes');
+    _periodicSyncTimer = Timer.periodic(Duration(minutes: AppConfig.periodicSyncMinutes), (_) => performSync());
     
     // Initial connectivity check
     _checkConnectivity();
@@ -146,17 +141,13 @@ class EnhancedSyncService {
     // Update sync info in database
     _updateSyncInfo(isOnline: _isOnline);
     
-    // If we just came online, connect SignalR and sync (non-blocking) - only if auto sync is enabled
+    // If we just came online, connect SignalR and sync (non-blocking)
     if (!wasOnline && _isOnline) {
       // Run in background without blocking
       Future.microtask(() async {
         try {
           await _signalRService.connect();
-          if (AppConfig.enableAutoSync) {
-            await performSync();
-          } else {
-            print('Enhanced Sync: Auto sync is DISABLED - skipping automatic sync on connectivity change');
-          }
+          await performSync();
         } catch (e) {
           print('Enhanced Sync: Background sync failed (non-blocking): $e');
         }
@@ -168,11 +159,6 @@ class EnhancedSyncService {
   
   /// Handle real-time customer created events
   void _onCustomerCreated(Map<String, dynamic> customerData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time customer created event');
-      return;
-    }
-    
     print('Enhanced Sync: Real-time customer created - ${customerData['name']}');
     
     // Convert to Company object and store locally
@@ -189,11 +175,6 @@ class EnhancedSyncService {
   
   /// Handle real-time customer updated events
   void _onCustomerUpdated(Map<String, dynamic> customerData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time customer updated event');
-      return;
-    }
-    
     print('Enhanced Sync: Real-time customer updated - ${customerData['name']}');
     
     // Convert to Company object and update locally
@@ -210,11 +191,6 @@ class EnhancedSyncService {
   
   /// Handle real-time customer deleted events
   void _onCustomerDeleted(String customerCode) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time customer deleted event');
-      return;
-    }
-    
     print('Enhanced Sync: Real-time customer deleted - $customerCode');
     
     // Find and delete locally
@@ -231,11 +207,6 @@ class EnhancedSyncService {
   
   /// Handle real-time company change events
   void _onCompanyChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time company change event');
-      return;
-    }
-    
     print('📡 Enhanced Sync: Received company change event: $changeData');
     
     final changeType = changeData['changeType'] as String;
@@ -294,11 +265,6 @@ class EnhancedSyncService {
   
   /// Handle real-time customer change events
   void _onCustomerChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time customer change event');
-      return;
-    }
-    
     final changeType = changeData['changeType'] as String;
     final customerData = changeData['data'] as Map<String, dynamic>;
     
@@ -311,11 +277,6 @@ class EnhancedSyncService {
 
   /// Handle real-time inventory change events
   void _onInventoryChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time inventory change event');
-      return;
-    }
-    
     final changeType = changeData['changeType'] as String;
     final inventoryData = changeData['data'] as Map<String, dynamic>;
     final skuNo = inventoryData['SKU_No'];
@@ -327,11 +288,6 @@ class EnhancedSyncService {
 
   /// Handle real-time quotation change events
   void _onQuotationChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time quotation change event');
-      return;
-    }
-    
     final changeType = changeData['changeType'] as String;
     final quotationData = changeData['data'] as Map<String, dynamic>;
     final quoteLabel = quotationData['Quote_PreLabel'];
@@ -344,11 +300,6 @@ class EnhancedSyncService {
 
   /// Handle real-time invoice change events
   void _onInvoiceChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time invoice change event');
-      return;
-    }
-    
     final changeType = changeData['changeType'] as String;
     final invoiceData = changeData['data'] as Map<String, dynamic>;
     final invoiceLabel = invoiceData['Invoice_PreLabel'];
@@ -360,11 +311,6 @@ class EnhancedSyncService {
 
   /// Handle real-time PLU change events
   void _onPluChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time PLU change event');
-      return;
-    }
-    
     final changeType = changeData['changeType'] as String;
     final pluData = changeData['data'] as Map<String, dynamic>;
     final skuNo = pluData['SKU_No'];
@@ -383,11 +329,6 @@ class EnhancedSyncService {
 
   /// Handle real-time customer PLU change events
   void _onCustomerPluChanged(Map<String, dynamic> changeData) async {
-    if (!AppConfig.enableAutoSync) {
-      print('Enhanced Sync: Auto sync is DISABLED - ignoring real-time customer PLU change event');
-      return;
-    }
-    
     final changeType = changeData['changeType'] as String;
     final customerPluData = changeData['data'] as Map<String, dynamic>;
     final customerCode = customerPluData['Customer_Code'];
@@ -423,33 +364,35 @@ class EnhancedSyncService {
     }
     
     try {
-      // OPTIMIZED: Parallelize independent sync operations for faster sync
-      // Step 1: Credit terms first (needed for checkout - dependency)
+      // FIRST: Sync credit terms (needed for checkout)
       print('🔄 ENHANCED SYNC: Step 1 - Syncing credit terms...');
       await _syncCreditTerms();
       print('✅ ENHANCED SYNC: Credit terms sync completed');
       
-      // Step 2: Parallel sync of independent operations (companies, roles, settings)
-      print('🔄 ENHANCED SYNC: Step 2 - Parallel sync of companies/roles/settings...');
-      await Future.wait([
-        syncCompaniesForUser(),
-        _syncUserRolesAndCustomers(),
-        _syncUserAppSettings(),
-      ], eagerError: false);
-      print('✅ ENHANCED SYNC: Companies/roles/settings sync completed');
+      await syncCompaniesForUser();
       
-      // Step 3: Sync quotations (depends on companies being loaded)
-      print('🔄 ENHANCED SYNC: Step 3 - Syncing quotations...');
+      // Sync user roles and customer mappings for role-based filtering
+      await _syncUserRolesAndCustomers();
+      
+      // Sync user app settings for permission control
+      print('🔄 ENHANCED SYNC: About to call _syncUserAppSettings...');
+      await _syncUserAppSettings();
+      print('🔄 ENHANCED SYNC: _syncUserAppSettings completed');
+      
+      // Sync unsynced quotations to server (offline-first)
+      print('🔄 ENHANCED SYNC: About to sync unsynced quotations...');
       await _syncUnsyncedQuotations();
-      print('✅ ENHANCED SYNC: Quotation sync completed');
+      print('🔄 ENHANCED SYNC: Quotation sync completed');
 
-      // Step 4: Parallel sync of inventory and PLU data (independent)
-      print('🔄 ENHANCED SYNC: Step 4 - Parallel sync of inventory/PLU...');
-      await Future.wait([
-        _syncInventoryPeriodically(),
-        _preloadInStockPlu(),
-      ], eagerError: false);
-      print('✅ ENHANCED SYNC: Inventory/PLU sync completed');
+      // Periodic inventory sync (paged, per company)
+      print('🔄 ENHANCED SYNC: About to sync inventory (periodic)...');
+      await _syncInventoryPeriodically();
+      print('🔄 ENHANCED SYNC: Inventory sync completed');
+
+      // Sync In_Stock_PLU for offline barcode scanning
+      print('🔄 ENHANCED SYNC: About to sync In_Stock_PLU...');
+      await _preloadInStockPlu();
+      print('🔄 ENHANCED SYNC: In_Stock_PLU sync completed');
 
     } catch (e) {
       print('Enhanced Sync: Error during sync: $e');
@@ -775,32 +718,118 @@ class EnhancedSyncService {
     await _preloadAllPlus();
   }
 
-  /// OPTIMIZED: Preload ALL customer PLU mappings at once instead of customer-by-customer
+  /// Preload customer-specific PLU mappings using server's getCustomerPlu function
   Future<void> _preloadCustomerPlus() async {
     try {
-      print('🏷️ PRELOAD: Loading ALL customer PLU mappings (optimized full table sync)...');
+      print('🏷️ PRELOAD: Loading customer PLU mappings using getCustomerPlu...');
 
+      // Try to connect if not connected
+      if (!_signalRService.isConnected) {
+        try {
+          await _signalRService.connect().timeout(const Duration(seconds: 5));
+        } catch (e) {
+          print('🏷️ PRELOAD: Cannot connect to server, skipping customer PLU sync');
+          return;
+        }
+      }
+
+      // Strategy: Call getCustomerPlu for each customer with comprehensive SKU list
       final companies = await _isar.companys.where().findAll();
-      
+
       for (final company in companies) {
         final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
         if (companyCode <= 0) continue;
 
-        print('🏷️ PRELOAD: Syncing all customer PLU for company $companyCode...');
-        
-        // OPTIMIZED: Sync entire AR_Customer_Item table for this company in one go
-        await _pluService.syncAllCustomerPlu(companyCode: companyCode);
-        
-        // Count how many we have locally now
-        final totalCount = await _isar.collection<CustomerPlu>()
+        print('🏷️ PRELOAD: Processing company $companyCode for customer PLU...');
+
+        // OPTIMIZATION: Get only customers that have PLU records from server
+        List<String> customersWithPlu = [];
+        try {
+          final response = await _signalRService.invoke('getCustomersWithPlu', [companyCode])
+              .timeout(const Duration(seconds: 10));
+          if (response is List) {
+            customersWithPlu = response.cast<String>();
+            print('🏷️ PRELOAD: Found ${customersWithPlu.length} customers with PLU for company $companyCode');
+          }
+        } catch (e) {
+          print('⚠️ PRELOAD: Failed to get customers with PLU, falling back to all customers: $e');
+          // Fallback: get all customers if the query fails
+          final allCustomers = await _isar.customers
+              .filter()
+              .companyCodeEqualTo(companyCode)
+              .findAll();
+          customersWithPlu = allCustomers.map((c) => c.code).toList();
+        }
+
+        if (customersWithPlu.isEmpty) {
+          print('🏷️ PRELOAD: No customers with PLU found, skipping company $companyCode');
+          continue;
+        }
+
+        // Get ALL SKUs for this company
+        final inventoryItems = await _isar.inventoryItems
             .filter()
             .companyCodeEqualTo(companyCode)
-            .count();
-        
-        print('✅ PRELOAD: Company $companyCode now has $totalCount customer PLU records');
+            .findAll();
+        final allSkus = inventoryItems
+            .map((it) => it.skuNo)
+            .where((sku) => sku > 0)
+            .toList()
+          ..sort();
+        if (allSkus.isEmpty) {
+          print('🏷️ PRELOAD: No inventory items found, skipping company $companyCode');
+          continue;
+        }
+
+        int processedCustomers = 0;
+        int syncedCustomers = 0;
+        int skippedCustomers = 0;
+
+        for (int i = 0; i < customersWithPlu.length; i += 5) {
+          final batch = customersWithPlu.skip(i).take(5).toList();
+          for (final customerCode in batch) {
+            print('🏷️ PRELOAD: Syncing customer PLU for $customerCode with ALL ${allSkus.length} SKUs...');
+
+            // Skip connection check here - already checked at method start
+            {
+              // Chunk SKUs to reduce payload and avoid potential server-side indexing issues
+              const int chunkSize = 200;
+              bool anyChunkSucceeded = false;
+              for (int start = 0; start < allSkus.length; start += chunkSize) {
+                final end = (start + chunkSize) > allSkus.length ? allSkus.length : (start + chunkSize);
+                final chunk = allSkus.sublist(start, end);
+                try {
+                  await _pluService.syncCustomerPlusForCustomer(
+                    companyCode: companyCode,
+                    customerCode: customerCode,
+                    skuNos: chunk,
+                  );
+                  anyChunkSucceeded = true;
+                } catch (e) {
+                  print('🏷️ PRELOAD: Customer PLU chunk sync failed for $customerCode at [$start..$end): $e');
+                  // If a chunk fails, continue with next chunk to avoid halting entire customer
+                }
+                await Future.delayed(const Duration(milliseconds: 50));
+              }
+              if (anyChunkSucceeded) {
+                print('🏷️ PRELOAD: ✅ Synced customer PLU for $customerCode (chunks=${(allSkus.length / chunkSize).ceil()})');
+                syncedCustomers++;
+              } else {
+                print('🏷️ PRELOAD: ⚠️ No customer PLU chunks succeeded for $customerCode');
+                skippedCustomers++;
+              }
+            }
+            processedCustomers++;
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+          await Future.delayed(const Duration(milliseconds: 500));
+          print('🏷️ PRELOAD: Processed batch ${(i ~/ 5) + 1}/${(customersWithPlu.length / 5).ceil()} ($processedCustomers customers so far)');
+        }
+
+        print('🏷️ PRELOAD: Company $companyCode summary - processed: $processedCustomers, synced: $syncedCustomers, skipped: $skippedCustomers');
       }
 
-      print('✅ PRELOAD: Customer PLU preload completed for all companies');
+      print('✅ PRELOAD: Customer PLU preload completed.');
     } catch (e) {
       print('❌ PRELOAD CUSTOMER PLU ERROR: $e');
     }
@@ -809,11 +838,6 @@ class EnhancedSyncService {
   /// Full data preload at app startup
   /// Runs the heavy preload tasks in the background without blocking UI
   Future<void> preloadAllDataAtStartup() async {
-    if (!AppConfig.enableAutoSync) {
-      print('🚀 FULL PRELOAD: Auto sync is DISABLED - skipping automatic data preload at startup');
-      return;
-    }
-    
     if (_isFullDataPreloaded) {
       print('🚀 FULL PRELOAD: Already completed, skipping');
       return;
@@ -1545,7 +1569,7 @@ class EnhancedSyncService {
     _isSyncing = true;
     _syncStatusController.add(true);
     
-    const totalSteps = 12;
+    const totalSteps = 10;
     
     try {
       // Step 1: Credit Terms (needed for checkout)
@@ -1585,41 +1609,29 @@ class EnhancedSyncService {
       await pluService.syncPlus();
       _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'PLU Codes', status: 'completed'));
       
-      // Step 7: Customers (must sync before Customer PLU)
-      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customers', status: 'running'));
-      print('👤 FULL SYNC [7/$totalSteps]: Syncing customers...');
-      await _syncAllCustomers();
-      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customers', status: 'completed'));
-      
-      // Step 8: Customer PLU (requires customers and PLU)
-      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'running'));
-      print('🏷️ FULL SYNC [8/$totalSteps]: Syncing customer PLU mappings...');
+      // Step 7: Customer PLU (requires customers and PLU)
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'running'));
+      print('🏷️ FULL SYNC [7/$totalSteps]: Syncing customer PLU mappings...');
       await syncCustomerPlu();
-      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'completed'));
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'completed'));
       
-      // Step 9: Invoices (historical data - headers only)
-      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'running'));
-      print('🧾 FULL SYNC [9/$totalSteps]: Syncing invoice headers...');
+      // Step 8: Invoices (historical data - headers only)
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'running'));
+      print('🧾 FULL SYNC [8/$totalSteps]: Syncing invoice headers...');
       await preloadAllInvoices();
-      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'completed'));
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'completed'));
       
-      // Step 10: Invoice Items (detailed line items)
-      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'running'));
-      print('📋 FULL SYNC [10/$totalSteps]: Syncing invoice items...');
+      // Step 9: Invoice Items (detailed line items)
+      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'running'));
+      print('📋 FULL SYNC [9/$totalSteps]: Syncing invoice items...');
       await _preloadAllInvoiceItems();
-      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'completed'));
+      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'completed'));
       
-      // Step 11: UOM Pricing (requires inventory)
-      _syncProgressController.add(SyncProgress(currentStep: 11, totalSteps: totalSteps, stepName: 'UOM Pricing', status: 'running'));
-      print('💰 FULL SYNC [11/$totalSteps]: Syncing UOM pricing...');
-      await _syncUomPricing();
-      _syncProgressController.add(SyncProgress(currentStep: 11, totalSteps: totalSteps, stepName: 'UOM Pricing', status: 'completed'));
-      
-      // Step 12: Upload unsynced quotations
-      _syncProgressController.add(SyncProgress(currentStep: 12, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
-      print('📝 FULL SYNC [12/$totalSteps]: Uploading unsynced quotations...');
+      // Step 10: Upload unsynced quotations
+      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
+      print('📝 FULL SYNC [10/$totalSteps]: Uploading unsynced quotations...');
       await _syncUnsyncedQuotations();
-      _syncProgressController.add(SyncProgress(currentStep: 12, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
+      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
       
       // Update sync info
       await _updateSyncInfo(
@@ -1636,106 +1648,6 @@ class EnhancedSyncService {
     } finally {
       _isSyncing = false;
       _syncStatusController.add(false);
-    }
-  }
-
-  /// Sync all customers for all companies user has access to
-  Future<void> _syncAllCustomers() async {
-    try {
-      print('👤 CUSTOMER SYNC: Starting full customer sync...');
-      
-      // Get all companies user has access to
-      final companies = await _isar.companys.where().findAll();
-      if (companies.isEmpty) {
-        print('⚠️ CUSTOMER SYNC: No companies found, skipping');
-        return;
-      }
-      
-      print('👤 CUSTOMER SYNC: Syncing customers for ${companies.length} companies');
-      
-      // Sync customers for each company
-      for (final company in companies) {
-        try {
-          // Convert company code to int
-          final companyCodeRaw = company.companyCode;
-          final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
-          
-          print('👤 CUSTOMER SYNC: Syncing customers for company $companyCode...');
-          await _customerService.syncCustomers(companyCode);
-          print('✅ CUSTOMER SYNC: Completed for company $companyCode');
-        } catch (e) {
-          print('❌ CUSTOMER SYNC: Failed for company ${company.companyCode}: $e');
-          // Continue with other companies even if one fails
-        }
-      }
-      
-      print('✅ CUSTOMER SYNC: Full customer sync completed');
-    } catch (e) {
-      print('❌ CUSTOMER SYNC: Error during customer sync: $e');
-      // Don't throw - allow sync to continue
-    }
-  }
-  
-  /// Sync UOM pricing for all inventory items
-  Future<void> _syncUomPricing() async {
-    try {
-      print('💰 UOM PRICING SYNC: Starting UOM pricing sync...');
-      
-      // Get current company
-      final selectedCompany = await AuthService().getSelectedCompany();
-      if (selectedCompany == null) {
-        print('⚠️ UOM PRICING SYNC: No company selected, skipping');
-        return;
-      }
-      
-      final companyCodeRaw = selectedCompany['companyCode'] ?? 1;
-      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
-      
-      // Get all inventory items for this company
-      final inventoryItems = await _isar.inventoryItems
-          .filter()
-          .companyCodeEqualTo(companyCode)
-          .findAll();
-      
-      if (inventoryItems.isEmpty) {
-        print('⚠️ UOM PRICING SYNC: No inventory items found, skipping');
-        return;
-      }
-      
-      print('💰 UOM PRICING SYNC: Syncing UOM pricing for ${inventoryItems.length} items...');
-      
-      // Sync UOM pricing for each item (in batches to avoid overwhelming the server)
-      const batchSize = 50;
-      int syncedCount = 0;
-      
-      for (int i = 0; i < inventoryItems.length; i += batchSize) {
-        final batch = inventoryItems.skip(i).take(batchSize).toList();
-        
-        await Future.wait(
-          batch.map((item) async {
-            try {
-              final uomPricing = await _inventoryService.getUomPricing(
-                companyCode: companyCode,
-                skuNo: item.skuNo,
-                forceRefresh: true,
-              );
-              if (uomPricing.isNotEmpty) {
-                syncedCount++;
-              }
-            } catch (e) {
-              // Silently continue if individual item fails
-            }
-          }),
-          eagerError: false,
-        );
-        
-        print('💰 UOM PRICING SYNC: Progress ${i + batch.length}/${inventoryItems.length} (${syncedCount} synced)');
-      }
-      
-      print('✅ UOM PRICING SYNC: Completed - synced $syncedCount items');
-    } catch (e) {
-      print('❌ UOM PRICING SYNC: Error during UOM pricing sync: $e');
-      // Don't throw - allow sync to continue
     }
   }
 
@@ -1810,36 +1722,35 @@ class EnhancedSyncService {
     }
   }
   
-  /// OPTIMIZED: Preload all invoices by company (not customer-by-customer)
+  /// Preload all invoices for all customers (public for manual sync)
   Future<void> preloadAllInvoices() async {
     try {
-      print('🧾 PRELOAD: Loading all invoices (optimized by company)...');
+      print('🧾 PRELOAD: Loading all invoices...');
       
-      // Get all companies
-      final companies = await _isar.companys.where().findAll();
+      // Get all customers
+      final customers = await _isar.customers.where().findAll();
       int totalInvoices = 0;
       
-      for (final company in companies) {
+      for (final customer in customers) {
         try {
-          final companyCode = int.tryParse(company.companyCode ?? '0') ?? 0;
-          if (companyCode <= 0) continue;
+          if (customer.code.isEmpty || customer.companyCode == null) continue;
           
-          print('🧾 PRELOAD: Loading all invoices for company $companyCode...');
+          print('🧾 PRELOAD: Loading invoices for customer ${customer.code}...');
           
-          // Fetch ALL invoices for this company (no customer filter)
-          final invoices = await _invoiceService.fetchInvoicesFromServer(
-            companyCode: companyCode,
-            customerCode: '', // Empty = all customers
+          // Fetch invoices for this customer
+          final invoices = await _invoiceService.getInvoices(
+            companyCode: customer.companyCode,
+            customerCode: customer.code,
           );
           
+          totalInvoices += invoices.length;
+          
           if (invoices.isNotEmpty) {
-            await _invoiceService.saveInvoicesToLocal(invoices);
-            totalInvoices += invoices.length;
-            print('✅ PRELOAD: Loaded ${invoices.length} invoices for company $companyCode');
+            print('✅ PRELOAD: Loaded ${invoices.length} invoices for customer ${customer.code}');
           }
           
         } catch (e) {
-          print('❌ PRELOAD: Error loading invoices for company ${company.companyCode}: $e');
+          print('❌ PRELOAD: Error loading invoices for customer ${customer.code}: $e');
         }
       }
       
@@ -1850,72 +1761,39 @@ class EnhancedSyncService {
     }
   }
   
-  /// OPTIMIZED: Preload all invoice items using batch fetching
-  /// Instead of fetching invoice-by-invoice (N+1), fetch in batches of 100
+  /// Preload all invoice items for all invoices
   Future<void> _preloadAllInvoiceItems() async {
     try {
-      print('📋 PRELOAD: Loading all invoice items (optimized batch fetch)...');
+      print('📋 PRELOAD: Loading all invoice items...');
       
-      // Get all invoices grouped by company
+      // Get all invoices
       final invoices = await _isar.invoices.where().findAll();
-      if (invoices.isEmpty) {
-        print('📋 PRELOAD: No invoices to fetch items for');
-        return;
-      }
-      
-      // Group invoices by company code
-      final Map<int, List<String>> invoicesByCompany = {};
-      for (final invoice in invoices) {
-        if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
-        invoicesByCompany.putIfAbsent(invoice.companyCode!, () => []);
-        invoicesByCompany[invoice.companyCode!]!.add(invoice.invoicePreLabel);
-      }
-      
       int totalItems = 0;
+      int processedInvoices = 0;
       
-      for (final entry in invoicesByCompany.entries) {
-        final companyCode = entry.key;
-        final invoiceLabels = entry.value;
-        
-        print('📋 PRELOAD: Fetching items for ${invoiceLabels.length} invoices in company $companyCode...');
-        
-        // Batch fetch in chunks of 100 invoices
-        const int batchSize = 100;
-        for (int i = 0; i < invoiceLabels.length; i += batchSize) {
-          final batch = invoiceLabels.skip(i).take(batchSize).toList();
+      for (final invoice in invoices) {
+        try {
+          if (invoice.invoicePreLabel.isEmpty || invoice.companyCode == null) continue;
           
-          try {
-            final items = await _invoiceService.fetchInvoiceItemsBatch(
-              companyCode: companyCode,
-              invoicePreLabels: batch,
-            );
-            
-            if (items.isNotEmpty) {
-              await _invoiceService.saveInvoiceItemsToLocal(items);
-              totalItems += items.length;
-              print('📋 PRELOAD: Batch ${(i ~/ batchSize) + 1} - saved ${items.length} items');
-            }
-          } catch (e) {
-            print('❌ PRELOAD: Batch fetch failed at offset $i: $e');
-            
-            // Fallback: try individual fetch for this batch
-            print('📋 PRELOAD: Falling back to individual fetch for batch...');
-            for (final label in batch) {
-              try {
-                final items = await _invoiceService.getInvoiceItems(
-                  companyCode: companyCode,
-                  invoicePreLabel: label,
-                );
-                totalItems += items.length;
-              } catch (e2) {
-                // Skip this invoice
-              }
-            }
+          processedInvoices++;
+          if (processedInvoices % 50 == 0) {
+            print('📋 PRELOAD: Processing invoice $processedInvoices/${invoices.length}...');
           }
+          
+          // Fetch invoice items for this invoice
+          final items = await _invoiceService.getInvoiceItems(
+            companyCode: invoice.companyCode,
+            invoicePreLabel: invoice.invoicePreLabel,
+          );
+          
+          totalItems += items.length;
+          
+        } catch (e) {
+          print('❌ PRELOAD: Error loading items for invoice ${invoice.invoicePreLabel}: $e');
         }
       }
       
-      print('✅ PRELOAD: Total invoice items loaded: $totalItems');
+      print('✅ PRELOAD: Total invoice items loaded: $totalItems from $processedInvoices invoices');
       
     } catch (e) {
       print('❌ PRELOAD INVOICE ITEMS ERROR: $e');

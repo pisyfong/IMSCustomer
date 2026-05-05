@@ -324,6 +324,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           'remark1': _remarksController.text,
           'currency': 'RM',
           'rate': 1.0,
+          'locationCode': 'FST',
           'totalQuoteQuantity': widget.cartItems.fold<double>(0, (sum, item) => sum + item.quantity),
           'totalQuoteItem': widget.cartItems.length,
           'grossAmount': _totalAmount,
@@ -384,13 +385,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final pdf = pw.Document();
       
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(20),
           build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
+            return [
                 // Header Section
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -594,9 +593,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 // Remarks
                 if (_remarksController.text.isNotEmpty)
                   pw.Text('REMARK 1: ${_remarksController.text}', style: const pw.TextStyle(fontSize: 8)),
-                
-                pw.Spacer(),
-                
+
+                pw.SizedBox(height: 10),
+
                 // Footer Section
                 pw.Container(
                   decoration: const pw.BoxDecoration(
@@ -651,8 +650,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ],
                   ),
                 ),
-              ],
-            );
+            ];
           },
         ),
       );
