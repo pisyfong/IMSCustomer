@@ -22,93 +22,113 @@ const CartItemSchema = CollectionSchema(
       name: r'addedDate',
       type: IsarType.dateTime,
     ),
-    r'companyCode': PropertySchema(
+    r'balanceFoc': PropertySchema(
       id: 1,
+      name: r'balanceFoc',
+      type: IsarType.double,
+    ),
+    r'balanceFocLoose': PropertySchema(
+      id: 2,
+      name: r'balanceFocLoose',
+      type: IsarType.double,
+    ),
+    r'balanceQuantity': PropertySchema(
+      id: 3,
+      name: r'balanceQuantity',
+      type: IsarType.double,
+    ),
+    r'balanceQuantityLoose': PropertySchema(
+      id: 4,
+      name: r'balanceQuantityLoose',
+      type: IsarType.double,
+    ),
+    r'companyCode': PropertySchema(
+      id: 5,
       name: r'companyCode',
       type: IsarType.long,
     ),
     r'description': PropertySchema(
-      id: 2,
+      id: 6,
       name: r'description',
       type: IsarType.string,
     ),
     r'displayDescription': PropertySchema(
-      id: 3,
+      id: 7,
       name: r'displayDescription',
       type: IsarType.string,
     ),
     r'displayGstPrice': PropertySchema(
-      id: 4,
+      id: 8,
       name: r'displayGstPrice',
       type: IsarType.string,
     ),
     r'displayGstSubtotal': PropertySchema(
-      id: 5,
+      id: 9,
       name: r'displayGstSubtotal',
       type: IsarType.string,
     ),
     r'displaySubtotal': PropertySchema(
-      id: 6,
+      id: 10,
       name: r'displaySubtotal',
       type: IsarType.string,
     ),
     r'displayUnitPrice': PropertySchema(
-      id: 7,
+      id: 11,
       name: r'displayUnitPrice',
       type: IsarType.string,
     ),
     r'displayUom': PropertySchema(
-      id: 8,
+      id: 12,
       name: r'displayUom',
       type: IsarType.string,
     ),
     r'factor': PropertySchema(
-      id: 9,
+      id: 13,
       name: r'factor',
       type: IsarType.double,
     ),
     r'gstPrice': PropertySchema(
-      id: 10,
+      id: 14,
       name: r'gstPrice',
       type: IsarType.double,
     ),
     r'gstSubtotal': PropertySchema(
-      id: 11,
+      id: 15,
       name: r'gstSubtotal',
       type: IsarType.double,
     ),
     r'pluNo': PropertySchema(
-      id: 12,
+      id: 16,
       name: r'pluNo',
       type: IsarType.string,
     ),
     r'quantity': PropertySchema(
-      id: 13,
+      id: 17,
       name: r'quantity',
       type: IsarType.long,
     ),
     r'remarks': PropertySchema(
-      id: 14,
+      id: 18,
       name: r'remarks',
       type: IsarType.string,
     ),
     r'skuNo': PropertySchema(
-      id: 15,
+      id: 19,
       name: r'skuNo',
       type: IsarType.long,
     ),
     r'subtotal': PropertySchema(
-      id: 16,
+      id: 20,
       name: r'subtotal',
       type: IsarType.double,
     ),
     r'unitPrice': PropertySchema(
-      id: 17,
+      id: 21,
       name: r'unitPrice',
       type: IsarType.double,
     ),
     r'uom': PropertySchema(
-      id: 18,
+      id: 22,
       name: r'uom',
       type: IsarType.string,
     )
@@ -200,24 +220,28 @@ void _cartItemSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDateTime(offsets[0], object.addedDate);
-  writer.writeLong(offsets[1], object.companyCode);
-  writer.writeString(offsets[2], object.description);
-  writer.writeString(offsets[3], object.displayDescription);
-  writer.writeString(offsets[4], object.displayGstPrice);
-  writer.writeString(offsets[5], object.displayGstSubtotal);
-  writer.writeString(offsets[6], object.displaySubtotal);
-  writer.writeString(offsets[7], object.displayUnitPrice);
-  writer.writeString(offsets[8], object.displayUom);
-  writer.writeDouble(offsets[9], object.factor);
-  writer.writeDouble(offsets[10], object.gstPrice);
-  writer.writeDouble(offsets[11], object.gstSubtotal);
-  writer.writeString(offsets[12], object.pluNo);
-  writer.writeLong(offsets[13], object.quantity);
-  writer.writeString(offsets[14], object.remarks);
-  writer.writeLong(offsets[15], object.skuNo);
-  writer.writeDouble(offsets[16], object.subtotal);
-  writer.writeDouble(offsets[17], object.unitPrice);
-  writer.writeString(offsets[18], object.uom);
+  writer.writeDouble(offsets[1], object.balanceFoc);
+  writer.writeDouble(offsets[2], object.balanceFocLoose);
+  writer.writeDouble(offsets[3], object.balanceQuantity);
+  writer.writeDouble(offsets[4], object.balanceQuantityLoose);
+  writer.writeLong(offsets[5], object.companyCode);
+  writer.writeString(offsets[6], object.description);
+  writer.writeString(offsets[7], object.displayDescription);
+  writer.writeString(offsets[8], object.displayGstPrice);
+  writer.writeString(offsets[9], object.displayGstSubtotal);
+  writer.writeString(offsets[10], object.displaySubtotal);
+  writer.writeString(offsets[11], object.displayUnitPrice);
+  writer.writeString(offsets[12], object.displayUom);
+  writer.writeDouble(offsets[13], object.factor);
+  writer.writeDouble(offsets[14], object.gstPrice);
+  writer.writeDouble(offsets[15], object.gstSubtotal);
+  writer.writeString(offsets[16], object.pluNo);
+  writer.writeLong(offsets[17], object.quantity);
+  writer.writeString(offsets[18], object.remarks);
+  writer.writeLong(offsets[19], object.skuNo);
+  writer.writeDouble(offsets[20], object.subtotal);
+  writer.writeDouble(offsets[21], object.unitPrice);
+  writer.writeString(offsets[22], object.uom);
 }
 
 CartItem _cartItemDeserialize(
@@ -228,17 +252,21 @@ CartItem _cartItemDeserialize(
 ) {
   final object = CartItem();
   object.addedDate = reader.readDateTime(offsets[0]);
-  object.companyCode = reader.readLong(offsets[1]);
-  object.description = reader.readStringOrNull(offsets[2]);
-  object.factor = reader.readDoubleOrNull(offsets[9]);
-  object.gstPrice = reader.readDoubleOrNull(offsets[10]);
+  object.balanceFoc = reader.readDoubleOrNull(offsets[1]);
+  object.balanceFocLoose = reader.readDoubleOrNull(offsets[2]);
+  object.balanceQuantity = reader.readDoubleOrNull(offsets[3]);
+  object.balanceQuantityLoose = reader.readDoubleOrNull(offsets[4]);
+  object.companyCode = reader.readLong(offsets[5]);
+  object.description = reader.readStringOrNull(offsets[6]);
+  object.factor = reader.readDoubleOrNull(offsets[13]);
+  object.gstPrice = reader.readDoubleOrNull(offsets[14]);
   object.id = id;
-  object.pluNo = reader.readStringOrNull(offsets[12]);
-  object.quantity = reader.readLong(offsets[13]);
-  object.remarks = reader.readStringOrNull(offsets[14]);
-  object.skuNo = reader.readLong(offsets[15]);
-  object.unitPrice = reader.readDoubleOrNull(offsets[17]);
-  object.uom = reader.readStringOrNull(offsets[18]);
+  object.pluNo = reader.readStringOrNull(offsets[16]);
+  object.quantity = reader.readLong(offsets[17]);
+  object.remarks = reader.readStringOrNull(offsets[18]);
+  object.skuNo = reader.readLong(offsets[19]);
+  object.unitPrice = reader.readDoubleOrNull(offsets[21]);
+  object.uom = reader.readStringOrNull(offsets[22]);
   return object;
 }
 
@@ -252,40 +280,48 @@ P _cartItemDeserializeProp<P>(
     case 0:
       return (reader.readDateTime(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 2:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 6:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
       return (reader.readString(offset)) as P;
     case 9:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 10:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 11:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 12:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 13:
-      return (reader.readLong(offset)) as P;
-    case 14:
-      return (reader.readStringOrNull(offset)) as P;
-    case 15:
-      return (reader.readLong(offset)) as P;
-    case 16:
-      return (reader.readDouble(offset)) as P;
-    case 17:
       return (reader.readDoubleOrNull(offset)) as P;
+    case 14:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 15:
+      return (reader.readDouble(offset)) as P;
+    case 16:
+      return (reader.readStringOrNull(offset)) as P;
+    case 17:
+      return (reader.readLong(offset)) as P;
     case 18:
+      return (reader.readStringOrNull(offset)) as P;
+    case 19:
+      return (reader.readLong(offset)) as P;
+    case 20:
+      return (reader.readDouble(offset)) as P;
+    case 21:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 22:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -625,6 +661,337 @@ extension CartItemQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition> balanceFocIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'balanceFoc',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'balanceFoc',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition> balanceFocEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'balanceFoc',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition> balanceFocGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'balanceFoc',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition> balanceFocLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'balanceFoc',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition> balanceFocBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'balanceFoc',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocLooseIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'balanceFocLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocLooseIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'balanceFocLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocLooseEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'balanceFocLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocLooseGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'balanceFocLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocLooseLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'balanceFocLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceFocLooseBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'balanceFocLoose',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'balanceQuantity',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'balanceQuantity',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'balanceQuantity',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'balanceQuantity',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'balanceQuantity',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'balanceQuantity',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLooseIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'balanceQuantityLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLooseIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'balanceQuantityLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLooseEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'balanceQuantityLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLooseGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'balanceQuantityLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLooseLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'balanceQuantityLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterFilterCondition>
+      balanceQuantityLooseBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'balanceQuantityLoose',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
       ));
     });
   }
@@ -2618,6 +2985,55 @@ extension CartItemQuerySortBy on QueryBuilder<CartItem, CartItem, QSortBy> {
     });
   }
 
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceFoc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFoc', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceFocDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFoc', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceFocLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFocLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceFocLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFocLoose', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByBalanceQuantityLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantityLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy>
+      sortByBalanceQuantityLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantityLoose', Sort.desc);
+    });
+  }
+
   QueryBuilder<CartItem, CartItem, QAfterSortBy> sortByCompanyCode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'companyCode', Sort.asc);
@@ -2848,6 +3264,55 @@ extension CartItemQuerySortThenBy
   QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByAddedDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'addedDate', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceFoc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFoc', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceFocDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFoc', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceFocLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFocLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceFocLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceFocLoose', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy> thenByBalanceQuantityLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantityLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QAfterSortBy>
+      thenByBalanceQuantityLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balanceQuantityLoose', Sort.desc);
     });
   }
 
@@ -3090,6 +3555,30 @@ extension CartItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<CartItem, CartItem, QDistinct> distinctByBalanceFoc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'balanceFoc');
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QDistinct> distinctByBalanceFocLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'balanceFocLoose');
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QDistinct> distinctByBalanceQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'balanceQuantity');
+    });
+  }
+
+  QueryBuilder<CartItem, CartItem, QDistinct> distinctByBalanceQuantityLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'balanceQuantityLoose');
+    });
+  }
+
   QueryBuilder<CartItem, CartItem, QDistinct> distinctByCompanyCode() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'companyCode');
@@ -3225,6 +3714,31 @@ extension CartItemQueryProperty
   QueryBuilder<CartItem, DateTime, QQueryOperations> addedDateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'addedDate');
+    });
+  }
+
+  QueryBuilder<CartItem, double?, QQueryOperations> balanceFocProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'balanceFoc');
+    });
+  }
+
+  QueryBuilder<CartItem, double?, QQueryOperations> balanceFocLooseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'balanceFocLoose');
+    });
+  }
+
+  QueryBuilder<CartItem, double?, QQueryOperations> balanceQuantityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'balanceQuantity');
+    });
+  }
+
+  QueryBuilder<CartItem, double?, QQueryOperations>
+      balanceQuantityLooseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'balanceQuantityLoose');
     });
   }
 

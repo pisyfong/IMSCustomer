@@ -18,26 +18,39 @@ class InStockUom {
   double? gstPrice;   // Unit price (incl. GST)
   String? status;     // Status: 'A' = Active, 'I' = Inactive
 
-  // Convert from server response
+  @Index()
+  DateTime? lastWriteTimeStamp; // For delta sync
+
+  // Convert from server response. Tolerates both PascalCase and lowercase
+  // keys because In_Stock_Uom historically returns lowercase columns from
+  // some endpoints and PascalCase from others.
   static InStockUom fromJson(Map<String, dynamic> json) {
     try {
-      final int company = _parseInt(json['Company_Code']) ?? 0;
-      final int sku = _parseInt(json['Sku_No']) ?? 0;
+      final int company = _parseInt(json['Company_Code'] ?? json['company_code']) ?? 0;
+      final int sku = _parseInt(json['Sku_No'] ?? json['sku_no']) ?? 0;
       return InStockUom()
         ..companyCode = company
         ..skuNo = sku
         ..id = Isar.autoIncrement
-        ..uom = json['Uom']
-        ..factor = _parseDouble(json['Factor'])
-        ..price = _parseDouble(json['Price'])
-        ..gstPrice = _parseDouble(json['GST_Price'])
-        ..status = json['Status'];
+        ..uom = (json['Uom'] ?? json['uom']) as String?
+        ..factor = _parseDouble(json['Factor'] ?? json['factor'])
+        ..price = _parseDouble(json['Price'] ?? json['price'])
+        ..gstPrice = _parseDouble(json['GST_Price'] ?? json['gst_price'])
+        ..status = (json['Status'] ?? json['status']) as String?
+        ..lastWriteTimeStamp = _parseDate(json['LastWriteTimeStamp'] ?? json['lastwritetimestamp']);
     } catch (e, stackTrace) {
       print('❌ ERROR in InStockUom.fromJson: $e');
       print('📋 JSON data: $json');
       print('📍 Stack trace: $stackTrace');
       rethrow;
     }
+  }
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 
   // Compose a stable unique Id per (companyCode, skuNo, uom)
@@ -77,6 +90,7 @@ class InStockUom {
       'Price': price,
       'GST_Price': gstPrice,
       'Status': status,
+      'LastWriteTimeStamp': lastWriteTimeStamp?.toIso8601String(),
     };
   }
 

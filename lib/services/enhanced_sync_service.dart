@@ -6,6 +6,8 @@ import 'signalr_service.dart';
 import 'company_service.dart';
 import 'auth_service.dart';
 import 'inventory_service.dart';
+import 'base_inventory_sync_service.dart';
+import 'base_transaction_sync_service.dart';
 import 'customer_service.dart';
 import 'quote_service.dart';
 import 'quote_item_service.dart';
@@ -109,9 +111,13 @@ class EnhancedSyncService {
     _pluChangedSubscription = _signalRService.pluChanged.listen(_onPluChanged);
     _customerPluChangedSubscription = _signalRService.customerPluChanged.listen(_onCustomerPluChanged);
     
-    // Start periodic sync using configured interval
-    print('Enhanced Sync: Starting periodic sync every ${AppConfig.periodicSyncMinutes} minutes');
-    _periodicSyncTimer = Timer.periodic(Duration(minutes: AppConfig.periodicSyncMinutes), (_) => performSync());
+    // Start periodic sync using configured interval (only if enableAutoSync is on)
+    if (AppConfig.enableAutoSync) {
+      print('Enhanced Sync: Starting periodic sync every ${AppConfig.periodicSyncMinutes} minutes');
+      _periodicSyncTimer = Timer.periodic(Duration(minutes: AppConfig.periodicSyncMinutes), (_) => performSync());
+    } else {
+      print('Enhanced Sync: Periodic sync DISABLED via AppConfig.enableAutoSync');
+    }
     
     // Initial connectivity check
     _checkConnectivity();
@@ -141,13 +147,18 @@ class EnhancedSyncService {
     // Update sync info in database
     _updateSyncInfo(isOnline: _isOnline);
     
-    // If we just came online, connect SignalR and sync (non-blocking)
+    // If we just came online, connect SignalR and (optionally) sync.
+    // The performSync() call is gated by AppConfig.enableAutoSync to prevent
+    // the reconnect storm from kicking off duplicate full syncs.
     if (!wasOnline && _isOnline) {
-      // Run in background without blocking
       Future.microtask(() async {
         try {
           await _signalRService.connect();
-          await performSync();
+          if (AppConfig.enableAutoSync) {
+            await performSync();
+          } else {
+            print('Enhanced Sync: came online — skipping auto sync (AppConfig.enableAutoSync = false)');
+          }
         } catch (e) {
           print('Enhanced Sync: Background sync failed (non-blocking): $e');
         }
@@ -293,9 +304,12 @@ class EnhancedSyncService {
     final quoteLabel = quotationData['Quote_PreLabel'];
     
     print('📝 Enhanced Sync: Real-time quotation $changeType - $quoteLabel');
-    print('📝 Quotation change detected - triggering background sync');
-    // Trigger a background sync to fetch updated quotations
-    Future.microtask(() => performSync());
+    if (AppConfig.enableAutoSync) {
+      print('📝 Quotation change detected - triggering background sync');
+      Future.microtask(() => performSync());
+    } else {
+      print('📝 Quotation change detected - skipping (auto sync disabled)');
+    }
   }
 
   /// Handle real-time invoice change events
@@ -379,20 +393,63 @@ class EnhancedSyncService {
       await _syncUserAppSettings();
       print('🔄 ENHANCED SYNC: _syncUserAppSettings completed');
       
-      // Sync unsynced quotations to server (offline-first)
+      // Sync unsynced quotations to server (offline-first upload)
       print('🔄 ENHANCED SYNC: About to sync unsynced quotations...');
       await _syncUnsyncedQuotations();
       print('🔄 ENHANCED SYNC: Quotation sync completed');
 
-      // Periodic inventory sync (paged, per company)
-      print('🔄 ENHANCED SYNC: About to sync inventory (periodic)...');
-      await _syncInventoryPeriodically();
-      print('🔄 ENHANCED SYNC: Inventory sync completed');
+      // Resolve which companies to drive base-table syncs for. Try the
+      // auth-selected company first; fall back to companies in local Isar.
+      final companies = <int>[];
+      try {
+        final auth = AuthService();
+        final selected = await auth.getSelectedCompany();
+        final raw = selected?['companyCode'];
+        int? selectedCode;
+        if (raw is int) {
+          selectedCode = raw;
+        } else if (raw is String) {
+          selectedCode = int.tryParse(raw);
+        }
+        if (selectedCode != null) companies.add(selectedCode);
+      } catch (_) {}
+      if (companies.isEmpty) {
+        try {
+          final localCompanies = await _isar.companys.where().findAll();
+          for (final c in localCompanies) {
+            final code = int.tryParse(c.companyCode ?? '');
+            if (code != null && code > 0 && !companies.contains(code)) {
+              companies.add(code);
+            }
+          }
+        } catch (_) {}
+      }
 
-      // Sync In_Stock_PLU for offline barcode scanning
-      print('🔄 ENHANCED SYNC: About to sync In_Stock_PLU...');
-      await _preloadInStockPlu();
-      print('🔄 ENHANCED SYNC: In_Stock_PLU sync completed');
+      // Inventory base-table sync (replaces _syncInventoryPeriodically and
+      // _preloadInStockPlu). The new sync upserts via composite/deterministic
+      // IDs instead of wiping-then-fetching, so an interrupted sync never
+      // empties the local cache — offline mode is preserved.
+      print('🔄 ENHANCED SYNC: About to sync inventory base tables...');
+      for (final code in companies) {
+        try {
+          await BaseInventorySyncService().syncAll(companyCode: code);
+        } catch (e) {
+          print('⚠️ ENHANCED SYNC: BaseInvSync failed for company $code: $e (cache preserved)');
+        }
+      }
+      print('🔄 ENHANCED SYNC: Inventory base-table sync completed');
+
+      // Transaction base-table sync (mp_invoice + mp_invoice_item +
+      // MP_Quote + MP_Quote_Item). Same upsert-only safety model.
+      print('🔄 ENHANCED SYNC: About to sync transaction base tables...');
+      for (final code in companies) {
+        try {
+          await BaseTransactionSyncService().syncAll(companyCode: code);
+        } catch (e) {
+          print('⚠️ ENHANCED SYNC: BaseTxnSync failed for company $code: $e (cache preserved)');
+        }
+      }
+      print('🔄 ENHANCED SYNC: Transaction base-table sync completed');
 
     } catch (e) {
       print('Enhanced Sync: Error during sync: $e');
@@ -859,46 +916,66 @@ class EnhancedSyncService {
         return;
       }
 
-      // Check server reachability in background (with short timeout)
-      // Don't wait - if it fails, individual methods will handle offline mode
-      final reachable = await _isServerReachableForPreload().timeout(
-        const Duration(seconds: 2),
-        onTimeout: () {
-          print('🚀 FULL PRELOAD: Server check timed out, continuing anyway');
-          return false;
-        },
-      );
-      
-      if (!reachable) {
-        print('🚀 FULL PRELOAD: Server not reachable, but continuing with cached data');
+      // No upfront reachability probe — base-table syncs use HTTP and handle
+      // their own offline fallback. The legacy probe was firing a SignalR
+      // connect with a 2s outer timeout, which orphaned a connect Future
+      // that subsequent callers awaited and saw as a TimeoutException.
+
+      // Run all preloads - each handles its own offline fallback.
+      // Run sequentially but don't block the UI.
+      // Companies first (other syncs filter by company).
+      await _preloadCompanies();
+      // Customers separately — they're the same Customer table not yet
+      // covered by the base-table redesign.
+      await _preloadAllCustomers();
+
+      // Resolve target companies for base-table syncs.
+      final companies = <int>[];
+      try {
+        final selected = await authService.getSelectedCompany();
+        final raw = selected?['companyCode'];
+        int? selectedCode;
+        if (raw is int) {
+          selectedCode = raw;
+        } else if (raw is String) {
+          selectedCode = int.tryParse(raw);
+        }
+        if (selectedCode != null) companies.add(selectedCode);
+      } catch (_) {}
+      if (companies.isEmpty) {
+        try {
+          final localCompanies = await _isar.companys.where().findAll();
+          for (final c in localCompanies) {
+            final code = int.tryParse(c.companyCode ?? '');
+            if (code != null && code > 0 && !companies.contains(code)) {
+              companies.add(code);
+            }
+          }
+        } catch (_) {}
       }
 
-      // Run all preloads - each handles its own offline fallback
-      // These run sequentially but don't block the UI
-      await _preloadCompanies();
-      await _preloadAllInventory();
-      await _preloadAllCustomers();
-      await _preloadAllPlus();
-      await _preloadAllQuotes();
-      await _preloadAllQuoteItems();
-      
-      // Customer PLU preload with timeout to prevent hangs
-      try {
-        await _preloadCustomerPlus().timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            print('⏱️ PRELOAD: Customer PLU preload timed out after 30s, continuing...');
-          },
-        );
-      } catch (e) {
-        print('❌ PRELOAD: Customer PLU preload failed: $e');
+      // Inventory base-table preload (replaces _preloadAllInventory,
+      // _preloadAllPlus, _preloadCustomerPlus). Upsert-only — never wipes
+      // the local cache mid-sync.
+      for (final code in companies) {
+        try {
+          await BaseInventorySyncService().syncAll(companyCode: code);
+        } catch (e) {
+          print('⚠️ PRELOAD: BaseInvSync failed for company $code: $e (cache preserved)');
+        }
       }
-      
-      // Disabled automatic invoice preloading for faster startup
-      // Invoices will be loaded on-demand when user views Previous Orders
-      // Manual sync still available in Settings page
-      // await _preloadAllInvoices();
-      
+
+      // Transaction base-table preload (replaces _preloadAllQuotes,
+      // _preloadAllQuoteItems, and adds invoices which the legacy preload
+      // skipped for startup speed).
+      for (final code in companies) {
+        try {
+          await BaseTransactionSyncService().syncAll(companyCode: code);
+        } catch (e) {
+          print('⚠️ PRELOAD: BaseTxnSync failed for company $code: $e (cache preserved)');
+        }
+      }
+
       await _preloadGroupAndDepartmentLookups();
       
       // Preload inventory images with timeout (5 minutes for all images)
@@ -1569,69 +1646,110 @@ class EnhancedSyncService {
     _isSyncing = true;
     _syncStatusController.add(true);
     
-    const totalSteps = 10;
-    
+    // Consolidated full-sync pipeline. The two BaseXxxSyncService calls each
+    // drain multiple base tables internally with single-flight guards,
+    // delta-via-LastWriteTimeStamp where available, and HTTP transport (no
+    // SignalR hangs). Replaces the legacy steps that paginated each table
+    // through CTE-heavy joins.
+    const totalSteps = 7;
+
+    // Determine which companies to drive base-table syncs for. Try the
+    // auth-selected company first; if no selection (e.g. user ran full sync
+    // before selecting a company), fall back to all companies in local Isar
+    // (which we just refreshed in step 2). This mirrors the legacy
+    // _syncInventoryPeriodically pattern of iterating known companies.
+    final companiesForBaseSyncs = <int>[];
+    try {
+      final auth = AuthService();
+      final selected = await auth.getSelectedCompany();
+      final raw = selected?['companyCode'];
+      int? selectedCode;
+      if (raw is int) {
+        selectedCode = raw;
+      } else if (raw is String) {
+        selectedCode = int.tryParse(raw);
+      }
+      if (selectedCode != null) {
+        companiesForBaseSyncs.add(selectedCode);
+      }
+    } catch (_) {}
+
+    if (companiesForBaseSyncs.isEmpty) {
+      try {
+        final localCompanies = await _isar.companys.where().findAll();
+        for (final c in localCompanies) {
+          final code = int.tryParse(c.companyCode ?? '');
+          if (code != null && code > 0 && !companiesForBaseSyncs.contains(code)) {
+            companiesForBaseSyncs.add(code);
+          }
+        }
+        if (companiesForBaseSyncs.isNotEmpty) {
+          print('🔍 FULL SYNC: No auth-selected company; using ${companiesForBaseSyncs.length} from local Isar: $companiesForBaseSyncs');
+        }
+      } catch (e) {
+        print('⚠️ FULL SYNC: Failed to enumerate local companies: $e');
+      }
+    }
+
     try {
       // Step 1: Credit Terms (needed for checkout)
       _syncProgressController.add(SyncProgress(currentStep: 1, totalSteps: totalSteps, stepName: 'Credit Terms', status: 'running'));
       print('📋 FULL SYNC [1/$totalSteps]: Syncing credit terms...');
       await _syncCreditTerms();
       _syncProgressController.add(SyncProgress(currentStep: 1, totalSteps: totalSteps, stepName: 'Credit Terms', status: 'completed'));
-      
+
       // Step 2: Companies (foundation data)
       _syncProgressController.add(SyncProgress(currentStep: 2, totalSteps: totalSteps, stepName: 'Companies', status: 'running'));
       print('🏢 FULL SYNC [2/$totalSteps]: Syncing companies...');
       await syncCompaniesForUser();
       _syncProgressController.add(SyncProgress(currentStep: 2, totalSteps: totalSteps, stepName: 'Companies', status: 'completed'));
-      
+
       // Step 3: User Roles & Customers (access control)
       _syncProgressController.add(SyncProgress(currentStep: 3, totalSteps: totalSteps, stepName: 'User Roles & Customers', status: 'running'));
       print('👥 FULL SYNC [3/$totalSteps]: Syncing user roles and customers...');
       await _syncUserRolesAndCustomers();
       _syncProgressController.add(SyncProgress(currentStep: 3, totalSteps: totalSteps, stepName: 'User Roles & Customers', status: 'completed'));
-      
+
       // Step 4: User App Settings (permissions)
       _syncProgressController.add(SyncProgress(currentStep: 4, totalSteps: totalSteps, stepName: 'User App Settings', status: 'running'));
       print('⚙️ FULL SYNC [4/$totalSteps]: Syncing user app settings...');
       await _syncUserAppSettings();
       _syncProgressController.add(SyncProgress(currentStep: 4, totalSteps: totalSteps, stepName: 'User App Settings', status: 'completed'));
-      
-      // Step 5: Inventory (products must exist before PLU)
-      _syncProgressController.add(SyncProgress(currentStep: 5, totalSteps: totalSteps, stepName: 'Inventory', status: 'running'));
-      print('📦 FULL SYNC [5/$totalSteps]: Syncing inventory...');
-      await _syncInventoryPeriodically(forceSync: true);
-      _syncProgressController.add(SyncProgress(currentStep: 5, totalSteps: totalSteps, stepName: 'Inventory', status: 'completed'));
-      
-      // Step 6: PLU Codes (requires inventory to exist)
-      _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'PLU Codes', status: 'running'));
-      print('🏷️ FULL SYNC [6/$totalSteps]: Syncing PLU codes...');
-      final pluService = PluService(_isar);
-      await pluService.syncPlus();
-      _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'PLU Codes', status: 'completed'));
-      
-      // Step 7: Customer PLU (requires customers and PLU)
-      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'running'));
-      print('🏷️ FULL SYNC [7/$totalSteps]: Syncing customer PLU mappings...');
-      await syncCustomerPlu();
-      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Customer PLU', status: 'completed'));
-      
-      // Step 8: Invoices (historical data - headers only)
-      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'running'));
-      print('🧾 FULL SYNC [8/$totalSteps]: Syncing invoice headers...');
-      await preloadAllInvoices();
-      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Invoice Headers', status: 'completed'));
-      
-      // Step 9: Invoice Items (detailed line items)
-      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'running'));
-      print('📋 FULL SYNC [9/$totalSteps]: Syncing invoice items...');
-      await _preloadAllInvoiceItems();
-      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Invoice Items', status: 'completed'));
-      
-      // Step 10: Upload unsynced quotations
-      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
-      print('📝 FULL SYNC [10/$totalSteps]: Uploading unsynced quotations...');
+
+      // Step 5: Inventory base tables (replaces legacy steps 5/6/7).
+      // Drains In_Stock + In_Stock_Uom + In_Stock_PLU + In_Stock_Location +
+      // AR_Customer_Item, then composes derived fields and recomputes stock.
+      _syncProgressController.add(SyncProgress(currentStep: 5, totalSteps: totalSteps, stepName: 'Inventory (base tables)', status: 'running'));
+      print('📦 FULL SYNC [5/$totalSteps]: Inventory base-table sync...');
+      if (companiesForBaseSyncs.isEmpty) {
+        print('⚠️ FULL SYNC [5/$totalSteps]: No companies known — skipping inventory base sync');
+      } else {
+        for (final code in companiesForBaseSyncs) {
+          await BaseInventorySyncService().syncAll(companyCode: code);
+        }
+      }
+      _syncProgressController.add(SyncProgress(currentStep: 5, totalSteps: totalSteps, stepName: 'Inventory (base tables)', status: 'completed'));
+
+      // Step 6: Transaction base tables (replaces legacy steps 8/9 and adds
+      // Quote download which the legacy full sync was missing entirely).
+      // Drains mp_invoice + mp_invoice_item + MP_Quote + MP_Quote_Item.
+      _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'Transactions (invoices + quotes)', status: 'running'));
+      print('🧾 FULL SYNC [6/$totalSteps]: Transaction base-table sync...');
+      if (companiesForBaseSyncs.isEmpty) {
+        print('⚠️ FULL SYNC [6/$totalSteps]: No companies known — skipping transaction base sync');
+      } else {
+        for (final code in companiesForBaseSyncs) {
+          await BaseTransactionSyncService().syncAll(companyCode: code);
+        }
+      }
+      _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'Transactions (invoices + quotes)', status: 'completed'));
+
+      // Step 7: Upload locally-created unsynced quotations to the server.
+      // Orthogonal to the download base-syncs above.
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
+      print('📝 FULL SYNC [7/$totalSteps]: Uploading unsynced quotations...');
       await _syncUnsyncedQuotations();
-      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
       
       // Update sync info
       await _updateSyncInfo(

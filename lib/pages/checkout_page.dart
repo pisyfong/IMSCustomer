@@ -21,7 +21,9 @@ import '../services/credit_term_service.dart';
 import '../services/offline_first_service.dart';
 import '../services/plu_service.dart';
 import '../services/draft_service.dart';
+import '../services/representative_service.dart';
 import '../models/credit_term.dart';
+import '../models/representative.dart';
 import '../main.dart'; // For isar instance
 
 class CheckoutPage extends StatefulWidget {
@@ -37,6 +39,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   late final CustomerService _customerService;
   late final QuotationService _quotationService;
   late final CreditTermService _creditTermService;
+  final RepresentativeService _representativeService = RepresentativeService();
   final CartService _cartService = CartService();
   final AuthService _authService = AuthService();
   final DraftService _draftService = DraftService();
@@ -51,6 +54,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   List<CreditTerm> _creditTerms = [];
   CreditTerm? _selectedCreditTerm;
   bool _isLoadingCreditTerms = true;
+  List<Representative> _representatives = [];
+  Representative? _selectedRepresentative;
+  bool _isLoadingRepresentatives = true;
   bool _isCreatingQuotation = false;
   bool _isSavingDraft = false;
   
@@ -67,6 +73,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _creditTermService = CreditTermService(signalRService);
     _loadSelectedCustomer();
     _loadCreditTerms();
+    _loadRepresentatives();
     _calculateTotals();
   }
 
@@ -143,6 +150,57 @@ class _CheckoutPageState extends State<CheckoutPage> {
         _creditTerms = [];
         _selectedCreditTerm = null;
       });
+    }
+  }
+
+  Future<void> _loadRepresentatives() async {
+    try {
+      final selectedCompany = await _authService.getSelectedCompany();
+      final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String
+          ? int.tryParse(companyCodeRaw) ?? 1
+          : companyCodeRaw as int;
+
+      // OFFLINE FIRST: paint cached list immediately
+      final cached = await _representativeService.getCachedRepresentatives(
+        companyCode: companyCode,
+      );
+      if (mounted) {
+        setState(() {
+          _representatives = cached;
+          _isLoadingRepresentatives = false;
+        });
+      }
+
+      // Background refresh from server; replace cache and update list when it returns
+      _representativeService
+          .fetchRepresentatives(companyCode: companyCode)
+          .then((fresh) {
+        if (!mounted) return;
+        setState(() {
+          _representatives = fresh;
+          // Keep current selection if still present in the refreshed list
+          if (_selectedRepresentative != null) {
+            final match = fresh.indexWhere(
+              (r) =>
+                  r.companyCode == _selectedRepresentative!.companyCode &&
+                  r.representativeId == _selectedRepresentative!.representativeId,
+            );
+            _selectedRepresentative = match >= 0 ? fresh[match] : null;
+          }
+        });
+      }).catchError((e) {
+        print('⚠️ REPRESENTATIVE: background refresh failed: $e');
+      });
+    } catch (e) {
+      print('❌ Error loading representatives: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingRepresentatives = false;
+          _representatives = [];
+          _selectedRepresentative = null;
+        });
+      }
     }
   }
 
@@ -317,7 +375,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         quotePreLabel: quoteNo,
         customer: _selectedCustomer!['code'] ?? '',
         quoteDate: DateTime.now(),
-        status: 'P', // P = Pending
+        status: 'A', // A = Active (matches existing server-side convention)
         term: _selectedCreditTerm?.term ?? '30', // Use selected credit term
         quoteExpiry: DateTime.now().add(Duration(days: _selectedCreditTerm?.days ?? 30)),
         additionalData: {
@@ -325,6 +383,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           'currency': 'RM',
           'rate': 1.0,
           'locationCode': 'FST',
+          'representativeId': _selectedRepresentative?.representativeId,
           'totalQuoteQuantity': widget.cartItems.fold<double>(0, (sum, item) => sum + item.quantity),
           'totalQuoteItem': widget.cartItems.length,
           'grossAmount': _totalAmount,
@@ -347,8 +406,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         'unitPrice': item.gstPrice ?? item.unitPrice ?? 0.0,  // Use GST-inclusive price
         'amount': (item.gstPrice ?? item.unitPrice ?? 0.0) * item.quantity,  // Use GST-inclusive amount
         'pluNo': item.pluNo,
-        'remark': item.displayDescription ?? item.description ?? 'Item ${item.skuNo}',  // Use actual description
-        'remarks': item.remarks,  // Keep user's additional remarks separate
+        'remark': item.remarks,  // Only the user's typed remark; description is looked up at render time
       }).toList();
       
       final itemsSaved = await _quotationService.saveQuotationItems(
@@ -381,7 +439,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
         pdfItems = cartItemsWithPlu;
         print('⚠️ No saved items found, using ${cartItemsWithPlu.length} cart items for PDF');
       }
-      
+
+      // SKU+UOM -> description lookup, sourced from the cart we just saved.
+      // QuoteItem rows persist only the user's remark now, not the description,
+      // so we resolve the description here at render time.
+      final descLookup = <String, String>{
+        for (final ci in cartItemsWithPlu)
+          '${ci.skuNo}_${ci.uom ?? 'PCS'}': ci.displayDescription,
+      };
+
       final pdf = pw.Document();
       
       pdf.addPage(
@@ -494,7 +560,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
                               pw.Text('SalesRep', style: const pw.TextStyle(fontSize: 8)),
-                              pw.Text(': ${_selectedCustomer!['code'] ?? "001"}', style: const pw.TextStyle(fontSize: 8)),
+                              pw.Text(
+                                ': ${_selectedRepresentative?.displayName ?? "-"}',
+                                style: const pw.TextStyle(fontSize: 8),
+                              ),
                             ],
                           ),
                         ],
@@ -547,11 +616,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         // Using saved quotation items from database
                         skuNo = item.skuNo.toString();
                         pluNo = item.pluNo ?? '';
-                        // Split combined remark back into description and remarks
-                        final remarkParts = (item.remark ?? '').split('\n');
-                        description = remarkParts.isNotEmpty ? remarkParts[0] : 'Item ${item.skuNo}';
-                        remarks = remarkParts.length > 1 ? remarkParts.sublist(1).join('\n') : '';
                         uom = item.uom;
+                        // Description is resolved from the cart we just saved; remark is now
+                        // strictly the user's typed remark (may be null).
+                        description = descLookup['${item.skuNo}_$uom'] ?? 'Item ${item.skuNo}';
+                        remarks = (item.remark ?? '').trim();
                         quantity = (item.quoteQuantity ?? 0).toInt();
                         // Use unitPrice directly without tax reduction (should match original cart price)
                         gstPrice = (item.unitPrice ?? 0.0).toStringAsFixed(2);
@@ -887,6 +956,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No customer selected. Using default customer for PDF generation.')),
       );
+    }
+
+    if (_selectedRepresentative == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a representative before creating the quotation.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
 
     final confirmed = await showDialog<bool>(
@@ -1322,6 +1401,88 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           );
                         }).toList(),
                         onChanged: (value) => setState(() => _selectedCreditTerm = value),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Representative (Compact, required)
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person_outline, size: 16, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Representative *',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_isLoadingRepresentatives)
+                  const SizedBox(
+                    height: 36,
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                else if (_representatives.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'No representatives available',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: _selectedRepresentative == null
+                            ? Colors.orange.shade400
+                            : Colors.grey.shade300,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<Representative>(
+                        value: _selectedRepresentative,
+                        isExpanded: true,
+                        isDense: true,
+                        hint: const Text(
+                          'Select representative',
+                          style: TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                        items: _representatives.map((rep) {
+                          return DropdownMenuItem<Representative>(
+                            value: rep,
+                            child: Text(rep.displayName, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (value) => setState(() => _selectedRepresentative = value),
                       ),
                     ),
                   ),

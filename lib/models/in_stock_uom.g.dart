@@ -52,23 +52,28 @@ const InStockUomSchema = CollectionSchema(
       name: r'gstPrice',
       type: IsarType.double,
     ),
-    r'price': PropertySchema(
+    r'lastWriteTimeStamp': PropertySchema(
       id: 7,
+      name: r'lastWriteTimeStamp',
+      type: IsarType.dateTime,
+    ),
+    r'price': PropertySchema(
+      id: 8,
       name: r'price',
       type: IsarType.double,
     ),
     r'skuNo': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'skuNo',
       type: IsarType.long,
     ),
     r'status': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'status',
       type: IsarType.string,
     ),
     r'uom': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'uom',
       type: IsarType.string,
     )
@@ -100,6 +105,19 @@ const InStockUomSchema = CollectionSchema(
       properties: [
         IndexPropertySchema(
           name: r'skuNo',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'lastWriteTimeStamp': IndexSchema(
+      id: 7326441883989890436,
+      name: r'lastWriteTimeStamp',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'lastWriteTimeStamp',
           type: IndexType.value,
           caseSensitive: false,
         )
@@ -152,10 +170,11 @@ void _inStockUomSerialize(
   writer.writeString(offsets[4], object.displayUom);
   writer.writeDouble(offsets[5], object.factor);
   writer.writeDouble(offsets[6], object.gstPrice);
-  writer.writeDouble(offsets[7], object.price);
-  writer.writeLong(offsets[8], object.skuNo);
-  writer.writeString(offsets[9], object.status);
-  writer.writeString(offsets[10], object.uom);
+  writer.writeDateTime(offsets[7], object.lastWriteTimeStamp);
+  writer.writeDouble(offsets[8], object.price);
+  writer.writeLong(offsets[9], object.skuNo);
+  writer.writeString(offsets[10], object.status);
+  writer.writeString(offsets[11], object.uom);
 }
 
 InStockUom _inStockUomDeserialize(
@@ -169,10 +188,11 @@ InStockUom _inStockUomDeserialize(
   object.factor = reader.readDoubleOrNull(offsets[5]);
   object.gstPrice = reader.readDoubleOrNull(offsets[6]);
   object.id = id;
-  object.price = reader.readDoubleOrNull(offsets[7]);
-  object.skuNo = reader.readLong(offsets[8]);
-  object.status = reader.readStringOrNull(offsets[9]);
-  object.uom = reader.readStringOrNull(offsets[10]);
+  object.lastWriteTimeStamp = reader.readDateTimeOrNull(offsets[7]);
+  object.price = reader.readDoubleOrNull(offsets[8]);
+  object.skuNo = reader.readLong(offsets[9]);
+  object.status = reader.readStringOrNull(offsets[10]);
+  object.uom = reader.readStringOrNull(offsets[11]);
   return object;
 }
 
@@ -198,12 +218,14 @@ P _inStockUomDeserializeProp<P>(
     case 6:
       return (reader.readDoubleOrNull(offset)) as P;
     case 7:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 8:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 9:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 10:
+      return (reader.readStringOrNull(offset)) as P;
+    case 11:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -242,6 +264,14 @@ extension InStockUomQueryWhereSort
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         const IndexWhereClause.any(indexName: r'skuNo'),
+      );
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhere> anyLastWriteTimeStamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'lastWriteTimeStamp'),
       );
     });
   }
@@ -490,6 +520,121 @@ extension InStockUomQueryWhere
         lower: [lowerSkuNo],
         includeLower: includeLower,
         upper: [upperSkuNo],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'lastWriteTimeStamp',
+        value: [null],
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastWriteTimeStamp',
+        lower: [null],
+        includeLower: false,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampEqualTo(DateTime? lastWriteTimeStamp) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'lastWriteTimeStamp',
+        value: [lastWriteTimeStamp],
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampNotEqualTo(DateTime? lastWriteTimeStamp) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastWriteTimeStamp',
+              lower: [],
+              upper: [lastWriteTimeStamp],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastWriteTimeStamp',
+              lower: [lastWriteTimeStamp],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastWriteTimeStamp',
+              lower: [lastWriteTimeStamp],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastWriteTimeStamp',
+              lower: [],
+              upper: [lastWriteTimeStamp],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampGreaterThan(
+    DateTime? lastWriteTimeStamp, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastWriteTimeStamp',
+        lower: [lastWriteTimeStamp],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampLessThan(
+    DateTime? lastWriteTimeStamp, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastWriteTimeStamp',
+        lower: [],
+        upper: [lastWriteTimeStamp],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterWhereClause>
+      lastWriteTimeStampBetween(
+    DateTime? lowerLastWriteTimeStamp,
+    DateTime? upperLastWriteTimeStamp, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastWriteTimeStamp',
+        lower: [lowerLastWriteTimeStamp],
+        includeLower: includeLower,
+        upper: [upperLastWriteTimeStamp],
         includeUpper: includeUpper,
       ));
     });
@@ -1309,6 +1454,80 @@ extension InStockUomQueryFilter
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      lastWriteTimeStampIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastWriteTimeStamp',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      lastWriteTimeStampIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastWriteTimeStamp',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      lastWriteTimeStampEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastWriteTimeStamp',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      lastWriteTimeStampGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastWriteTimeStamp',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      lastWriteTimeStampLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastWriteTimeStamp',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition>
+      lastWriteTimeStampBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastWriteTimeStamp',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QAfterFilterCondition> priceIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1829,6 +2048,20 @@ extension InStockUomQuerySortBy
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy>
+      sortByLastWriteTimeStamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastWriteTimeStamp', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy>
+      sortByLastWriteTimeStampDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastWriteTimeStamp', Sort.desc);
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QAfterSortBy> sortByPrice() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'price', Sort.asc);
@@ -1978,6 +2211,20 @@ extension InStockUomQuerySortThenBy
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy>
+      thenByLastWriteTimeStamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastWriteTimeStamp', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InStockUom, InStockUom, QAfterSortBy>
+      thenByLastWriteTimeStampDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastWriteTimeStamp', Sort.desc);
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QAfterSortBy> thenByPrice() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'price', Sort.asc);
@@ -2077,6 +2324,13 @@ extension InStockUomQueryWhereDistinct
     });
   }
 
+  QueryBuilder<InStockUom, InStockUom, QDistinct>
+      distinctByLastWriteTimeStamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastWriteTimeStamp');
+    });
+  }
+
   QueryBuilder<InStockUom, InStockUom, QDistinct> distinctByPrice() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'price');
@@ -2152,6 +2406,13 @@ extension InStockUomQueryProperty
   QueryBuilder<InStockUom, double?, QQueryOperations> gstPriceProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'gstPrice');
+    });
+  }
+
+  QueryBuilder<InStockUom, DateTime?, QQueryOperations>
+      lastWriteTimeStampProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastWriteTimeStamp');
     });
   }
 

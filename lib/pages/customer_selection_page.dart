@@ -47,21 +47,25 @@ class _CustomerSelectionPageState extends State<CustomerSelectionPage> {
     super.dispose();
   }
 
+  /// Non-blocking online-status probe. Uses the synchronous cached state
+  /// (no network) to update the indicator immediately, then optionally
+  /// kicks a probe in the background. Never blocks the UI.
   Future<void> _checkOnlineStatus() async {
-    try {
-      final isOnline = await OfflineFirstService.isServerReachable();
-      if (mounted) {
-        setState(() {
-          _isOnline = isOnline;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isOnline = false;
-        });
-      }
+    // Cached state is synchronous — paint immediately.
+    final cached = OfflineFirstService.isLikelyOnline();
+    if (mounted) {
+      setState(() => _isOnline = cached);
     }
+    // Optional background probe to refresh the indicator. Errors swallowed.
+    // ignore: unawaited_futures
+    () async {
+      try {
+        final isOnline = await OfflineFirstService.isServerReachable();
+        if (mounted) setState(() => _isOnline = isOnline);
+      } catch (_) {
+        // Cached state already shown — fine.
+      }
+    }();
   }
 
   Future<void> _loadCustomers({bool forceSync = false}) async {
@@ -73,15 +77,17 @@ class _CustomerSelectionPageState extends State<CustomerSelectionPage> {
 
     try {
       final companyCodeRaw = widget.selectedCompany['companyCode'];
-      final companyCode = companyCodeRaw is String 
-          ? int.parse(companyCodeRaw) 
+      final companyCode = companyCodeRaw is String
+          ? int.parse(companyCodeRaw)
           : companyCodeRaw as int;
 
+      // Read customers (offline-first — returns local cache immediately).
       final customers = await _customerService.getCustomers(companyCode, forceSync: forceSync);
-      
-      // Check online status
-      final isOnline = await OfflineFirstService.isServerReachable();
-      
+
+      // Online indicator: use cached connectivity state — no network probe,
+      // no waiting. _checkOnlineStatus will refresh it asynchronously.
+      final isOnline = OfflineFirstService.isLikelyOnline();
+
       setState(() {
         _customers = customers;
         _filteredCustomers = customers;

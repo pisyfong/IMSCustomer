@@ -24,6 +24,9 @@ import 'models/user_customer.dart';
 import 'models/user_app_settings.dart';
 import 'models/quotation.dart';
 import 'models/credit_term.dart';
+import 'models/representative.dart';
+import 'models/in_stock_location.dart';
+import 'models/sync_checkpoint.dart';
 import 'models/group_lookup.dart';
 import 'models/department_lookup.dart';
 import 'models/customer_plu.dart';
@@ -51,6 +54,11 @@ class DummyItem {
 
 // Global Isar instance
 late Isar isar;
+
+/// Global route observer so pages can hook into didPush/didPopNext and refresh
+/// when they become visible again (e.g. PendingUploadsPage).
+final RouteObserver<ModalRoute<void>> appRouteObserver =
+    RouteObserver<ModalRoute<void>>();
 
 // Global SignalR service instances
 late SignalRService signalRService;
@@ -86,6 +94,9 @@ Future<void> initIsar() async {
       UserAppSettingsSchema,
       QuotationSchema,
       CreditTermSchema,
+      RepresentativeSchema,
+      InStockLocationSchema,
+      SyncCheckpointSchema,
       GroupLookupSchema,
       DepartmentLookupSchema,
       CustomerPluSchema,
@@ -231,19 +242,22 @@ class _MyAppState extends State<MyApp> {
   /// Start full data preload in background (non-blocking)
   /// OFFLINE-FIRST: Never blocks the UI, runs silently in background
   void _startFullDataPreload() {
-    print('🚀 APP STARTUP: Scheduling background data preload...');
-    
-    // Fire and forget - don't await, don't block
-    // The preload method itself handles all errors and offline scenarios
-    enhancedSyncService.preloadAllDataAtStartup();
-    
-    print('✅ APP STARTUP: Background preload scheduled (non-blocking)');
+    if (AppConfig.enableAutoSync) {
+      print('🚀 APP STARTUP: Scheduling background data preload...');
+      // Fire and forget - don't await, don't block
+      // The preload method itself handles all errors and offline scenarios
+      enhancedSyncService.preloadAllDataAtStartup();
+      print('✅ APP STARTUP: Background preload scheduled (non-blocking)');
+    } else {
+      print('🚀 APP STARTUP: Skipping startup preload (AppConfig.enableAutoSync = false)');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'IMS Customer',
+      navigatorObservers: [appRouteObserver],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.redAccent.shade100, brightness: Brightness.light),
         scaffoldBackgroundColor: Colors.red[50],

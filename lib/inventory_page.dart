@@ -163,14 +163,10 @@ class _InventoryPageState extends State<InventoryPage> {
   void _executeSearch() {
     final query = _searchController.text.trim();
     if (query != _currentSearchQuery) {
-      final wasNonEmpty = _currentSearchQuery.isNotEmpty;
       _currentSearchQuery = query;
-      // If user cleared the search from a non-empty query, force refresh to repopulate full catalog
-      if (query.isEmpty && wasNonEmpty) {
-        _resetAndLoadInventory(forceRefresh: true);
-      } else {
-        _resetAndLoadInventory();
-      }
+      // Search input changed — reload from local Isar (no server call).
+      // The full catalog is always cached; clearing the filter just re-reads it.
+      _resetAndLoadInventory();
     }
   }
 
@@ -178,10 +174,11 @@ class _InventoryPageState extends State<InventoryPage> {
   void _onPluSearchChanged() {
     final pluQuery = _pluController.text.trim();
     if (pluQuery.isEmpty) {
-      // If PLU search is cleared, clear the main search too
+      // If PLU search is cleared, clear the main search too. Just re-read
+      // from local Isar — the full catalog is already cached.
       if (_currentSearchQuery.isNotEmpty) {
         _currentSearchQuery = '';
-        _resetAndLoadInventory(forceRefresh: true);
+        _resetAndLoadInventory();
       }
       return;
     }
@@ -1752,7 +1749,8 @@ class _InventoryPageState extends State<InventoryPage> {
     setState(() {
       _scannedPluNo = '';
     });
-    _resetAndLoadInventory(forceRefresh: true);
+    // Just re-read from local Isar; no server refetch needed.
+    _resetAndLoadInventory();
   }
 
   void _clearSearch() {
@@ -2714,23 +2712,6 @@ class _InventoryPageState extends State<InventoryPage> {
                 Icons.filter_list,
                 size: 18,
                 color: _showFilters ? Colors.blue.shade600 : Colors.grey.shade700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Refresh button
-          GestureDetector(
-            onTap: _refreshInventory,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.refresh,
-                size: 18,
-                color: Colors.green.shade600,
               ),
             ),
           ),

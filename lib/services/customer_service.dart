@@ -12,7 +12,35 @@ class CustomerService {
   final SignalRService _signalRService;
   final RoleCustomerService _roleCustomerService = RoleCustomerService();
 
+  // Single-flight guard: companyCode -> in-flight background refresh future.
+  // Prevents the same company being re-synced concurrently if multiple page
+  // loads or screens trigger getCustomers() while a sync is already running.
+  final Map<int, Future<void>> _bgRefreshes = <int, Future<void>>{};
+
   CustomerService(this._signalRService);
+
+  /// Kicks off a non-blocking background refresh of customers for the company,
+  /// updating the local cache so the NEXT call to getCustomers() sees fresher
+  /// data. Network errors are swallowed; current users see no interruption.
+  ///
+  /// Skips entirely if cached connectivity state says we're offline — avoids
+  /// the SignalR connect-then-fail noise when the server is unreachable.
+  void _maybeBackgroundRefreshCustomers(int companyCode) {
+    if (_bgRefreshes.containsKey(companyCode)) return;
+    if (!OfflineFirstService.isLikelyOnline()) {
+      // Quietly skip; user already has cached data on screen.
+      return;
+    }
+    final fut = () async {
+      try {
+        await syncCustomers(companyCode);
+      } catch (e) {
+        print('🔁 CustomerService: background refresh failed (cache preserved): $e');
+      }
+    }();
+    _bgRefreshes[companyCode] = fut;
+    fut.whenComplete(() => _bgRefreshes.remove(companyCode));
+  }
 
   /// Sync customers from server and save to local database (graceful failure handling)
   Future<List<Customer>> syncCustomers(int companyCode) async {
@@ -128,9 +156,13 @@ class CustomerService {
         return localCustomers;
       }
 
-      // If we have local data, return it immediately (offline-first)
+      // If we have local data, return it immediately (offline-first).
+      // ALSO kick off a background refresh — fire-and-forget — so the next
+      // call sees fresh data. Errors are swallowed; the user UI is never
+      // blocked or interrupted by network failures.
       if (localCustomers.isNotEmpty) {
         print('📱 Using ${localCustomers.length} cached customers (offline-first)');
+        _maybeBackgroundRefreshCustomers(companyCode);
         return localCustomers;
       }
 

@@ -205,7 +205,8 @@ app.post('/api/quotations', async (req, res) => {
         request.input('Attention_Remark', sql.NVarChar(50), quotation.Attention_Remark);
         request.input('latitude', sql.NVarChar(30), quotation.latitude);
         request.input('longitude', sql.NVarChar(30), quotation.longitude);
-        
+        request.input('Representative_ID', sql.SmallInt, quotation.Representative_ID);
+
         const query = `
             INSERT INTO [RMS].[dbo].[MP_Quote] (
                 Company_Code, Quote_PreLabel, Master_PreLabel, Quote_Date, Customer, Term,
@@ -214,7 +215,7 @@ app.post('/api/quotations', async (req, res) => {
                 Total_Discount_Rate, Total_Discount_Amount, Total_Tax_Rate, Total_Tax_Amount,
                 Net_Amount, Other_Charges, Location_Code, Project_Code, SY_Location_Code,
                 GST_Amount, Total_Amount_B4_GST, Quoted_By, Attention_Remark,
-                latitude, longitude, Added_Date
+                latitude, longitude, Representative_ID, Added_Date
             ) VALUES (
                 @Company_Code, @Quote_PreLabel, @Master_PreLabel, @Quote_Date, @Customer, @Term,
                 @Quote_Expiry, @Status, @Ref1, @Ref2, @Ref3, @Ref4, @Remark1, @Remark2,
@@ -222,7 +223,7 @@ app.post('/api/quotations', async (req, res) => {
                 @Total_Discount_Rate, @Total_Discount_Amount, @Total_Tax_Rate, @Total_Tax_Amount,
                 @Net_Amount, @Other_Charges, @Location_Code, @Project_Code, @SY_Location_Code,
                 @GST_Amount, @Total_Amount_B4_GST, @Quoted_By, @Attention_Remark,
-                @latitude, @longitude, GETDATE()
+                @latitude, @longitude, @Representative_ID, GETDATE()
             )
         `;
         

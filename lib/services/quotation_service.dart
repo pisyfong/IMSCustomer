@@ -26,7 +26,7 @@ class QuotationService {
     Map<String, dynamic>? additionalData,
   }) async {
     final quotationDate = quoteDate ?? DateTime.now();
-    final quotationStatus = status ?? 'P'; // P = Pending
+    final quotationStatus = status ?? 'A'; // A = Active (matches existing server-side convention)
     
     // STEP 1: Log quotation creation BEFORE saving to database
     await QuotationLogger.logQuotationCreation(
@@ -122,10 +122,34 @@ class QuotationService {
         .findAll();
   }
 
+  /// Sync a specific subset of quotations (by quotePreLabel) to the server.
+  /// Used by the Pending Uploads page to upload only the user-selected quotes.
+  Future<Map<String, dynamic>> syncQuotationsByPreLabels(
+      List<String> preLabels) async {
+    if (preLabels.isEmpty) {
+      return {
+        'total': 0,
+        'synced': 0,
+        'skipped': 0,
+        'failed': 0,
+        'details': <Map<String, dynamic>>[],
+      };
+    }
+    final all = await getUnsyncedQuotations();
+    final wanted = preLabels.toSet();
+    final filtered = all.where((q) => wanted.contains(q.quotePreLabel)).toList();
+    return _syncQuotationsList(filtered);
+  }
+
   /// Sync unsynced quotations to server
   /// Returns a map with sync results for UI display
   Future<Map<String, dynamic>> syncUnsyncedQuotationsWithDetails() async {
     final unsyncedQuotations = await getUnsyncedQuotations();
+    return _syncQuotationsList(unsyncedQuotations);
+  }
+
+  Future<Map<String, dynamic>> _syncQuotationsList(
+      List<Quotation> unsyncedQuotations) async {
     final results = <String, dynamic>{
       'total': unsyncedQuotations.length,
       'synced': 0,
@@ -649,6 +673,7 @@ class QuotationService {
     if (data.containsKey('locationCode')) quotation.locationCode = data['locationCode'];
     if (data.containsKey('projectCode')) quotation.projectCode = data['projectCode'];
     if (data.containsKey('quotedBy')) quotation.quotedBy = data['quotedBy'];
+    if (data.containsKey('representativeId')) quotation.representativeId = data['representativeId'] as int?;
     if (data.containsKey('attentionRemark')) quotation.attentionRemark = data['attentionRemark'];
     if (data.containsKey('latitude')) quotation.latitude = data['latitude'];
     if (data.containsKey('longitude')) quotation.longitude = data['longitude'];
@@ -772,7 +797,9 @@ class QuotationService {
         ..taxAmount = 0.0
         ..netAmount = item['amount'] ?? (quantity * unitPrice)
         ..pluNo = item['pluNo'] ?? item['plu_no']
-        ..remark = _buildItemRemark(item['remark'], item['remarks'])
+        ..remark = (item['remark'] as String?)?.trim().isNotEmpty == true
+            ? (item['remark'] as String).trim()
+            : null
         ..locationCode = 'FST'
         ..quoteQuantityOri = quantity
         ..unitPriceOri = unitPrice
@@ -1050,20 +1077,6 @@ class QuotationService {
     }
     
     return quotationsWithItems;
-  }
-
-  /// Build item remark by combining description and user remarks
-  String _buildItemRemark(String? description, String? userRemarks) {
-    final desc = description ?? '';
-    final remarks = userRemarks?.trim() ?? '';
-    
-    if (desc.isEmpty && remarks.isEmpty) {
-      return '';
-    } else if (desc.isNotEmpty && remarks.isNotEmpty) {
-      return '$desc\n$remarks'; // Description on first line, remarks on second line
-    } else {
-      return desc.isNotEmpty ? desc : remarks;
-    }
   }
 
   /// Log duplicate quotation details to text file for manual review

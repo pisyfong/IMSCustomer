@@ -525,24 +525,40 @@ class SignalRService {
     }
   }
   
-  /// Generic invoke method for SignalR hub methods
-  Future<dynamic> invoke(String methodName, List<dynamic> args) async {
-    // Invoking SignalR method: $methodName
-    
+  /// Generic invoke method for SignalR hub methods.
+  ///
+  /// [timeout] caps how long we wait for the server to respond. Without this,
+  /// invokes dispatched on a transport that dies mid-call (e.g. during a
+  /// reconnect) hang forever — the underlying signalr_netcore client does not
+  /// surface a transport-closed error to already-pending invocations. A timeout
+  /// guarantees the awaiter eventually sees an error and can fall back to
+  /// cached data instead of locking the UI.
+  Future<dynamic> invoke(
+    String methodName,
+    List<dynamic> args, {
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
     if (_hubConnection == null) {
       print('❌ SignalR: No hub connection available for $methodName');
       throw Exception('SignalR: No hub connection available');
     }
-    
+
     if (!_isConnected) {
       print('❌ SignalR: Connection not established');
       throw Exception('SignalR: Connection not established');
     }
-    
+
     try {
-      // Invoking $methodName on server
-      final result = await _hubConnection!.invoke(methodName, args: args.cast<Object>());
-      
+      final result = await _hubConnection!
+          .invoke(methodName, args: args.cast<Object>())
+          .timeout(timeout, onTimeout: () {
+        print('⏰ SignalR: $methodName timed out after ${timeout.inSeconds}s');
+        throw TimeoutException(
+          'SignalR invoke timed out: $methodName',
+          timeout,
+        );
+      });
+
       return result;
     } catch (e) {
       print('🚨 SignalR: $methodName failed with error: $e');

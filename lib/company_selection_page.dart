@@ -13,6 +13,8 @@ import 'config/app_config.dart';
 import 'dart:math' as math;
 import 'pages/customer_selection_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/pending_uploads_page.dart';
+import 'models/quotation.dart';
 
 class CompanySelectionPage extends StatefulWidget {
   const CompanySelectionPage({Key? key}) : super(key: key);
@@ -21,7 +23,8 @@ class CompanySelectionPage extends StatefulWidget {
   State<CompanySelectionPage> createState() => _CompanySelectionPageState();
 }
 
-class _CompanySelectionPageState extends State<CompanySelectionPage> {
+class _CompanySelectionPageState extends State<CompanySelectionPage>
+    with RouteAware {
   bool _isOnline = false;
   bool _loading = false;
   String _searchQuery = '';
@@ -30,6 +33,7 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
   String? _debugInfo;
   List<String> _debugMessages = []; // Accumulate debug messages
   List<Company> _companies = [];
+  int _pendingUploadsCount = 0;
 
   @override
   void initState() {
@@ -39,13 +43,47 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
     _clearSelectedCompany();
     _setupRealTimeListenersWhenReady();
     _setupEnhancedSyncListener();
+    _refreshPendingUploadsCount();
+  }
+
+  /// Counts unsynced (offline-created) quotations and updates the badge
+  /// shown on the Pending Uploads button.
+  Future<void> _refreshPendingUploadsCount() async {
+    try {
+      final count = await isar.quotations
+          .filter()
+          .isSyncedEqualTo(false)
+          .count();
+      if (mounted) {
+        setState(() => _pendingUploadsCount = count);
+      }
+    } catch (_) {
+      // Best-effort badge — stay silent on failure.
+    }
   }
   
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
   void dispose() {
-    // Clean up any listeners if needed
+    appRouteObserver.unsubscribe(this);
     super.dispose();
   }
+
+  /// Refresh the pending-uploads badge whenever this page becomes visible
+  /// (initial push, or returning from any pushed route).
+  @override
+  void didPush() => _refreshPendingUploadsCount();
+
+  @override
+  void didPopNext() => _refreshPendingUploadsCount();
   
   /// Set up real-time listeners when SignalR connection is ready (offline-first)
   void _setupRealTimeListenersWhenReady() async {
@@ -232,62 +270,65 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
   }
 
   Future<void> _initIsarAndMaybeFetch() async {
-    // Use offline-first pattern for initial load
-    print('🚀 CompanySelectionPage: Initial load using offline-first pattern');
-    
+    // OFFLINE-FIRST page load.
+    // 1. Read whatever is in local Isar and paint immediately — never wait
+    //    on the network for the first frame.
+    // 2. Kick off a background server refresh (fire-and-forget). When it
+    //    finishes, the existing isar.companys.where().watch() stream
+    //    listener at the StreamBuilder updates the list automatically.
+    // 3. Connectivity probe runs in parallel, also non-blocking.
+    print('🚀 CompanySelectionPage: Initial load (offline-first, paint-then-refresh)');
+
+    // ── Step 1: paint local cache instantly ──
     try {
-      // Get current user
-      final authService = AuthService();
-      final user = await authService.loadSavedLogin();
-      
-      if (user != null) {
-        // Use offline-first service for consistent behavior
-        final companies = await OfflineFirstService.getCompaniesOfflineFirst(
-          userId: user.userId,
-        );
-        
+      final localCompanies = await isar.companys.where().findAll();
+      if (mounted) {
         setState(() {
-          _companies = companies;
+          _companies = localCompanies;
           _loading = false;
-        });
-        
-        // Update online status
-        final isOnline = await OfflineFirstService.isServerReachable();
-        setState(() {
-          _isOnline = isOnline;
-        });
-        
-        print('✅ Initial load completed: ${companies.length} companies (${isOnline ? "Online" : "Offline"})');
-      } else {
-        print('❌ No user found for initial load');
-        setState(() {
-          _loading = false;
-          _error = 'No user logged in';
+          _error = null;
         });
       }
+      print('📱 Painted ${localCompanies.length} companies from local cache');
     } catch (e) {
-      print('❌ Initial load failed: $e');
-      
-      // Fallback: Load whatever is in local DB
-      try {
-        final fallbackCompanies = await isar.companys.where().findAll();
-        setState(() {
-          _companies = fallbackCompanies;
-          _loading = false;
-          _isOnline = false;
-          _error = fallbackCompanies.isEmpty ? 'No cached companies available' : null;
-        });
-        print('🔄 Initial load fallback: ${fallbackCompanies.length} companies from cache');
-      } catch (fallbackError) {
-        setState(() {
-          _companies = [];
-          _loading = false;
-          _isOnline = false;
-          _error = 'Failed to load companies: $e';
-        });
-        print('❌ Complete initial load failure');
-      }
+      // Even local read failed — keep loading state so the user knows
+      // something is happening, but don't hang.
+      print('❌ Local read failed: $e');
     }
+
+    // ── Step 2 & 3: background refresh + connectivity probe (fire-and-forget) ──
+    // Errors are swallowed; UI never sees them.
+    // Skip the network attempt entirely if cached connectivity already says
+    // we're offline — no point firing connect/timeout cycles that just spam
+    // the log when the user is testing offline mode.
+    if (!OfflineFirstService.isLikelyOnline()) {
+      print('🔁 Background init: offline (cached) — skipping server probe');
+      if (mounted) setState(() => _isOnline = false);
+      return;
+    }
+
+    // ignore: unawaited_futures
+    () async {
+      try {
+        final authService = AuthService();
+        final user = await authService.loadSavedLogin();
+        if (user == null) return;
+        // Connectivity probe — no UI block, no exception bubbling.
+        try {
+          final isOnline = await OfflineFirstService.isServerReachable();
+          if (mounted) setState(() => _isOnline = isOnline);
+        } catch (_) {}
+        // Fetch companies; OfflineFirstService writes them to Isar internally,
+        // and the page's StreamBuilder picks up the change.
+        try {
+          await OfflineFirstService.getCompaniesOfflineFirst(userId: user.userId);
+        } catch (e) {
+          print('🔁 Background company refresh failed (cache preserved): $e');
+        }
+      } catch (e) {
+        print('🔁 Background init step skipped: $e');
+      }
+    }();
   }
 
   Future<void> _fetchCompaniesFromServer() async {
@@ -787,6 +828,67 @@ class _CompanySelectionPageState extends State<CompanySelectionPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(Icons.settings, size: 18, color: Colors.grey.shade700),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Pending uploads button — offline-created quotations awaiting sync
+          GestureDetector(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PendingUploadsPage(),
+                ),
+              );
+              _refreshPendingUploadsCount();
+            },
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _pendingUploadsCount > 0
+                        ? Colors.deepOrange.shade50
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.cloud_upload_outlined,
+                    size: 18,
+                    color: _pendingUploadsCount > 0
+                        ? Colors.deepOrange.shade700
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                if (_pendingUploadsCount > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                          minWidth: 16, minHeight: 16),
+                      child: Text(
+                        _pendingUploadsCount > 99
+                            ? '99+'
+                            : '$_pendingUploadsCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(width: 8),

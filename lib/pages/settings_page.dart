@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'dart:async';
 import '../services/enhanced_sync_service.dart';
+import '../services/base_inventory_sync_service.dart';
+import '../services/base_transaction_sync_service.dart';
 import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_service.dart';
@@ -19,6 +21,9 @@ import '../models/invoice.dart';
 import '../models/customer.dart';
 import '../models/inventory_item.dart';
 import '../models/in_stock_uom.dart';
+import '../models/in_stock_plu.dart';
+import '../models/in_stock_location.dart';
+import '../models/sync_checkpoint.dart';
 import '../models/group_lookup.dart';
 import '../models/department_lookup.dart';
 import '../models/plu.dart';
@@ -417,10 +422,26 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           case 'Quotations':
             await isar.collection<Quote>().clear();
             await isar.collection<QuoteItem>().clear();
+            // Drop the per-(company,table) checkpoints for quote tables so
+            // the next BaseTxnSync starts fresh instead of trying delta-only.
+            await isar.syncCheckpoints
+                .filter()
+                .tableNameEqualTo('MP_Quote')
+                .or()
+                .tableNameEqualTo('MP_Quote_Item')
+                .deleteAll();
             break;
           case 'Invoices':
             await isar.collection<Invoice>().clear();
             await isar.collection<InvoiceItem>().clear();
+            // Drop the per-(company,table) checkpoints for invoice tables so
+            // the next BaseTxnSync starts fresh instead of trying delta-only.
+            await isar.syncCheckpoints
+                .filter()
+                .tableNameEqualTo('mp_invoice')
+                .or()
+                .tableNameEqualTo('mp_invoice_item')
+                .deleteAll();
             break;
           case 'Customers':
             await isar.collection<Customer>().clear();
@@ -428,6 +449,10 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           case 'Inventory':
             await isar.collection<InventoryItem>().clear();
             await isar.collection<InStockUom>().clear();
+            await isar.collection<InStockPlu>().clear();
+            await isar.collection<InStockLocation>().clear();
+            await isar.collection<CustomerPlu>().clear();
+            await isar.collection<SyncCheckpoint>().clear();
             break;
           case 'All':
             await isar.collection<Quote>().clear();
@@ -437,6 +462,10 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
             await isar.collection<Customer>().clear();
             await isar.collection<InventoryItem>().clear();
             await isar.collection<InStockUom>().clear();
+            await isar.collection<InStockPlu>().clear();
+            await isar.collection<InStockLocation>().clear();
+            await isar.collection<CustomerPlu>().clear();
+            await isar.collection<SyncCheckpoint>().clear();
             break;
         }
       });
@@ -737,6 +766,30 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     );
   }
   
+  /// Small label to break up the long Advanced Sync list into logical groups.
+  Widget _buildSubSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade600,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(height: 1, color: Colors.grey.shade300),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -801,12 +854,35 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
             ),
             children: [
               const Divider(height: 1),
+              // Recommended (new base-table architecture)
+              _buildSubSectionHeader('Recommended'),
+              _buildCompactActionButton(
+                icon: Icons.science_outlined,
+                label: 'Sync Inventory (Base Tables)',
+                color: Colors.teal,
+                onPressed: _isSyncing ? null : _syncInventoryBaseTables,
+              ),
+              _buildCompactActionButton(
+                icon: Icons.receipt_long_outlined,
+                label: 'Sync Transactions (Invoices + Quotes)',
+                color: Colors.blueGrey,
+                onPressed: _isSyncing ? null : _syncInvoicesBaseTables,
+              ),
               _buildCompactActionButton(
                 icon: Icons.image,
-                label: 'Sync Images',
+                label: 'Sync Product Images',
                 color: Colors.purple,
                 onPressed: _isSyncing ? null : _syncImages,
               ),
+              _buildCompactActionButton(
+                icon: Icons.admin_panel_settings,
+                label: 'Sync Roles & Access',
+                color: Colors.deepPurple,
+                onPressed: _isSyncing ? null : _syncRolesAndAccess,
+              ),
+
+              // Legacy / per-table (kept as fallback)
+              _buildSubSectionHeader('Legacy (per table)'),
               _buildCompactActionButton(
                 icon: Icons.description,
                 label: 'Sync Quotations',
@@ -854,24 +930,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                 label: 'Sync Barcode PLU (In_Stock_PLU)',
                 color: Colors.deepOrange,
                 onPressed: _isSyncing ? null : _syncInStockPLU,
-              ),
-              _buildCompactActionButton(
-                icon: Icons.cloud_upload,
-                label: 'Upload Quotations',
-                color: Colors.deepOrange,
-                onPressed: _isSyncing ? null : _uploadQuotations,
-              ),
-              _buildCompactActionButton(
-                icon: Icons.bug_report,
-                label: 'Debug Quotation Sync',
-                color: Colors.purple,
-                onPressed: _isSyncing ? null : _showQuotationSyncDebug,
-              ),
-              _buildCompactActionButton(
-                icon: Icons.admin_panel_settings,
-                label: 'Sync Roles & Access',
-                color: Colors.deepPurple,
-                onPressed: _isSyncing ? null : _syncRolesAndAccess,
               ),
             ],
           ),
@@ -1102,96 +1160,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       children: [
         _buildStatCard('Quotations', _quotesCount, _quoteItemsCount, 'items', Icons.description, Colors.blue),
         const SizedBox(height: 8),
-        // Unsynced Quotations Card with Expandable Table
-        // Show always for visibility (change to > 0 if you want to hide when empty)
-        if (true)
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.shade200, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.orange.shade100,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.cloud_upload, color: Colors.orange.shade700, size: 24),
-                  ),
-                  title: Row(
-                    children: [
-                      const Text(
-                        'Unsynced Quotations',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade700,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'PENDING',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  subtitle: Text(
-                    'Tap to ${_showUnsyncedTable ? "hide" : "view"} details',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _unsyncedQuotesCount.toString(),
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade700,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        _showUnsyncedTable ? Icons.expand_less : Icons.expand_more,
-                        color: Colors.orange.shade700,
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    setState(() {
-                      _showUnsyncedTable = !_showUnsyncedTable;
-                    });
-                  },
-                ),
-                if (_showUnsyncedTable) _buildUnsyncedQuotationsTable(),
-              ],
-            ),
-          ),
         _buildStatCard('Invoices', _invoicesCount, _invoiceItemsCount, 'items', Icons.receipt_long, Colors.green),
         const SizedBox(height: 8),
         _buildStatCard('Customers', _customersCount, _customerPluCount, 'PLU mappings', Icons.people, Colors.orange),
@@ -1918,6 +1886,102 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         _isSyncing = false;
         _syncStatus = 'Ready';
       });
+    }
+  }
+
+  Future<void> _syncInvoicesBaseTables() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing invoice base tables (mp_invoice + mp_invoice_item)...';
+    });
+
+    final stopwatch = Stopwatch()..start();
+    try {
+      final selectedCompany = await _authService.getSelectedCompany();
+      final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String
+          ? int.tryParse(companyCodeRaw) ?? 1
+          : companyCodeRaw as int;
+
+      await BaseTransactionSyncService().syncAll(companyCode: companyCode);
+
+      stopwatch.stop();
+      await _loadCacheStats();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Base-table invoice sync done in ${stopwatch.elapsedMilliseconds}ms'),
+            backgroundColor: Colors.blueGrey,
+          ),
+        );
+      }
+    } catch (e) {
+      stopwatch.stop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Base-table invoice sync failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncStatus = 'Ready';
+        });
+      }
+    }
+  }
+
+  Future<void> _syncInventoryBaseTables() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing inventory base tables (In_Stock + Uom + PLU + Location)...';
+    });
+
+    final stopwatch = Stopwatch()..start();
+    try {
+      final selectedCompany = await _authService.getSelectedCompany();
+      final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
+      final companyCode = companyCodeRaw is String
+          ? int.tryParse(companyCodeRaw) ?? 1
+          : companyCodeRaw as int;
+
+      await BaseInventorySyncService().syncAll(companyCode: companyCode);
+
+      stopwatch.stop();
+      await _loadCacheStats();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Base-table inventory sync done in ${stopwatch.elapsedMilliseconds}ms'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      }
+    } catch (e) {
+      stopwatch.stop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Base-table sync failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncStatus = 'Ready';
+        });
+      }
     }
   }
 

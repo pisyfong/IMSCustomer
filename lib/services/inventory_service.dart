@@ -1,8 +1,18 @@
+import 'dart:async';
+
 import 'package:isar/isar.dart';
 
 import '../models/inventory_item.dart';
 
 import '../models/in_stock_uom.dart';
+
+import '../models/in_stock_plu.dart';
+
+import '../models/in_stock_location.dart';
+
+import '../models/customer_plu.dart';
+
+import '../models/sync_checkpoint.dart';
 
 import '../models/group_lookup.dart';
 
@@ -15,6 +25,8 @@ import 'signalr_service.dart';
 import 'auth_service.dart';
 
 import 'offline_first_service.dart';
+
+import 'base_inventory_sync_service.dart';
 
 
 
@@ -116,6 +128,19 @@ class InventoryService {
 
   final Set<int> _fullSyncedCompanies = <int>{};
 
+  /// External hook for BaseInventorySyncService (or any other sync surface) to
+  /// say "this company has fresh data in Isar already, don't auto-trigger the
+  /// old getInventory full-sync". Without this, opening the inventory page after
+  /// a base-table sync would still kick off the legacy CTE+joins pull.
+  void markCompanyAsFullySynced(int companyCode) {
+    _fullSyncedCompanies.add(companyCode);
+  }
+
+  // Single-flight guard: maps companyCode -> in-flight full-sync future. Prevents
+  // concurrent callers from kicking off duplicate full-sync passes (which previously
+  // caused the inventory pagination to run twice in parallel and saturate the network).
+  final Map<int, Future<void>> _fullSyncInFlight = <int, Future<void>>{};
+
   
 
   // In-memory cache: companyCode -> { deptCode: description }
@@ -139,6 +164,8 @@ class InventoryService {
     int limit = 100,
 
     int offset = 0,
+
+    bool applyFlag3Filter = true,
 
   }) async {
 
@@ -214,7 +241,10 @@ class InventoryService {
 
         print('⏰ INVENTORY SERVICE: Inventory fetch request timed out');
 
-        return null;
+        throw TimeoutException(
+          'Inventory fetch timed out after 15s (offset=$offset, limit=$limit)',
+          const Duration(seconds: 15),
+        );
 
       });
 
@@ -316,7 +346,15 @@ class InventoryService {
 
       print('🔍 INVENTORY SERVICE: Successfully converted ${inventoryItems.length} inventory items');
 
-      // Exclude items marked with Flag3 == 'N' from server fetch
+      // Exclude items marked with Flag3 == 'N' from server fetch (caller can opt out
+      // for paginated full-syncs, where filtering must happen after all pages are
+      // collected so page-size comparisons reflect real server-side pagination).
+
+      if (!applyFlag3Filter) {
+
+        return inventoryItems;
+
+      }
 
       final before = inventoryItems.length;
 
@@ -360,6 +398,8 @@ class InventoryService {
 
     int pageSize = 1000,
 
+    int maxRetriesPerPage = 3,
+
   }) async {
 
     final List<InventoryItem> all = [];
@@ -368,17 +408,61 @@ class InventoryService {
 
     while (true) {
 
-      final page = await fetchInventoryFromServer(
+      List<InventoryItem>? page;
 
-        companyCode: companyCode,
+      Object? lastError;
 
-        searchQuery: searchQuery,
+      for (int attempt = 1; attempt <= maxRetriesPerPage; attempt++) {
 
-        limit: pageSize,
+        try {
 
-        offset: offset,
+          page = await fetchInventoryFromServer(
 
-      );
+            companyCode: companyCode,
+
+            searchQuery: searchQuery,
+
+            limit: pageSize,
+
+            offset: offset,
+
+          );
+
+          break;
+
+        } catch (e) {
+
+          lastError = e;
+
+          if (attempt >= maxRetriesPerPage) break;
+
+          final backoffMs = 500 * (1 << (attempt - 1));
+
+          print(
+
+            '⚠️ INVENTORY SERVICE: page offset=$offset attempt $attempt/$maxRetriesPerPage failed: $e — retrying in ${backoffMs}ms',
+
+          );
+
+          await Future.delayed(Duration(milliseconds: backoffMs));
+
+        }
+
+      }
+
+      if (page == null) {
+
+        // Persistent failure — surface to caller so it can keep the existing cache
+
+        // instead of overwriting with a partial snapshot.
+
+        throw Exception(
+
+          'Inventory pagination aborted at offset $offset after $maxRetriesPerPage retries: $lastError',
+
+        );
+
+      }
 
       if (page.isEmpty) break;
 
@@ -2168,30 +2252,41 @@ class InventoryService {
 
 
 
-      // Full sync only once per company (or when explicitly forced)
+      // OFFLINE-FIRST: serve local cache immediately, kick off background
+      // sync (fire-and-forget) so the UI never waits on the network.
+      //
+      // - forceRefresh=true means the caller explicitly wants fresh data
+      //   AND will await it (used by the manual "Refresh" buttons).
+      // - forceRefresh=false (default, normal page load) returns local
+      //   data instantly while a background sync runs to update the cache.
+      //   The next page load will see the fresher data.
+      //
+      // BaseInvSync has its own single-flight guard, so multiple background
+      // triggers within a session safely de-duplicate.
 
-      if (forceRefresh || !_fullSyncedCompanies.contains(effectiveCompanyCode)) {
-
-        print('📱 INVENTORY SERVICE: Performing initial FULL sync for company $effectiveCompanyCode');
-
-        final all = await fetchAllInventoryFromServer(
-
-          companyCode: effectiveCompanyCode,
-
-          // fetch full catalog; search applied locally after
-
-          searchQuery: null,
-
-        );
-
-        if (all.isNotEmpty) {
-
-          await saveInventoryToLocal(all, companyCode: effectiveCompanyCode);
-
+      if (forceRefresh) {
+        // Explicit refresh: await so the caller sees the fresh result.
+        try {
+          await BaseInventorySyncService().syncAll(companyCode: effectiveCompanyCode);
+        } catch (e) {
+          print('⚠️ INVENTORY SERVICE: BaseInvSync (force) failed: $e — using cached data');
         }
-
         _fullSyncedCompanies.add(effectiveCompanyCode);
-
+      } else if (!_fullSyncedCompanies.contains(effectiveCompanyCode)) {
+        // Normal page load: fire and forget. Mark as "in progress" up
+        // front so concurrent getInventory calls don't all schedule.
+        _fullSyncedCompanies.add(effectiveCompanyCode);
+        // ignore: unawaited_futures
+        BaseInventorySyncService()
+            .syncAll(companyCode: effectiveCompanyCode)
+            .catchError((e) {
+          // Network failed — leave local cache untouched. Next sync attempt
+          // (e.g. Refresh button or app foreground) will retry.
+          print('⚠️ INVENTORY SERVICE: background BaseInvSync failed: $e — cache preserved');
+          // Allow another attempt next time getInventory is called by removing
+          // the in-progress mark on failure.
+          _fullSyncedCompanies.remove(effectiveCompanyCode);
+        });
       }
 
 
@@ -2354,15 +2449,65 @@ class InventoryService {
 
               .deleteAll();
 
+          await isar.inStockUoms
+
+              .filter()
+
+              .companyCodeEqualTo(companyCode)
+
+              .deleteAll();
+
+          await isar.inStockPlus
+
+              .filter()
+
+              .companyCodeEqualTo(companyCode)
+
+              .deleteAll();
+
+          await isar.inStockLocations
+
+              .filter()
+
+              .companyCodeEqualTo(companyCode)
+
+              .deleteAll();
+
+          await isar.customerPlus
+
+              .filter()
+
+              .companyCodeEqualTo(companyCode)
+
+              .deleteAll();
+
+          await isar.syncCheckpoints
+
+              .filter()
+
+              .companyCodeEqualTo(companyCode)
+
+              .deleteAll();
+
         } else {
 
           await isar.inventoryItems.clear();
+
+          await isar.inStockUoms.clear();
+
+          await isar.inStockPlus.clear();
+
+          await isar.inStockLocations.clear();
+
+          await isar.customerPlus.clear();
+
+          await isar.syncCheckpoints.clear();
 
         }
 
       });
 
-      print('🗑️ INVENTORY SERVICE: Cleared local inventory data');
+      print('🗑️ INVENTORY SERVICE: Cleared inventory + UOM + PLU + Location + CustomerPlu + checkpoints');
 
     } catch (e) {
 
@@ -2462,9 +2607,19 @@ class InventoryService {
 
         await isar.inventoryItems.clear();
 
+        await isar.inStockUoms.clear();
+
+        await isar.inStockPlus.clear();
+
+        await isar.inStockLocations.clear();
+
+        await isar.customerPlus.clear();
+
+        await isar.syncCheckpoints.clear();
+
       });
 
-      print('🗑️ INVENTORY SERVICE: Cleared ALL inventory cache');
+      print('🗑️ INVENTORY SERVICE: Cleared ALL inventory + UOM + PLU + Location + CustomerPlu + checkpoints');
 
     } catch (e) {
 
