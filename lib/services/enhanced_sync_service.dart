@@ -29,6 +29,7 @@ import '../config/app_config.dart'; // For sync timing configuration
 import 'plu_service.dart';
 import 'quotation_service.dart';
 import 'credit_term_service.dart';
+import 'representative_service.dart';
 import 'invoice_service.dart';
 import 'offline_first_service.dart';
 import 'inventory_image_service.dart';
@@ -450,6 +451,18 @@ class EnhancedSyncService {
         }
       }
       print('🔄 ENHANCED SYNC: Transaction base-table sync completed');
+
+      print('🔄 ENHANCED SYNC: About to sync representatives...');
+      for (final code in companies) {
+        try {
+          final reps = await RepresentativeService()
+              .fetchRepresentatives(companyCode: code);
+          print('✅ ENHANCED SYNC: ${reps.length} reps cached for company $code');
+        } catch (e) {
+          print('⚠️ ENHANCED SYNC: Representative sync failed for company $code: $e (cache preserved)');
+        }
+      }
+      print('🔄 ENHANCED SYNC: Representative sync completed');
 
     } catch (e) {
       print('Enhanced Sync: Error during sync: $e');
@@ -973,6 +986,15 @@ class EnhancedSyncService {
           await BaseTransactionSyncService().syncAll(companyCode: code);
         } catch (e) {
           print('⚠️ PRELOAD: BaseTxnSync failed for company $code: $e (cache preserved)');
+        }
+      }
+
+      // Representatives — small per-company list, replace-on-fetch.
+      for (final code in companies) {
+        try {
+          await RepresentativeService().fetchRepresentatives(companyCode: code);
+        } catch (e) {
+          print('⚠️ PRELOAD: Representative sync failed for company $code: $e (cache preserved)');
         }
       }
 
@@ -1651,7 +1673,7 @@ class EnhancedSyncService {
     // delta-via-LastWriteTimeStamp where available, and HTTP transport (no
     // SignalR hangs). Replaces the legacy steps that paginated each table
     // through CTE-heavy joins.
-    const totalSteps = 7;
+    const totalSteps = 8;
 
     // Determine which companies to drive base-table syncs for. Try the
     // auth-selected company first; if no selection (e.g. user ran full sync
@@ -1744,12 +1766,28 @@ class EnhancedSyncService {
       }
       _syncProgressController.add(SyncProgress(currentStep: 6, totalSteps: totalSteps, stepName: 'Transactions (invoices + quotes)', status: 'completed'));
 
-      // Step 7: Upload locally-created unsynced quotations to the server.
+      // Step 7: Representatives — per-company list used by checkout dropdown.
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Representatives', status: 'running'));
+      print('👤 FULL SYNC [7/$totalSteps]: Syncing representatives...');
+      if (companiesForBaseSyncs.isEmpty) {
+        print('⚠️ FULL SYNC [7/$totalSteps]: No companies known — skipping representative sync');
+      } else {
+        for (final code in companiesForBaseSyncs) {
+          try {
+            await RepresentativeService().fetchRepresentatives(companyCode: code);
+          } catch (e) {
+            print('⚠️ FULL SYNC: Representative sync failed for company $code: $e (cache preserved)');
+          }
+        }
+      }
+      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Representatives', status: 'completed'));
+
+      // Step 8: Upload locally-created unsynced quotations to the server.
       // Orthogonal to the download base-syncs above.
-      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
-      print('📝 FULL SYNC [7/$totalSteps]: Uploading unsynced quotations...');
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
+      print('📝 FULL SYNC [8/$totalSteps]: Uploading unsynced quotations...');
       await _syncUnsyncedQuotations();
-      _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
       
       // Update sync info
       await _updateSyncInfo(

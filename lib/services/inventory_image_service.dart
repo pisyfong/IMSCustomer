@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -286,13 +287,18 @@ class InventoryImageService {
   // Clear all cached images
   Future<void> clearCache() async {
     if (_imageDirectory == null) await initialize();
-    
+
     try {
       if (await _imageDirectory!.exists()) {
         await _imageDirectory!.delete(recursive: true);
         await _imageDirectory!.create(recursive: true);
         print('🗑️ Image cache cleared');
       }
+      // Evict Flutter's in-memory decoded-image cache; otherwise Image.file
+      // keeps serving stale pixels from RAM keyed by (path, scale) even after
+      // the underlying file is deleted or overwritten.
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
     } catch (e) {
       print('❌ Error clearing cache: $e');
     }
