@@ -28,6 +28,8 @@ import 'offline_first_service.dart';
 
 import 'base_inventory_sync_service.dart';
 
+import 'taxonomy_mode_service.dart';
+
 
 
 enum StockStatus { inStock, outOfStock, lowStock, all }
@@ -874,19 +876,19 @@ class InventoryService {
 
       // Target SQL: SELECT DISTINCT company_code, grp, description FROM RMS.dbo.PI_Group
 
-      final List<String> methodCandidates = [
-
-        'getGroupLookup',
-
-        'getGroups',
-
-        'GetGroups',
-
-        'getPiGroups',
-
-        'GetPI_Group',
-
-      ];
+      final _isWebMode = TaxonomyModeService.instance.modeOrDefault == TaxonomyMode.web;
+      final List<String> methodCandidates = _isWebMode
+          ? const [
+              'getWebGroupLookup',
+              'getWebGroups',
+            ]
+          : const [
+              'getGroupLookup',
+              'getGroups',
+              'GetGroups',
+              'getPiGroups',
+              'GetPI_Group',
+            ];
 
       // First, try with company code argument
 
@@ -1260,17 +1262,18 @@ class InventoryService {
 
       // Try a few likely hub method names to maximize compatibility
 
-      final List<String> methodCandidates = [
-
-        'getDepartmentLookup',
-
-        'getDepartments',
-
-        'GetDepartments',
-
-        'getDeptDescriptions',
-
-      ];
+      final _isWebMode = TaxonomyModeService.instance.modeOrDefault == TaxonomyMode.web;
+      final List<String> methodCandidates = _isWebMode
+          ? const [
+              'getWebDeptLookup',
+              'getWebDepts',
+            ]
+          : const [
+              'getDepartmentLookup',
+              'getDepartments',
+              'GetDepartments',
+              'getDeptDescriptions',
+            ];
 
       // First, try with company code argument
 
@@ -1844,50 +1847,31 @@ class InventoryService {
 
     
 
-    // Group filter (Grp)
+    // Taxonomy mode: PI columns (grp/dept/subDept/category) vs Web columns
+    final _webMode = TaxonomyModeService.instance.modeOrDefault == TaxonomyMode.web;
 
+    // Group filter
     if (filter.groups != null && filter.groups!.isNotEmpty) {
-
-      filtered = filtered.where((item) => 
-
-        filter.groups!.contains(item.grp)).toList();
-
+      filtered = filtered.where((item) =>
+        filter.groups!.contains(_webMode ? item.webGrp : item.grp)).toList();
     }
 
-    
-
-    // Department filter (Dept)
-
+    // Department filter
     if (filter.departments != null && filter.departments!.isNotEmpty) {
-
-      filtered = filtered.where((item) => 
-
-        filter.departments!.contains(item.dept)).toList();
-
+      filtered = filtered.where((item) =>
+        filter.departments!.contains(_webMode ? item.webDept : item.dept)).toList();
     }
 
-    
-
-    // Sub-Department filter (SubDept)
-
+    // Sub-Department filter
     if (filter.subDepartments != null && filter.subDepartments!.isNotEmpty) {
-
-      filtered = filtered.where((item) => 
-
-        filter.subDepartments!.contains(item.subDept)).toList();
-
+      filtered = filtered.where((item) =>
+        filter.subDepartments!.contains(_webMode ? item.webSubDept : item.subDept)).toList();
     }
-
-    
 
     // Category filter
-
     if (filter.categories != null && filter.categories!.isNotEmpty) {
-
-      filtered = filtered.where((item) => 
-
-        filter.categories!.contains(item.category)).toList();
-
+      filtered = filtered.where((item) =>
+        filter.categories!.contains(_webMode ? item.webCategory : item.category)).toList();
     }
 
     
@@ -1978,32 +1962,28 @@ class InventoryService {
 
 
 
-      // Bases for each level (do not filter a level by its own selection)
+      final _webMode = TaxonomyModeService.instance.modeOrDefault == TaxonomyMode.web;
+      String? _grp(InventoryItem it)   => _webMode ? it.webGrp      : it.grp;
+      String? _dept(InventoryItem it)  => _webMode ? it.webDept     : it.dept;
+      String? _sub(InventoryItem it)   => _webMode ? it.webSubDept  : it.subDept;
+      String? _cat(InventoryItem it)   => _webMode ? it.webCategory : it.category;
 
+      // Bases for each level (do not filter a level by its own selection)
       final Iterable<InventoryItem> baseForGroups = allItems; // company-level only
 
       Iterable<InventoryItem> baseForDepartments = allItems;
-
       if (groups != null && groups.isNotEmpty) {
-
-        baseForDepartments = baseForDepartments.where((it) => it.grp != null && groups.contains(it.grp));
-
+        baseForDepartments = baseForDepartments.where((it) => _grp(it) != null && groups.contains(_grp(it)));
       }
 
       Iterable<InventoryItem> baseForSubDepartments = baseForDepartments;
-
       if (departments != null && departments.isNotEmpty) {
-
-        baseForSubDepartments = baseForSubDepartments.where((it) => it.dept != null && departments.contains(it.dept));
-
+        baseForSubDepartments = baseForSubDepartments.where((it) => _dept(it) != null && departments.contains(_dept(it)));
       }
 
       Iterable<InventoryItem> baseForCategories = baseForSubDepartments;
-
       if (subDepartments != null && subDepartments.isNotEmpty) {
-
-        baseForCategories = baseForCategories.where((it) => it.subDept != null && subDepartments.contains(it.subDept));
-
+        baseForCategories = baseForCategories.where((it) => _sub(it) != null && subDepartments.contains(_sub(it)));
       }
 
 
@@ -2023,31 +2003,22 @@ class InventoryService {
 
 
       for (final item in baseForGroups) {
-
-        if (item.grp?.isNotEmpty == true) groupsSet.add(item.grp!);
-
+        final v = _grp(item);
+        if (v != null && v.isNotEmpty) groupsSet.add(v);
       }
-
       for (final item in baseForDepartments) {
-
-        if (item.dept?.isNotEmpty == true) departmentsSet.add(item.dept!);
-
+        final v = _dept(item);
+        if (v != null && v.isNotEmpty) departmentsSet.add(v);
       }
-
       for (final item in baseForSubDepartments) {
-
-        if (item.subDept?.isNotEmpty == true) subDepartmentsSet.add(item.subDept!);
-
+        final v = _sub(item);
+        if (v != null && v.isNotEmpty) subDepartmentsSet.add(v);
       }
-
       for (final item in baseForCategories) {
-
-        if (item.category?.isNotEmpty == true) categoriesSet.add(item.category!);
-
+        final v = _cat(item);
+        if (v != null && v.isNotEmpty) categoriesSet.add(v);
         if (item.brand?.isNotEmpty == true) brandsSet.add(item.brand!);
-
         if (item.status?.isNotEmpty == true) statusesSet.add(item.status!);
-
       }
 
 

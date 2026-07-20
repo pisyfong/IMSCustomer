@@ -5,7 +5,7 @@ class AppConfig {
   
   // Backend domains
   static const String _productionDomain = 'fungseng.dyndns.org';
-  static const String _developmentDomain = '192.168.16.12';//'192.168.16.12';//'10.0.2.2'; // Android emulator localhost
+  static const String _developmentDomain = '192.168.16.182';//'192.168.16.12';//'10.0.2.2'; // Android emulator localhost
  
   // Ports
   static const int _productionPort = 1194;

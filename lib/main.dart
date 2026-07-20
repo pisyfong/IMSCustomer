@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 // HTTP removed - using SignalR-only architecture
+import 'services/taxonomy_mode_service.dart';
 import 'login_page.dart';
 import 'company_selection_page.dart';
 import 'menu_page.dart';
@@ -154,7 +155,10 @@ void main() async {
   
   // Initialize Isar
   await initIsar();
-  
+
+  // Warm the taxonomy-mode cache so modeOrDefault is correct on first read
+  await TaxonomyModeService.instance.getMode();
+
   // Run the app
   runApp(const MyApp());
 }

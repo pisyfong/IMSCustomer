@@ -7,6 +7,7 @@ import '../services/base_transaction_sync_service.dart';
 import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_service.dart';
+import '../services/taxonomy_mode_service.dart';
 import '../services/invoice_service.dart';
 import '../services/inventory_image_service.dart';
 import '../services/quotation_service.dart';
@@ -73,6 +74,9 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   // Connection status
   bool _isOnline = false;
   bool _signalRConnected = false;
+
+  // Taxonomy source toggle (per-device): PI_Group vs Web_Group
+  TaxonomyMode _taxonomyMode = TaxonomyMode.pi;
   List<Quotation> _unsyncedQuotations = [];
   bool _showUnsyncedTable = false;
   
@@ -81,6 +85,11 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     super.initState();
     _syncService = EnhancedSyncService(isar, _signalRService);
     _imageService.initialize();
+
+    // Warm the taxonomy-mode cache and reflect in UI
+    TaxonomyModeService.instance.getMode().then((m) {
+      if (mounted) setState(() => _taxonomyMode = m);
+    });
     
     // Setup animation controller for sync icon
     _animationController = AnimationController(
@@ -538,6 +547,13 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                       
                       const SizedBox(height: 16),
                       
+                      // Preferences
+                      _buildSectionTitle('Preferences'),
+                      const SizedBox(height: 8),
+                      _buildTaxonomyModeToggle(),
+
+                      const SizedBox(height: 16),
+
                       // Quick Actions
                       _buildSectionTitle('Quick Actions'),
                       const SizedBox(height: 8),
@@ -786,6 +802,35 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
             child: Container(height: 1, color: Colors.grey.shade300),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTaxonomyModeToggle() {
+    final isWeb = _taxonomyMode == TaxonomyMode.web;
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        title: const Text('Use Web taxonomy', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: Text(
+          isWeb
+              ? 'Filters use Web_Group / Web_Dept / Web_Category / Web_Sub_Dept'
+              : 'Filters use PI_Group and In_Stock Dept / Category / SubDept',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        value: isWeb,
+        onChanged: (v) async {
+          final mode = v ? TaxonomyMode.web : TaxonomyMode.pi;
+          await TaxonomyModeService.instance.setMode(mode);
+          if (!mounted) return;
+          setState(() => _taxonomyMode = mode);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(seconds: 2),
+            content: Text('Taxonomy source: ${v ? 'Web' : 'PI'} — re-open filter to refresh options'),
+          ));
+        },
       ),
     );
   }
