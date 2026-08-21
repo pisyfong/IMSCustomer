@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:barcode/barcode.dart';
+import 'qty.dart';
 import 'package:isar/isar.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -12,6 +13,7 @@ import '../models/quotation.dart';
 import '../models/quote_item.dart';
 import '../models/representative.dart';
 import 'auth_service.dart';
+import 'company_letterhead.dart';
 
 /// Re-renders the quotation PDF for a saved Quotation row, looking up all
 /// dependent data (items, customer, representative, credit term, inventory
@@ -99,6 +101,9 @@ class QuotationPdfService {
     final selectedCompany = await auth.getSelectedCompany();
     final companyName =
         selectedCompany?['companyName']?.toString() ?? 'Company';
+    // Who this document is FROM — resolved from the database, never baked
+    // into the build. See CompanyLetterhead.
+    final letterhead = await CompanyLetterhead.current();
 
     // ─── Build the PDF ───
     final pdf = pw.Document();
@@ -124,18 +129,16 @@ class QuotationPdfService {
                         style: pw.TextStyle(
                             fontSize: 14, fontWeight: pw.FontWeight.bold),
                       ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        'LOT 1422 EASTWOOD VALLEY INDUSTRIAL PARK 1, JALAN MIRI BY-PASS,',
-                        style: const pw.TextStyle(fontSize: 8),
-                      ),
-                      pw.Text(
-                        '96000 MIRI SARAWAK  TEL/FAX: 085-419489, 013-6686555',
-                        style: const pw.TextStyle(fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('Email: fungseng22@gmail.com',
-                          style: const pw.TextStyle(fontSize: 8)),
+                      if (letterhead.registrationNo.isNotEmpty) ...[
+                        pw.SizedBox(height: 2),
+                        pw.Text('Co. Reg: ${letterhead.registrationNo}',
+                            style: const pw.TextStyle(fontSize: 8)),
+                      ],
+                      if (letterhead.addressLines.isNotEmpty) ...[
+                        pw.SizedBox(height: 3),
+                        for (final line in letterhead.addressLines)
+                          pw.Text(line, style: const pw.TextStyle(fontSize: 8)),
+                      ],
                     ],
                   ),
                 ),
@@ -244,16 +247,29 @@ class QuotationPdfService {
                 ...items.asMap().entries.map((e) {
                   final idx = e.key + 1;
                   final item = e.value;
-                  final qty = (item.quoteQuantity ?? 0).toInt();
+                  final qty = _fmtQty(item.quoteQuantity ?? 0);
                   final price = (item.unitPrice ?? 0).toStringAsFixed(2);
                   final amount = (item.netAmount ?? 0).toStringAsFixed(2);
+                  // The Foc and Uom/F columns were always printed empty, so a
+                  // quotation giving goods away read as though it did not.
+                  final foc = _n(item.quoteFoc);
+                  final loose = _n(item.quoteQuantityLoose);
+                  final focLoose = _n(item.quoteFocLoose);
+                  final factor = _n(item.factor);
                   return pw.TableRow(children: [
                     _cell('$idx'),
                     _barcodeCell(item.pluNo),
                     _descCell(descFor(item), (item.remark ?? '').trim()),
-                    _cell('$qty', align: pw.TextAlign.right),
-                    _cell(''),
-                    _cell(item.uom),
+                    _cell(loose > 0 ? '$qty + ${_fmtQty(loose)}' : '$qty',
+                        align: pw.TextAlign.right),
+                    _cell(
+                        focLoose > 0
+                            ? '${_fmtQty(foc)} + ${_fmtQty(focLoose)}'
+                            : (foc > 0 ? _fmtQty(foc) : ''),
+                        align: pw.TextAlign.right),
+                    _cell(factor > 1
+                        ? '${item.uom}/${_fmtQty(factor)}'
+                        : item.uom),
                     _cell(price, align: pw.TextAlign.right),
                     _cell(''),
                     _cell(amount, align: pw.TextAlign.right),
@@ -370,6 +386,14 @@ class QuotationPdfService {
         child: pw.Text(text,
             style: pw.TextStyle(fontSize: fontSize), textAlign: align),
       );
+
+  /// Null-safe read of a nullable quantity column.
+  double _n(double? v) => v ?? 0;
+
+  /// Quantities print at [Qty.decimals], matching the screen the operator
+  /// confirmed and the SQ line that was stored. A KG quantity is not whole
+  /// often enough for a narrow column to be worth an inconsistency.
+  String _fmtQty(double v) => Qty.fmt(v);
 
   pw.Widget _descCell(String description, String? remarks) {
     return pw.Padding(

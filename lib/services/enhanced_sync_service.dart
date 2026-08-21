@@ -6,6 +6,9 @@ import 'signalr_service.dart';
 import 'company_service.dart';
 import 'auth_service.dart';
 import 'inventory_service.dart';
+import 'taxonomy_mode_service.dart';
+import 'user_directory_service.dart';
+import 'location_service.dart';
 import 'base_inventory_sync_service.dart';
 import 'base_transaction_sync_service.dart';
 import 'customer_service.dart';
@@ -28,7 +31,11 @@ import '../main.dart'; // For global isar instance
 import '../config/app_config.dart'; // For sync timing configuration
 import 'plu_service.dart';
 import 'quotation_service.dart';
+import 'pick_service.dart';
+import 'pack_service.dart';
 import 'credit_term_service.dart';
+import '../models/app_location.dart';
+import 'adjustment_service.dart';
 import 'representative_service.dart';
 import 'invoice_service.dart';
 import 'offline_first_service.dart';
@@ -159,6 +166,14 @@ class EnhancedSyncService {
             await performSync();
           } else {
             print('Enhanced Sync: came online — skipping auto sync (AppConfig.enableAutoSync = false)');
+            // Barcodes still come down. Coming back online is exactly when a
+            // device is most likely to be holding a stale barcode table — and
+            // a link made against a stale one fails at the NEXT sync, long
+            // after the goods have moved.
+            final code = await _selectedCompanyCode();
+            if (code != null) {
+              await BaseInventorySyncService().syncPlusOnly(companyCode: code);
+            }
           }
         } catch (e) {
           print('Enhanced Sync: Background sync failed (non-blocking): $e');
@@ -313,6 +328,17 @@ class EnhancedSyncService {
     }
   }
 
+  /// The signed-in company code, or null if none is selected yet.
+  Future<int?> _selectedCompanyCode() async {
+    try {
+      final company = await AuthService().getSelectedCompany();
+      final raw = company?['companyCode'];
+      return raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Handle real-time invoice change events
   void _onInvoiceChanged(Map<String, dynamic> changeData) async {
     final changeType = changeData['changeType'] as String;
@@ -398,6 +424,25 @@ class EnhancedSyncService {
       print('🔄 ENHANCED SYNC: About to sync unsynced quotations...');
       await _syncUnsyncedQuotations();
       print('🔄 ENHANCED SYNC: Quotation sync completed');
+
+      // Upload unsynced picks, then packs. Packs were never wired in here, so
+      // a saved pack only ever reached the server if someone opened the
+      // Packing hub and refreshed — and the save dialog now tells the operator
+      // it is "queued for the next sync", which has to be true.
+      try {
+        final r = await PickService().syncUnsyncedPicks();
+        print('🔄 ENHANCED SYNC: Uploaded ${r['synced']}/${r['total']} picks');
+      } catch (e) {
+        print('⚠️ ENHANCED SYNC: pick upload failed: $e');
+      }
+      // Packs after picks: a pack is validated against its parent pick, so the
+      // pick must exist server-side first.
+      try {
+        final r = await PackService().syncUnsyncedPacks();
+        print('🔄 ENHANCED SYNC: Uploaded ${r['synced']}/${r['total']} packs');
+      } catch (e) {
+        print('⚠️ ENHANCED SYNC: pack upload failed: $e');
+      }
 
       // Resolve which companies to drive base-table syncs for. Try the
       // auth-selected company first; fall back to companies in local Isar.
@@ -999,6 +1044,8 @@ class EnhancedSyncService {
       }
 
       await _preloadGroupAndDepartmentLookups();
+      await UserDirectoryService().sync(); // PI_Users for the Assigned To picker
+      await LocationService().sync(); // PI_Company_Location for the scope picker
       
       // Preload inventory images with timeout (5 minutes for all images)
       try {
@@ -1673,13 +1720,21 @@ class EnhancedSyncService {
     // delta-via-LastWriteTimeStamp where available, and HTTP transport (no
     // SignalR hangs). Replaces the legacy steps that paginated each table
     // through CTE-heavy joins.
-    const totalSteps = 8;
+    const totalSteps = 10;
 
     // Determine which companies to drive base-table syncs for. Try the
     // auth-selected company first; if no selection (e.g. user ran full sync
     // before selecting a company), fall back to all companies in local Isar
     // (which we just refreshed in step 2). This mirrors the legacy
     // _syncInventoryPeriodically pattern of iterating known companies.
+    // EVERY known company, not just the one currently selected.
+    //
+    // A full sync is what an operator runs before going offline, so it has to
+    // cover everywhere they might switch to afterwards — shelf positions,
+    // stock and quotes for another company are unreachable once they are out
+    // of coverage, and the failure looks like missing data rather than an
+    // unsynced company. The selected company goes FIRST so the common case is
+    // usable soonest; companies with no data cost one empty round trip each.
     final companiesForBaseSyncs = <int>[];
     try {
       final auth = AuthService();
@@ -1696,7 +1751,7 @@ class EnhancedSyncService {
       }
     } catch (_) {}
 
-    if (companiesForBaseSyncs.isEmpty) {
+    {
       try {
         final localCompanies = await _isar.companys.where().findAll();
         for (final c in localCompanies) {
@@ -1706,7 +1761,8 @@ class EnhancedSyncService {
           }
         }
         if (companiesForBaseSyncs.isNotEmpty) {
-          print('🔍 FULL SYNC: No auth-selected company; using ${companiesForBaseSyncs.length} from local Isar: $companiesForBaseSyncs');
+          print('🏢 FULL SYNC: base tables for ${companiesForBaseSyncs.length} '
+              'company(ies): $companiesForBaseSyncs');
         }
       } catch (e) {
         print('⚠️ FULL SYNC: Failed to enumerate local companies: $e');
@@ -1780,15 +1836,123 @@ class EnhancedSyncService {
           }
         }
       }
+      // Credit-note lookups, in the same step: adjustment codes and open
+      // batches are per company AND location, and without them cached the CN
+      // screen cannot open at all offline — which is where credit notes get
+      // raised.
+      if (companiesForBaseSyncs.isNotEmpty) {
+        final locations = await isar.appLocations.where().findAll();
+        for (final code in companiesForBaseSyncs) {
+          final forCompany =
+              locations.where((l) => l.companyCode == code).toList();
+          // Every location the device knows, not just the selected one: the
+          // operator can switch location offline, and the lookups have to
+          // already be there when they do.
+          for (final loc in forCompany) {
+            try {
+              await AdjustmentService().syncLookups(
+                  companyCode: code, locationCode: loc.locationCode);
+            } catch (e) {
+              print('⚠️ FULL SYNC: CN lookups failed for '
+                  '$code/${loc.locationCode}: $e (cache preserved)');
+            }
+          }
+        }
+      }
       _syncProgressController.add(SyncProgress(currentStep: 7, totalSteps: totalSteps, stepName: 'Representatives', status: 'completed'));
+
+      // Step 8: the reference data a full sync was quietly leaving out.
+      //
+      // These four were only ever fetched by _runBackgroundPreload() (startup)
+      // or lazily by the screen that needed them, so a device that had never
+      // opened Customer Selection had an EMPTY customer master — which is why
+      // receipts printed a customer code with no name against it. "Full sync"
+      // has to mean full, or nobody can trust it to fix anything.
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Reference Data', status: 'running'));
+      print('📇 FULL SYNC [8/$totalSteps]: Syncing reference data '
+          '(customers, users, locations, taxonomy, customer PLUs)...');
+      if (companiesForBaseSyncs.isEmpty) {
+        print('⚠️ FULL SYNC [8/$totalSteps]: No companies known — skipping reference data');
+      } else {
+        // Customer master — per company, forced so it actually hits the server.
+        for (final code in companiesForBaseSyncs) {
+          try {
+            final list = await _customerService.getCustomers(code, forceSync: true);
+            print('   ✓ customers: ${list.length} (company $code)');
+          } catch (e) {
+            print('⚠️ FULL SYNC: customer sync failed for company $code: $e (cache preserved)');
+          }
+        }
+        // PI_Users — the Assigned To directory and the receipt's assignee name.
+        try {
+          final n = await UserDirectoryService().sync();
+          print('   ✓ users: $n');
+        } catch (e) {
+          print('⚠️ FULL SYNC: user directory sync failed: $e (cache preserved)');
+        }
+        // PI_Company_Location — the location scope picker.
+        try {
+          final n = await LocationService().sync();
+          print('   ✓ locations: $n');
+        } catch (e) {
+          print('⚠️ FULL SYNC: location sync failed: $e (cache preserved)');
+        }
+        // Group / department lookups, both taxonomies.
+        try {
+          await _preloadGroupAndDepartmentLookups();
+        } catch (e) {
+          print('⚠️ FULL SYNC: group/department lookup sync failed: $e (cache preserved)');
+        }
+        // Customer-specific PLUs — the barcode a given customer scans for an
+        // item, which differs from the master PLU.
+        try {
+          await _preloadCustomerPlus();
+        } catch (e) {
+          print('⚠️ FULL SYNC: customer PLU sync failed: $e (cache preserved)');
+        }
+      }
+      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Reference Data', status: 'completed'));
 
       // Step 8: Upload locally-created unsynced quotations to the server.
       // Orthogonal to the download base-syncs above.
-      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
-      print('📝 FULL SYNC [8/$totalSteps]: Uploading unsynced quotations...');
+      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'running'));
+      print('📝 FULL SYNC [9/$totalSteps]: Uploading unsynced quotations...');
       await _syncUnsyncedQuotations();
-      _syncProgressController.add(SyncProgress(currentStep: 8, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
-      
+      // Upload locally-created / edited picks alongside quotations.
+      try {
+        final r = await PickService().syncUnsyncedPicks();
+        print('📝 FULL SYNC [9/$totalSteps]: Uploaded ${r['synced']}/${r['total']} picks');
+      } catch (e) {
+        print('⚠️ FULL SYNC: pick upload failed: $e');
+      }
+      // Packs after picks — see the note in the incremental sync path.
+      try {
+        final r = await PackService().syncUnsyncedPacks();
+        print('📝 FULL SYNC [9/$totalSteps]: Uploaded ${r['synced']}/${r['total']} packs');
+      } catch (e) {
+        print('⚠️ FULL SYNC: pack upload failed: $e');
+      }
+      _syncProgressController.add(SyncProgress(currentStep: 9, totalSteps: totalSteps, stepName: 'Upload Quotations', status: 'completed'));
+
+      // Step 10: inventory images. Deliberately LAST and time-boxed — it's the
+      // slowest thing here by an order of magnitude, and every other step has
+      // already committed by the time it runs. A timeout leaves the images
+      // that did download in the cache; the rest fill in on the next sync or
+      // on demand, so a slow link degrades the pictures, not the data.
+      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Inventory Images', status: 'running'));
+      print('🖼️ FULL SYNC [10/$totalSteps]: Preloading inventory images...');
+      try {
+        await _preloadInventoryImages().timeout(
+          const Duration(minutes: 5),
+          onTimeout: () => print(
+              '⏱️ FULL SYNC [10/$totalSteps]: Image preload timed out — '
+              'downloaded images kept, remainder deferred'),
+        );
+      } catch (e) {
+        print('⚠️ FULL SYNC: image preload failed: $e (cache preserved)');
+      }
+      _syncProgressController.add(SyncProgress(currentStep: 10, totalSteps: totalSteps, stepName: 'Inventory Images', status: 'completed'));
+
       // Update sync info
       await _updateSyncInfo(
         isOnline: _isOnline,
@@ -2072,17 +2236,24 @@ class EnhancedSyncService {
           if (companyCode <= 0) continue;
           
           print('🏷️ PRELOAD: Loading lookups for company $companyCode...');
-          
-          // Load groups (this will fetch from server and cache locally)
-          final groups = await _inventoryService.getGroupMap(companyCode: companyCode);
-          totalGroups += groups.length;
-          
-          // Load departments (this will fetch from server and cache locally)
-          final departments = await _inventoryService.getDepartmentMap(companyCode: companyCode);
-          totalDepartments += departments.length;
-          
-          if (groups.isNotEmpty || departments.isNotEmpty) {
-            print('✅ PRELOAD: Loaded ${groups.length} groups, ${departments.length} departments for company $companyCode');
+
+          // Preload BOTH taxonomies (pi + web) so switching modes works fully
+          // offline. Each mode is stored under its own partition/cache key.
+          for (final mode in TaxonomyMode.values) {
+            // Load groups (fetches from server and caches locally per mode)
+            final groups = await _inventoryService.getGroupMap(
+                companyCode: companyCode, mode: mode);
+            totalGroups += groups.length;
+
+            // Load departments (per mode)
+            final departments = await _inventoryService.getDepartmentMap(
+                companyCode: companyCode, mode: mode);
+            totalDepartments += departments.length;
+
+            if (groups.isNotEmpty || departments.isNotEmpty) {
+              print('✅ PRELOAD: ${mode.name} — ${groups.length} groups, '
+                  '${departments.length} departments for company $companyCode');
+            }
           }
           
         } catch (e) {

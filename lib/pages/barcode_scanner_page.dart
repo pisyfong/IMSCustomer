@@ -9,7 +9,26 @@ class BarcodeScannerPage extends StatefulWidget {
 }
 
 class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
-  final MobileScannerController _controller = MobileScannerController();
+  // Accept every symbology mobile_scanner supports, including QR. Passing
+  // an explicit list forces the underlying zxing/MLKit decoder to enable
+  // all of them (otherwise some builds default to only common 1D formats).
+  final MobileScannerController _controller = MobileScannerController(
+    formats: const [
+      BarcodeFormat.qrCode,
+      BarcodeFormat.dataMatrix,
+      BarcodeFormat.pdf417,
+      BarcodeFormat.aztec,
+      BarcodeFormat.ean13,
+      BarcodeFormat.ean8,
+      BarcodeFormat.upcA,
+      BarcodeFormat.upcE,
+      BarcodeFormat.code39,
+      BarcodeFormat.code93,
+      BarcodeFormat.code128,
+      BarcodeFormat.itf,
+      BarcodeFormat.codabar,
+    ],
+  );
   bool _returned = false;
   String? _lastCode;
 
@@ -36,7 +55,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan Barcode'),
+        title: const Text('Scan Code'),
         actions: [
           IconButton(
             icon: const Icon(Icons.flash_on),

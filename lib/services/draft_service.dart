@@ -99,6 +99,10 @@ class DraftService {
     required String uom,
     required double quantity,
     required double unitPrice,
+    double foc = 0,
+    double quantityLoose = 0,
+    double focLoose = 0,
+    double factor = 1,
     String? pluNo,
     String? description,
     String? remark,
@@ -110,7 +114,11 @@ class DraftService {
         ? 1
         : existingItems.map((i) => i.sequenceNo).reduce((a, b) => a > b ? a : b) + 1;
 
-    final netAmount = quantity * unitPrice;
+    // FOC is given away, so only the charged quantity and any loose units
+    // contribute — matching how the checkout prices the same line.
+    final safeFactor = factor > 0 ? factor : 1.0;
+    final netAmount =
+        quantity * unitPrice + (unitPrice / safeFactor) * quantityLoose;
 
     final item = DraftQuotationItem()
       ..draftId = draftId
@@ -121,6 +129,10 @@ class DraftService {
       ..description = description
       ..uom = uom
       ..quantity = quantity
+      ..foc = foc
+      ..quantityLoose = quantityLoose
+      ..focLoose = focLoose
+      ..factor = safeFactor
       ..unitPrice = unitPrice
       ..netAmount = netAmount
       ..remark = remark

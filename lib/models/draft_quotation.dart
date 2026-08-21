@@ -101,6 +101,28 @@ class DraftQuotationItem {
 
   double quantity = 0;
 
+  /// Free and loose quantities, carried so a draft reopens as the order that
+  /// was saved. Nullable rather than defaulted, because a non-nullable number
+  /// added to a collection with existing rows reads back as a sentinel on
+  /// those rows instead of the initialiser.
+  double? foc;
+  double? quantityLoose;
+  double? focLoose;
+
+  /// Pack size. Without it a reopened draft fell back to 1.0, which silently
+  /// reduced a carton line to singles on the way to the quotation.
+  double? factor;
+
+  double get focQty => foc ?? 0;
+  double get looseQty => quantityLoose ?? 0;
+  double get focLooseQty => focLoose ?? 0;
+  double get factorOrOne {
+    // Not `(factor ?? 1) > 0 ? factor! : 1` — that guard passes when factor is
+    // null and the force-unwrap then throws.
+    final f = factor ?? 1;
+    return f > 0 ? f : 1;
+  }
+
   double unitPrice = 0;
 
   double netAmount = 0;
@@ -122,6 +144,10 @@ class DraftQuotationItem {
       'Description': description,
       'Uom': uom,
       'Quantity': quantity,
+      'Foc': focQty,
+      'Quantity_Loose': looseQty,
+      'Foc_Loose': focLooseQty,
+      'Factor': factorOrOne,
       'Unit_Price': unitPrice,
       'Net_Amount': netAmount,
       'Remark': remark,

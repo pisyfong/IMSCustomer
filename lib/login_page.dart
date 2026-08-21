@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'services/auth_service.dart';
 import 'services/activation_service.dart';
 import 'models/user.dart';
+import 'widgets/company_picker_sheet.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
@@ -79,8 +80,10 @@ class _LoginPageState extends State<LoginPage> {
       final user = await authService.login(username, password);
       
       if (mounted) {
-        // Login successful, navigate to company selection page
-        Navigator.of(context).pushReplacementNamed('/company');
+        // Pop up the company picker (auto-selects if the user only belongs
+        // to one company). Fine to await — we push /home either way.
+        await CompanyPickerSheet.ensureSelected(context);
+        if (mounted) Navigator.of(context).pushReplacementNamed('/home');
       }
     } catch (e) {
       if (mounted) {

@@ -9,11 +9,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path/path.dart' as path;
 import '../models/cart_item.dart';
+import '../services/location_service.dart';
 import '../models/customer.dart';
 import '../models/quote_item.dart';
 import '../services/customer_service.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
+import '../services/company_letterhead.dart';
 import '../services/signalr_service.dart';
 import '../services/quote_number_service.dart';
 import '../services/quotation_service.dart';
@@ -21,10 +23,13 @@ import '../services/credit_term_service.dart';
 import '../services/offline_first_service.dart';
 import '../services/plu_service.dart';
 import '../services/draft_service.dart';
+import '../services/alternate_company_service.dart';
+import '../services/qty.dart';
 import '../services/representative_service.dart';
 import '../models/credit_term.dart';
 import '../models/representative.dart';
 import '../main.dart'; // For isar instance
+import '../theme/app_design.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -36,6 +41,11 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
+  /// Quantities are decimals but almost always whole, so drop the trailing
+  /// `.0` rather than showing "3.0 FOC" on a narrow handheld screen.
+  static String _qty(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
   late final CustomerService _customerService;
   late final QuotationService _quotationService;
   late final CreditTermService _creditTermService;
@@ -57,6 +67,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
   List<Representative> _representatives = [];
   Representative? _selectedRepresentative;
   bool _isLoadingRepresentatives = true;
+
+  /// The group entity this quotation is raised under — `Alternate_Company` on
+  /// the SQ header. It is the ISSUING company, not the bill-to customer: at
+  /// Miri the quotation prefix follows it (YT/AR/YC/AA), and all 187,320
+  /// legacy quotes carry one while this app was writing none.
+  final AlternateCompanyService _altCompanyService = AlternateCompanyService();
+  List<AlternateCompany> _alternateCompanies = [];
+  AlternateCompany? _selectedAlternateCompany;
+  bool _isLoadingAltCompanies = true;
+  /// Set when the list could not be loaded. The card used to hide itself in
+  /// that case, which made a stale backend look like a missing feature —
+  /// there was nothing on screen to explain why the field was not there.
+  bool _altCompaniesFailed = false;
   bool _isCreatingQuotation = false;
   bool _isSavingDraft = false;
   
@@ -72,9 +95,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _quotationService = QuotationService(signalRService);
     _creditTermService = CreditTermService(signalRService);
     _loadSelectedCustomer();
+    _loadLocation();
     _loadCreditTerms();
     _loadRepresentatives();
+    _loadAlternateCompanies();
     _calculateTotals();
+  }
+
+  /// The location scope this quotation belongs to. Null is acceptable — the
+  /// server falls back to the user's default location — but sending it keeps
+  /// the document tied to where the operator actually is.
+  String? _locationCode;
+
+  Future<void> _loadLocation() async {
+    final code = await LocationService().selectedCode();
+    if (mounted) setState(() => _locationCode = code);
   }
 
   Future<void> _loadSelectedCustomer() async {
@@ -150,6 +185,41 @@ class _CheckoutPageState extends State<CheckoutPage> {
         _creditTerms = [];
         _selectedCreditTerm = null;
       });
+    }
+  }
+
+  /// Loads the issuing entities, defaulting to the one last used here.
+  ///
+  /// A branch raises nearly every document under the same entity, so the last
+  /// choice is a better default than the company-wide most-used — and far
+  /// better than making the operator pick every time.
+  Future<void> _loadAlternateCompanies() async {
+    try {
+      final company = await _authService.getSelectedCompany();
+      final raw = company?['companyCode'] ?? 1;
+      final companyCode = raw is String ? int.tryParse(raw) ?? 1 : raw as int;
+
+      final list = await _altCompanyService.load(companyCode);
+      final last = await _altCompanyService.lastUsed(companyCode);
+      if (!mounted) return;
+      setState(() {
+        _alternateCompanies = list;
+        _isLoadingAltCompanies = false;
+        _altCompaniesFailed = list.isEmpty;
+        if (list.isNotEmpty) {
+          final i = list.indexWhere((c) => c.code == last);
+          // Falls back to the most-used, which the endpoint returns first.
+          _selectedAlternateCompany = i >= 0 ? list[i] : list.first;
+        }
+      });
+    } catch (e) {
+      print('🏢 CHECKOUT: alternate companies failed ($e)');
+      if (mounted) {
+        setState(() {
+          _isLoadingAltCompanies = false;
+          _altCompaniesFailed = true;
+        });
+      }
     }
   }
 
@@ -261,6 +331,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ..gstPrice = item.gstPrice
           ..factor = item.factor
           ..quantity = item.quantity
+          // These copies exist only to attach a PLU, so every other field has
+          // to survive intact. Omitting the free/loose quantities here would
+          // drop them between the cart and the saved quotation.
+          ..foc = item.foc
+          ..quantityLoose = item.quantityLoose
+          ..focLoose = item.focLoose
           ..remarks = item.remarks
           ..addedDate = item.addedDate;
         
@@ -339,6 +415,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ..gstPrice = item.gstPrice
           ..factor = item.factor
           ..quantity = item.quantity
+          // These copies exist only to attach a PLU, so every other field has
+          // to survive intact. Omitting the free/loose quantities here would
+          // drop them between the cart and the saved quotation.
+          ..foc = item.foc
+          ..quantityLoose = item.quantityLoose
+          ..focLoose = item.focLoose
           ..remarks = item.remarks
           ..addedDate = item.addedDate;
         return updatedItem;
@@ -356,6 +438,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
       final companyName = selectedCompany?['companyName'] ?? 'Company';
+      // Who this document is FROM — resolved from the database, never baked
+      // into the build. See CompanyLetterhead.
+      final letterhead = await CompanyLetterhead.current();
       print('✅ User ID: $userId, Company: $companyName ($companyCode)');
       
       // Fetch customer PLU if toggle is ON
@@ -370,6 +455,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
       print('💳 Selected credit term: ${_selectedCreditTerm?.displayFull}');
       print('💳 Term code: "${_selectedCreditTerm?.term}", Days: ${_selectedCreditTerm?.days}');
       
+      if (_selectedAlternateCompany != null) {
+        await _altCompanyService.rememberUsed(
+            companyCode, _selectedAlternateCompany!.code);
+      }
       final quotation = await _quotationService.createQuotation(
         companyCode: companyCode,
         quotePreLabel: quoteNo,
@@ -382,8 +471,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
           'remark1': _remarksController.text,
           'currency': 'RM',
           'rate': 1.0,
-          'locationCode': 'FST',
+          // The location being worked in, not a hardcoded site.
+          'locationCode': _locationCode,
           'representativeId': _selectedRepresentative?.representativeId,
+          // Blank rather than a guess when the list could not be loaded: a
+          // wrong entity files the document under the wrong company, which is
+          // worse than an empty column an admin can see and fix.
+          'alternateCompany': _selectedAlternateCompany?.code ?? '',
           'totalQuoteQuantity': widget.cartItems.fold<double>(0, (sum, item) => sum + item.quantity),
           'totalQuoteItem': widget.cartItems.length,
           'grossAmount': _totalAmount,
@@ -399,14 +493,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
       
       // Save quotation items to database
       print('📝 Saving quotation items to database...');
-      final cartItemsData = widget.cartItems.map((item) => {
+      final cartItemsData = widget.cartItems.map((item) {
+        // One price drives both the unit price and the amount, so they can
+        // never disagree about which of gstPrice/unitPrice was in play.
+        final price = item.gstPrice ?? item.unitPrice ?? 0.0;
+        final factor = (item.factor ?? 1.0) > 0 ? (item.factor ?? 1.0) : 1.0;
+        return {
         'skuNo': item.skuNo,
         'uom': item.uom,
-        'quantity': item.quantity.toDouble(),
-        'unitPrice': item.gstPrice ?? item.unitPrice ?? 0.0,  // Use GST-inclusive price
-        'amount': (item.gstPrice ?? item.unitPrice ?? 0.0) * item.quantity,  // Use GST-inclusive amount
+        // Was omitted, so every line reached the server as Factor = 1.0. The
+        // conversion to SI reduces a line to base units as
+        // (Quantity + Foc) * Factor + loose, so a missing factor silently
+        // understated a carton line by its own pack size.
+        'factor': factor,
+        'quantity': item.quantity,
+        'foc': item.focQty,
+        'quantityLoose': item.looseQty,
+        'focLoose': item.focLooseQty,
+        'unitPrice': price,  // Use GST-inclusive price
+        // FOC contributes nothing: only the ordered quantity is charged, plus
+        // any loose units at the base-unit price.
+        'amount': price * item.quantity + (price / factor) * item.looseQty,
         'pluNo': item.pluNo,
         'remark': item.remarks,  // Only the user's typed remark; description is looked up at render time
+        };
       }).toList();
       
       final itemsSaved = await _quotationService.saveQuotationItems(
@@ -471,11 +581,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             companyName.toUpperCase(),
                             style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
                           ),
-                          pw.SizedBox(height: 3),
-                          pw.Text('LOT 1422 EASTWOOD VALLEY INDUSTRIAL PARK 1, JALAN MIRI BY-PASS,', style: const pw.TextStyle(fontSize: 8)),
-                          pw.Text('96000 MIRI SARAWAK  TEL/FAX: 085-419489, 013-6686555', style: const pw.TextStyle(fontSize: 8)),
-                          pw.SizedBox(height: 5),
-                          pw.Text('Email: fungseng22@gmail.com', style: const pw.TextStyle(fontSize: 8)),
+                          if (letterhead.registrationNo.isNotEmpty) ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text('Co. Reg: ${letterhead.registrationNo}',
+                                style: const pw.TextStyle(fontSize: 8)),
+                          ],
+                          if (letterhead.addressLines.isNotEmpty) ...[
+                            pw.SizedBox(height: 3),
+                            for (final line in letterhead.addressLines)
+                              pw.Text(line,
+                                  style: const pw.TextStyle(fontSize: 8)),
+                          ],
                         ],
                       ),
                     ),
@@ -610,7 +726,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       
                       // Handle both QuoteItem (from database) and CartItem (fallback) types
                       String skuNo, pluNo, description, remarks, uom, gstPrice, gstSubtotal;
-                      int quantity;
+                      // Formatted, not numeric: this row is going onto a PDF
+                      // and a 2dp quantity cannot survive an int.
+                      String quantity;
                       
                       if (item is QuoteItem) {
                         // Using saved quotation items from database
@@ -621,7 +739,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         // strictly the user's typed remark (may be null).
                         description = descLookup['${item.skuNo}_$uom'] ?? 'Item ${item.skuNo}';
                         remarks = (item.remark ?? '').trim();
-                        quantity = (item.quoteQuantity ?? 0).toInt();
+                        quantity = Qty.fmt(item.quoteQuantity ?? 0);
                         // Use unitPrice directly without tax reduction (should match original cart price)
                         gstPrice = (item.unitPrice ?? 0.0).toStringAsFixed(2);
                         gstSubtotal = (item.netAmount ?? 0.0).toStringAsFixed(2);
@@ -634,7 +752,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         description = cartItem.displayDescription ?? 'Item ${cartItem.skuNo}';
                         remarks = cartItem.remarks ?? '';
                         uom = cartItem.displayUom ?? 'PCS';
-                        quantity = cartItem.quantity.toInt();
+                        // 2dp, like every other quantity — .toInt() here
+                        // printed a 2.5 KG line on the PDF as 2.
+                        quantity = Qty.fmt(cartItem.quantity);
                         // Use the raw price values without RM prefix to match QuoteItem format
                         gstPrice = (cartItem.gstPrice ?? 0.0).toStringAsFixed(2);
                         gstSubtotal = (cartItem.gstSubtotal ?? 0.0).toStringAsFixed(2);
@@ -913,7 +1033,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
           companyCode: companyCode,
           skuNo: cartItem.skuNo,
           uom: cartItem.uom ?? 'PCS',
-          quantity: cartItem.quantity.toDouble(),
+          quantity: cartItem.quantity,
+          foc: cartItem.focQty,
+          quantityLoose: cartItem.looseQty,
+          focLoose: cartItem.focLooseQty,
+          factor: cartItem.factor ?? 1,
           unitPrice: cartItem.gstPrice ?? cartItem.unitPrice ?? 0,
           pluNo: cartItem.pluNo,
           description: cartItem.displayDescription,
@@ -1068,6 +1192,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   children: [
                     // Customer Card (Compact)
                     _buildCustomerCard(),
+                    _buildIssuingCompanyCard(),
                     const SizedBox(height: 8),
                     
                     // Order Items (Compact List)
@@ -1236,6 +1361,121 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  /// Which of the group's companies issues this quotation.
+  ///
+  /// Shown on its own row rather than squeezed in beside the representative,
+  /// because picking the wrong entity is not a cosmetic mistake — the document
+  /// is filed under, and numbered for, the company chosen here.
+  Widget _buildIssuingCompanyCard() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.apartment_outlined, size: 16, color: Colors.grey.shade700),
+              const SizedBox(width: 6),
+              const Text(
+                'Issued by',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const Spacer(),
+              if (_selectedAlternateCompany != null)
+                Text(
+                  _selectedAlternateCompany!.code,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade600),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_isLoadingAltCompanies)
+            const SizedBox(
+              height: 36,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (_alternateCompanies.isEmpty)
+            // Says what happened and offers the retry, rather than leaving a
+            // blank where a field should be. The order can still be placed —
+            // the column simply goes out empty, as it did before this existed.
+            InkWell(
+              onTap: () {
+                setState(() => _isLoadingAltCompanies = true);
+                _loadAlternateCompanies();
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, size: 15, color: Colors.orange.shade800),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _altCompaniesFailed
+                            ? 'Could not load issuing companies — tap to retry'
+                            : 'No issuing companies configured',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<AlternateCompany>(
+                  value: _selectedAlternateCompany,
+                  isExpanded: true,
+                  isDense: true,
+                  hint: const Text('Select issuing company',
+                      style: TextStyle(fontSize: 12, color: Colors.black54)),
+                  style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  items: _alternateCompanies
+                      .map((c) => DropdownMenuItem<AlternateCompany>(
+                            value: c,
+                            child:
+                                Text(c.label, overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (v) =>
+                      setState(() => _selectedAlternateCompany = v),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOrderItemsCard() {
     return Container(
       decoration: BoxDecoration(
@@ -1288,7 +1528,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       ),
                       child: Center(
                         child: Text(
-                          '${item.quantity.toInt()}',
+                          Qty.fmt(item.quantity),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -1313,6 +1553,29 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             '${item.displayUom} @ ${item.displayGstPrice}',
                             style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                           ),
+                          // Free and loose units are easy to mis-key and cost
+                          // nothing, so the confirmation screen has to state
+                          // them before the order is committed.
+                          if (item.focQty > 0 ||
+                              item.looseQty > 0 ||
+                              item.focLooseQty > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                [
+                                  if (item.focQty > 0)
+                                    '+${_qty(item.focQty)} FOC',
+                                  if (item.looseQty > 0)
+                                    '+${_qty(item.looseQty)} loose',
+                                  if (item.focLooseQty > 0)
+                                    '+${_qty(item.focLooseQty)} FOC loose',
+                                ].join('  ·  '),
+                                style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppDesign.warning),
+                              ),
+                            ),
                         ],
                       ),
                     ),

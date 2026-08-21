@@ -3,6 +3,7 @@ import '../models/draft_quotation.dart';
 import '../models/inventory_item.dart';
 import '../models/cart_item.dart';
 import '../services/draft_service.dart';
+import '../services/qty.dart';
 import '../services/inventory_service.dart';
 import '../services/invoice_service.dart';
 import '../services/signalr_service.dart';
@@ -105,7 +106,7 @@ class _EditDraftPageState extends State<EditDraftPage> {
   }
 
   Future<void> _editItemQuantity(DraftQuotationItem item) async {
-    final controller = TextEditingController(text: item.quantity.toStringAsFixed(0));
+    final controller = TextEditingController(text: Qty.fmt(item.quantity));
 
     final newQty = await showDialog<double>(
       context: context,
@@ -113,7 +114,8 @@ class _EditDraftPageState extends State<EditDraftPage> {
         title: const Text('Edit Quantity'),
         content: TextField(
           controller: controller,
-          keyboardType: TextInputType.number,
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
           autofocus: true,
           decoration: const InputDecoration(
             labelText: 'Quantity',
@@ -127,7 +129,7 @@ class _EditDraftPageState extends State<EditDraftPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              final qty = double.tryParse(controller.text);
+              final qty = Qty.tryParse(controller.text);
               if (qty != null && qty > 0) {
                 Navigator.pop(context, qty);
               }
@@ -323,14 +325,19 @@ class _EditDraftPageState extends State<EditDraftPage> {
           uom: item.uom ?? 'PCS',
           unitPrice: item.unitPrice,
           gstPrice: item.unitPrice,
-          factor: 1.0,
-          quantity: item.quantity.toInt(),
+          // Was hardcoded 1.0, which turned a carton line back into singles
+          // every time a draft was reopened.
+          factor: item.factorOrOne,
+          quantity: item.quantity,
+          foc: item.focQty,
+          quantityLoose: item.looseQty,
+          focLoose: item.focLooseQty,
           remarks: item.remark,
           // Set balance quantities to order quantities for quotation creation
           balanceQuantity: item.quantity,
-          balanceQuantityLoose: 0.0,
-          balanceFoc: 0.0,
-          balanceFocLoose: 0.0,
+          balanceQuantityLoose: item.looseQty,
+          balanceFoc: item.focQty,
+          balanceFocLoose: item.focLooseQty,
         );
       }
 
@@ -705,7 +712,7 @@ class _EditDraftPageState extends State<EditDraftPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Qty: ${item.quantity.toStringAsFixed(0)}',
+                                'Qty: ${Qty.fmt(item.quantity)}',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,

@@ -700,21 +700,44 @@ class InvoiceService {
       final invoicePreLabels = filteredItems.map((item) => item.invoicePreLabel).toSet();
       var allInvoices = await isar.invoices.where().findAll();
       
-      // Filter invoices by customer and get only those with matching items
+      // Filter invoices by customer and get only those with matching items.
+      //
+      // Customer is compared trimmed: it comes from a char() column, so a
+      // padded '01/A01  ' would never equal the code the app holds.
+      final wantCustomer = customerCode.trim();
       final invoiceMap = <String, Invoice>{};
+      int headersForCustomer = 0;
       for (final invoice in allInvoices) {
-        if (invoice.companyCode == companyCode &&
-            invoice.customer == customerCode &&
-            invoicePreLabels.contains(invoice.invoicePreLabel)) {
+        if (invoice.companyCode != companyCode) continue;
+        if ((invoice.customer ?? '').trim() != wantCustomer) continue;
+        headersForCustomer++;
+        if (invoicePreLabels.contains(invoice.invoicePreLabel)) {
           invoiceMap[invoice.invoicePreLabel] = invoice;
         }
       }
-      
+
       print('📋 INVOICE SERVICE: Found ${invoiceMap.length} invoices for customer $customerCode out of ${invoicePreLabels.length} invoice labels');
-      if (invoiceMap.isEmpty && invoicePreLabels.isNotEmpty) {
-        print('⚠️ INVOICE SERVICE: Invoice items exist but invoice headers not synced for customer $customerCode');
-        print('   Invoice labels needed: ${invoicePreLabels.take(3).join(", ")}...');
-        
+
+      // An empty result is the NORMAL case: the SKU is stocked widely, and
+      // most of the invoices carrying it belong to other customers. That is
+      // not a sync fault, and it must not trigger a server round-trip — doing
+      // so put a network call behind every bottom sheet for an item this
+      // customer has never bought, which is most of them.
+      //
+      // A genuine gap looks different: no headers for this customer at all,
+      // even though its lines are on the device.
+      final looksLikeSyncGap =
+          invoiceMap.isEmpty && invoicePreLabels.isNotEmpty && headersForCustomer == 0;
+
+      if (invoiceMap.isEmpty && headersForCustomer > 0) {
+        print('ℹ️ INVOICE SERVICE: $customerCode has $headersForCustomer invoice(s) '
+            'on device, none containing SKU $skuNo — no history to show');
+      }
+
+      if (looksLikeSyncGap) {
+        print('⚠️ INVOICE SERVICE: no invoice headers on device for customer $customerCode');
+        print('   Invoice labels seen on items: ${invoicePreLabels.take(3).join(", ")}...');
+
         // Auto-fetch missing invoice headers if connected
         if (_signalRService.isConnected) {
           print('🔄 INVOICE SERVICE: Auto-fetching invoice headers for customer $customerCode...');
@@ -756,6 +779,13 @@ class InvoiceService {
           'qty': item.quantity ?? 0,
           'uom': item.uom,
           'price': item.unitPrice ?? 0,
+          // The rest of the line, so the history row can be put back into the
+          // cart as it was sold rather than as a bare quantity. Without the
+          // factor a re-ordered carton line would be priced as singles.
+          'foc': item.foc ?? 0,
+          'quantityLoose': item.quantityLoose ?? 0,
+          'focLoose': item.focLoose ?? 0,
+          'factor': item.factor,
         });
       }
       

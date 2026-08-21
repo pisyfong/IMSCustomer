@@ -32,10 +32,20 @@ const DepartmentLookupSchema = CollectionSchema(
       name: r'description',
       type: IsarType.string,
     ),
-    r'lastUpdated': PropertySchema(
+    r'groupCode': PropertySchema(
       id: 3,
+      name: r'groupCode',
+      type: IsarType.string,
+    ),
+    r'lastUpdated': PropertySchema(
+      id: 4,
       name: r'lastUpdated',
       type: IsarType.dateTime,
+    ),
+    r'taxonomyMode': PropertySchema(
+      id: 5,
+      name: r'taxonomyMode',
+      type: IsarType.string,
     )
   },
   estimateSize: _departmentLookupEstimateSize,
@@ -44,9 +54,9 @@ const DepartmentLookupSchema = CollectionSchema(
   deserializeProp: _departmentLookupDeserializeProp,
   idName: r'id',
   indexes: {
-    r'companyCode_departmentCode': IndexSchema(
-      id: 3019046284128165971,
-      name: r'companyCode_departmentCode',
+    r'companyCode_taxonomyMode_departmentCode': IndexSchema(
+      id: 7091087888630405022,
+      name: r'companyCode_taxonomyMode_departmentCode',
       unique: false,
       replace: false,
       properties: [
@@ -54,6 +64,11 @@ const DepartmentLookupSchema = CollectionSchema(
           name: r'companyCode',
           type: IndexType.value,
           caseSensitive: false,
+        ),
+        IndexPropertySchema(
+          name: r'taxonomyMode',
+          type: IndexType.hash,
+          caseSensitive: true,
         ),
         IndexPropertySchema(
           name: r'departmentCode',
@@ -79,6 +94,8 @@ int _departmentLookupEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.departmentCode.length * 3;
   bytesCount += 3 + object.description.length * 3;
+  bytesCount += 3 + object.groupCode.length * 3;
+  bytesCount += 3 + object.taxonomyMode.length * 3;
   return bytesCount;
 }
 
@@ -91,7 +108,9 @@ void _departmentLookupSerialize(
   writer.writeLong(offsets[0], object.companyCode);
   writer.writeString(offsets[1], object.departmentCode);
   writer.writeString(offsets[2], object.description);
-  writer.writeDateTime(offsets[3], object.lastUpdated);
+  writer.writeString(offsets[3], object.groupCode);
+  writer.writeDateTime(offsets[4], object.lastUpdated);
+  writer.writeString(offsets[5], object.taxonomyMode);
 }
 
 DepartmentLookup _departmentLookupDeserialize(
@@ -104,8 +123,10 @@ DepartmentLookup _departmentLookupDeserialize(
   object.companyCode = reader.readLong(offsets[0]);
   object.departmentCode = reader.readString(offsets[1]);
   object.description = reader.readString(offsets[2]);
+  object.groupCode = reader.readString(offsets[3]);
   object.id = id;
-  object.lastUpdated = reader.readDateTimeOrNull(offsets[3]);
+  object.lastUpdated = reader.readDateTimeOrNull(offsets[4]);
+  object.taxonomyMode = reader.readString(offsets[5]);
   return object;
 }
 
@@ -123,7 +144,11 @@ P _departmentLookupDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
       return (reader.readDateTimeOrNull(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -221,28 +246,28 @@ extension DepartmentLookupQueryWhere
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeEqualToAnyDepartmentCode(int companyCode) {
+      companyCodeEqualToAnyTaxonomyModeDepartmentCode(int companyCode) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'companyCode_departmentCode',
+        indexName: r'companyCode_taxonomyMode_departmentCode',
         value: [companyCode],
       ));
     });
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeNotEqualToAnyDepartmentCode(int companyCode) {
+      companyCodeNotEqualToAnyTaxonomyModeDepartmentCode(int companyCode) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
+              indexName: r'companyCode_taxonomyMode_departmentCode',
               lower: [],
               upper: [companyCode],
               includeUpper: false,
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
+              indexName: r'companyCode_taxonomyMode_departmentCode',
               lower: [companyCode],
               includeLower: false,
               upper: [],
@@ -250,13 +275,13 @@ extension DepartmentLookupQueryWhere
       } else {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
+              indexName: r'companyCode_taxonomyMode_departmentCode',
               lower: [companyCode],
               includeLower: false,
               upper: [],
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
+              indexName: r'companyCode_taxonomyMode_departmentCode',
               lower: [],
               upper: [companyCode],
               includeUpper: false,
@@ -266,13 +291,13 @@ extension DepartmentLookupQueryWhere
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeGreaterThanAnyDepartmentCode(
+      companyCodeGreaterThanAnyTaxonomyModeDepartmentCode(
     int companyCode, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'companyCode_departmentCode',
+        indexName: r'companyCode_taxonomyMode_departmentCode',
         lower: [companyCode],
         includeLower: include,
         upper: [],
@@ -281,13 +306,13 @@ extension DepartmentLookupQueryWhere
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeLessThanAnyDepartmentCode(
+      companyCodeLessThanAnyTaxonomyModeDepartmentCode(
     int companyCode, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'companyCode_departmentCode',
+        indexName: r'companyCode_taxonomyMode_departmentCode',
         lower: [],
         upper: [companyCode],
         includeUpper: include,
@@ -296,7 +321,7 @@ extension DepartmentLookupQueryWhere
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeBetweenAnyDepartmentCode(
+      companyCodeBetweenAnyTaxonomyModeDepartmentCode(
     int lowerCompanyCode,
     int upperCompanyCode, {
     bool includeLower = true,
@@ -304,7 +329,7 @@ extension DepartmentLookupQueryWhere
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'companyCode_departmentCode',
+        indexName: r'companyCode_taxonomyMode_departmentCode',
         lower: [lowerCompanyCode],
         includeLower: includeLower,
         upper: [upperCompanyCode],
@@ -314,45 +339,93 @@ extension DepartmentLookupQueryWhere
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeDepartmentCodeEqualTo(int companyCode, String departmentCode) {
+      companyCodeTaxonomyModeEqualToAnyDepartmentCode(
+          int companyCode, String taxonomyMode) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'companyCode_departmentCode',
-        value: [companyCode, departmentCode],
+        indexName: r'companyCode_taxonomyMode_departmentCode',
+        value: [companyCode, taxonomyMode],
       ));
     });
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
-      companyCodeEqualToDepartmentCodeNotEqualTo(
-          int companyCode, String departmentCode) {
+      companyCodeEqualToTaxonomyModeNotEqualToAnyDepartmentCode(
+          int companyCode, String taxonomyMode) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
+              indexName: r'companyCode_taxonomyMode_departmentCode',
               lower: [companyCode],
-              upper: [companyCode, departmentCode],
+              upper: [companyCode, taxonomyMode],
               includeUpper: false,
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
-              lower: [companyCode, departmentCode],
+              indexName: r'companyCode_taxonomyMode_departmentCode',
+              lower: [companyCode, taxonomyMode],
               includeLower: false,
               upper: [companyCode],
             ));
       } else {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
-              lower: [companyCode, departmentCode],
+              indexName: r'companyCode_taxonomyMode_departmentCode',
+              lower: [companyCode, taxonomyMode],
               includeLower: false,
               upper: [companyCode],
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_departmentCode',
+              indexName: r'companyCode_taxonomyMode_departmentCode',
               lower: [companyCode],
-              upper: [companyCode, departmentCode],
+              upper: [companyCode, taxonomyMode],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
+      companyCodeTaxonomyModeDepartmentCodeEqualTo(
+          int companyCode, String taxonomyMode, String departmentCode) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'companyCode_taxonomyMode_departmentCode',
+        value: [companyCode, taxonomyMode, departmentCode],
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterWhereClause>
+      companyCodeTaxonomyModeEqualToDepartmentCodeNotEqualTo(
+          int companyCode, String taxonomyMode, String departmentCode) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_departmentCode',
+              lower: [companyCode, taxonomyMode],
+              upper: [companyCode, taxonomyMode, departmentCode],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_departmentCode',
+              lower: [companyCode, taxonomyMode, departmentCode],
+              includeLower: false,
+              upper: [companyCode, taxonomyMode],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_departmentCode',
+              lower: [companyCode, taxonomyMode, departmentCode],
+              includeLower: false,
+              upper: [companyCode, taxonomyMode],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_departmentCode',
+              lower: [companyCode, taxonomyMode],
+              upper: [companyCode, taxonomyMode, departmentCode],
               includeUpper: false,
             ));
       }
@@ -691,6 +764,142 @@ extension DepartmentLookupQueryFilter
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'groupCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'groupCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'groupCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'groupCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'groupCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'groupCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'groupCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'groupCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'groupCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      groupCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'groupCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
       idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -819,6 +1028,142 @@ extension DepartmentLookupQueryFilter
       ));
     });
   }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'taxonomyMode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'taxonomyMode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'taxonomyMode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterFilterCondition>
+      taxonomyModeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'taxonomyMode',
+        value: '',
+      ));
+    });
+  }
 }
 
 extension DepartmentLookupQueryObject
@@ -872,6 +1217,20 @@ extension DepartmentLookupQuerySortBy
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      sortByGroupCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'groupCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      sortByGroupCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'groupCode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
       sortByLastUpdated() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastUpdated', Sort.asc);
@@ -882,6 +1241,20 @@ extension DepartmentLookupQuerySortBy
       sortByLastUpdatedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastUpdated', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      sortByTaxonomyMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      sortByTaxonomyModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.desc);
     });
   }
 }
@@ -930,6 +1303,20 @@ extension DepartmentLookupQuerySortThenBy
     });
   }
 
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      thenByGroupCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'groupCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      thenByGroupCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'groupCode', Sort.desc);
+    });
+  }
+
   QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -954,6 +1341,20 @@ extension DepartmentLookupQuerySortThenBy
       thenByLastUpdatedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastUpdated', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      thenByTaxonomyMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QAfterSortBy>
+      thenByTaxonomyModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.desc);
     });
   }
 }
@@ -983,9 +1384,23 @@ extension DepartmentLookupQueryWhereDistinct
   }
 
   QueryBuilder<DepartmentLookup, DepartmentLookup, QDistinct>
+      distinctByGroupCode({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'groupCode', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QDistinct>
       distinctByLastUpdated() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastUpdated');
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, DepartmentLookup, QDistinct>
+      distinctByTaxonomyMode({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'taxonomyMode', caseSensitive: caseSensitive);
     });
   }
 }
@@ -1018,10 +1433,23 @@ extension DepartmentLookupQueryProperty
     });
   }
 
+  QueryBuilder<DepartmentLookup, String, QQueryOperations> groupCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'groupCode');
+    });
+  }
+
   QueryBuilder<DepartmentLookup, DateTime?, QQueryOperations>
       lastUpdatedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastUpdated');
+    });
+  }
+
+  QueryBuilder<DepartmentLookup, String, QQueryOperations>
+      taxonomyModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'taxonomyMode');
     });
   }
 }

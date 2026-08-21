@@ -1,0 +1,16 @@
+{
+  "takenAt": "2026-08-11T11:10:52.157Z",
+  "counts": {
+    "MP_Invoice": 10074,
+    "MP_Invoice_Item": 104215,
+    "MP_Txn_History": 202,
+    "In_Stock": 6027,
+    "In_Stock_Location": 5835,
+    "MP_Quote": 4860,
+    "MP_Quote_Item": 88639,
+    "AR_Customer_Item": 7311,
+    "PI_Running_No": null,
+    "MP_Running_No": null
+  },
+  "maxInvoice": "FST/SI/010074"
+}

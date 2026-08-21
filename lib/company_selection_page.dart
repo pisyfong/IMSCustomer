@@ -14,6 +14,7 @@ import 'dart:math' as math;
 import 'pages/customer_selection_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/pending_uploads_page.dart';
+import 'widgets/app_nav_drawer.dart';
 import 'models/quotation.dart';
 
 class CompanySelectionPage extends StatefulWidget {
@@ -34,6 +35,52 @@ class _CompanySelectionPageState extends State<CompanySelectionPage>
   List<String> _debugMessages = []; // Accumulate debug messages
   List<Company> _companies = [];
   int _pendingUploadsCount = 0;
+  bool _navigating = false; // one-shot guard for auto-forward / tap
+
+  /// Save the company and open the ordering (customer selection) flow.
+  /// Guarded so the single-company auto-forward can't double-fire.
+  Future<void> _selectAndOpen(Company company) async {
+    if (_navigating) return;
+    _navigating = true;
+    try {
+      final authService = AuthService();
+      await authService.saveSelectedCompany({
+        'companyId': company.companyCode,
+        'companyName': company.companyName,
+        'companyCode': company.companyCode,
+      });
+      print('🔄 Company selected: ${company.companyName} (${company.companyCode})');
+      final invoiceService = InvoiceService(signalRService);
+      final companyCodeInt = int.tryParse(company.companyCode) ?? 0;
+      if (companyCodeInt > 0) {
+        invoiceService.syncNewInvoices(companyCodeInt).then((result) {
+          print('✅ Incremental invoice sync completed for company ${company.companyCode}');
+        }).catchError((e) {
+          print('⚠️ Incremental invoice sync failed: $e');
+        });
+      }
+    } catch (e) {
+      print('Error saving selected company: $e');
+    }
+    if (!mounted) {
+      _navigating = false;
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomerSelectionPage(
+          selectedCompany: {
+            'companyId': company.companyCode,
+            'companyName': company.companyName,
+            'companyCode': company.companyCode,
+          },
+        ),
+      ),
+    );
+    // Allow re-entry after returning (e.g. user backs out of customer page).
+    _navigating = false;
+  }
 
   @override
   void initState() {
@@ -290,6 +337,29 @@ class _CompanySelectionPageState extends State<CompanySelectionPage>
         });
       }
       print('📱 Painted ${localCompanies.length} companies from local cache');
+
+      // Skip the picker and go straight into Ordering when:
+      //   1. a company is already selected (saved), or
+      //   2. there's only one company to choose from.
+      final saved = await AuthService().getSelectedCompany();
+      final savedCode = saved?['companyCode']?.toString();
+      Company? target;
+      if (savedCode != null && savedCode.isNotEmpty) {
+        for (final c in localCompanies) {
+          if (c.companyCode == savedCode) {
+            target = c;
+            break;
+          }
+        }
+      }
+      target ??= localCompanies.length == 1 ? localCompanies.first : null;
+
+      if (target != null) {
+        final t = target;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _selectAndOpen(t);
+        });
+      }
     } catch (e) {
       // Even local read failed — keep loading state so the user knows
       // something is happening, but don't hang.
@@ -589,6 +659,7 @@ class _CompanySelectionPageState extends State<CompanySelectionPage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
+      drawer: const AppNavDrawer(current: AppSection.ordering),
       body: SafeArea(
         child: Column(
           children: [
@@ -741,22 +812,19 @@ class _CompanySelectionPageState extends State<CompanySelectionPage>
       ),
       child: Row(
         children: [
-          // Logout button
-          GestureDetector(
-            onTap: () async {
-              final authService = AuthService();
-              await authService.logout();
-              if (mounted) {
-                Navigator.of(context).pushReplacementNamed('/login');
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
+          // Hamburger — opens the module drawer (Ordering / Picking / CN /
+          // Settings / Log out).
+          Builder(
+            builder: (context) => GestureDetector(
+              onTap: () => Scaffold.of(context).openDrawer(),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.menu, size: 20),
               ),
-              child: const Icon(Icons.logout, size: 20),
             ),
           ),
           const SizedBox(width: 12),
@@ -1008,51 +1076,7 @@ class _CompanySelectionPageState extends State<CompanySelectionPage>
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            try {
-              final authService = AuthService();
-              await authService.saveSelectedCompany({
-                'companyId': company.companyCode,
-                'companyName': company.companyName,
-                'companyCode': company.companyCode,
-              });
-              
-              // Trigger incremental invoice sync for this company (silent background sync)
-              print('🔄 Company selected: ${company.companyName} (${company.companyCode})');
-              print('🔄 Starting incremental invoice sync...');
-              
-              // Import invoice service and trigger sync in background
-              final invoiceService = InvoiceService(signalRService);
-              final companyCodeInt = int.tryParse(company.companyCode) ?? 0;
-              if (companyCodeInt > 0) {
-                invoiceService.syncNewInvoices(companyCodeInt).then((result) {
-                  print('✅ Incremental invoice sync completed for company ${company.companyCode}');
-                  print('   Invoices: ${result['invoicesInserted']} inserted, ${result['invoicesUpdated']} updated');
-                  print('   Items: ${result['itemsInserted']} inserted, ${result['itemsUpdated']} updated');
-                }).catchError((e) {
-                  print('⚠️ Incremental invoice sync failed: $e');
-                });
-              } else {
-                print('⚠️ Invalid company code: ${company.companyCode}');
-              }
-              
-            } catch (e) {
-              print('Error saving selected company: $e');
-            }
-            if (!mounted) return;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CustomerSelectionPage(
-                  selectedCompany: {
-                    'companyId': company.companyCode,
-                    'companyName': company.companyName,
-                    'companyCode': company.companyCode,
-                  },
-                ),
-              ),
-            );
-          },
+          onTap: () => _selectAndOpen(company),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Row(

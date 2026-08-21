@@ -22,33 +22,38 @@ const SyncCheckpointSchema = CollectionSchema(
       name: r'companyCode',
       type: IsarType.long,
     ),
-    r'lastError': PropertySchema(
+    r'lastCursorId': PropertySchema(
       id: 1,
+      name: r'lastCursorId',
+      type: IsarType.long,
+    ),
+    r'lastError': PropertySchema(
+      id: 2,
       name: r'lastError',
       type: IsarType.string,
     ),
     r'lastErrorAt': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'lastErrorAt',
       type: IsarType.dateTime,
     ),
     r'lastRowCount': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'lastRowCount',
       type: IsarType.long,
     ),
     r'lastSyncedAt': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'lastSyncedAt',
       type: IsarType.dateTime,
     ),
     r'lastWriteTimeStamp': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'lastWriteTimeStamp',
       type: IsarType.dateTime,
     ),
     r'tableName': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'tableName',
       type: IsarType.string,
     )
@@ -109,12 +114,13 @@ void _syncCheckpointSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.companyCode);
-  writer.writeString(offsets[1], object.lastError);
-  writer.writeDateTime(offsets[2], object.lastErrorAt);
-  writer.writeLong(offsets[3], object.lastRowCount);
-  writer.writeDateTime(offsets[4], object.lastSyncedAt);
-  writer.writeDateTime(offsets[5], object.lastWriteTimeStamp);
-  writer.writeString(offsets[6], object.tableName);
+  writer.writeLong(offsets[1], object.lastCursorId);
+  writer.writeString(offsets[2], object.lastError);
+  writer.writeDateTime(offsets[3], object.lastErrorAt);
+  writer.writeLong(offsets[4], object.lastRowCount);
+  writer.writeDateTime(offsets[5], object.lastSyncedAt);
+  writer.writeDateTime(offsets[6], object.lastWriteTimeStamp);
+  writer.writeString(offsets[7], object.tableName);
 }
 
 SyncCheckpoint _syncCheckpointDeserialize(
@@ -126,12 +132,13 @@ SyncCheckpoint _syncCheckpointDeserialize(
   final object = SyncCheckpoint();
   object.companyCode = reader.readLong(offsets[0]);
   object.id = id;
-  object.lastError = reader.readStringOrNull(offsets[1]);
-  object.lastErrorAt = reader.readDateTimeOrNull(offsets[2]);
-  object.lastRowCount = reader.readLongOrNull(offsets[3]);
-  object.lastSyncedAt = reader.readDateTimeOrNull(offsets[4]);
-  object.lastWriteTimeStamp = reader.readDateTimeOrNull(offsets[5]);
-  object.tableName = reader.readString(offsets[6]);
+  object.lastCursorId = reader.readLongOrNull(offsets[1]);
+  object.lastError = reader.readStringOrNull(offsets[2]);
+  object.lastErrorAt = reader.readDateTimeOrNull(offsets[3]);
+  object.lastRowCount = reader.readLongOrNull(offsets[4]);
+  object.lastSyncedAt = reader.readDateTimeOrNull(offsets[5]);
+  object.lastWriteTimeStamp = reader.readDateTimeOrNull(offsets[6]);
+  object.tableName = reader.readString(offsets[7]);
   return object;
 }
 
@@ -145,16 +152,18 @@ P _syncCheckpointDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readStringOrNull(offset)) as P;
-    case 2:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 3:
       return (reader.readLongOrNull(offset)) as P;
-    case 4:
+    case 2:
+      return (reader.readStringOrNull(offset)) as P;
+    case 3:
       return (reader.readDateTimeOrNull(offset)) as P;
+    case 4:
+      return (reader.readLongOrNull(offset)) as P;
     case 5:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 7:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -591,6 +600,80 @@ extension SyncCheckpointQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterFilterCondition>
+      lastCursorIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastCursorId',
+      ));
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterFilterCondition>
+      lastCursorIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastCursorId',
+      ));
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterFilterCondition>
+      lastCursorIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastCursorId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterFilterCondition>
+      lastCursorIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastCursorId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterFilterCondition>
+      lastCursorIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastCursorId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterFilterCondition>
+      lastCursorIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastCursorId',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -1208,6 +1291,20 @@ extension SyncCheckpointQuerySortBy
     });
   }
 
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterSortBy>
+      sortByLastCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCursorId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterSortBy>
+      sortByLastCursorIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCursorId', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterSortBy> sortByLastError() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastError', Sort.asc);
@@ -1319,6 +1416,20 @@ extension SyncCheckpointQuerySortThenBy
     });
   }
 
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterSortBy>
+      thenByLastCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCursorId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterSortBy>
+      thenByLastCursorIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastCursorId', Sort.desc);
+    });
+  }
+
   QueryBuilder<SyncCheckpoint, SyncCheckpoint, QAfterSortBy> thenByLastError() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastError', Sort.asc);
@@ -1411,6 +1522,13 @@ extension SyncCheckpointQueryWhereDistinct
     });
   }
 
+  QueryBuilder<SyncCheckpoint, SyncCheckpoint, QDistinct>
+      distinctByLastCursorId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastCursorId');
+    });
+  }
+
   QueryBuilder<SyncCheckpoint, SyncCheckpoint, QDistinct> distinctByLastError(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1465,6 +1583,12 @@ extension SyncCheckpointQueryProperty
   QueryBuilder<SyncCheckpoint, int, QQueryOperations> companyCodeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'companyCode');
+    });
+  }
+
+  QueryBuilder<SyncCheckpoint, int?, QQueryOperations> lastCursorIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastCursorId');
     });
   }
 

@@ -466,6 +466,32 @@ const InvoiceSchema = CollectionSchema(
           caseSensitive: false,
         )
       ],
+    ),
+    r'webLinkPrelabel': IndexSchema(
+      id: 5230689031984664535,
+      name: r'webLinkPrelabel',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'webLinkPrelabel',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'appDLPrelabel': IndexSchema(
+      id: -2975535900423236244,
+      name: r'appDLPrelabel',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'appDLPrelabel',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
     )
   },
   links: {},
@@ -1312,6 +1338,136 @@ extension InvoiceQueryWhere on QueryBuilder<Invoice, Invoice, QWhereClause> {
         upper: [invoicePreLabel, upperCompanyCode],
         includeUpper: includeUpper,
       ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> webLinkPrelabelIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'webLinkPrelabel',
+        value: [null],
+      ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> webLinkPrelabelIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'webLinkPrelabel',
+        lower: [null],
+        includeLower: false,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> webLinkPrelabelEqualTo(
+      String? webLinkPrelabel) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'webLinkPrelabel',
+        value: [webLinkPrelabel],
+      ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> webLinkPrelabelNotEqualTo(
+      String? webLinkPrelabel) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'webLinkPrelabel',
+              lower: [],
+              upper: [webLinkPrelabel],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'webLinkPrelabel',
+              lower: [webLinkPrelabel],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'webLinkPrelabel',
+              lower: [webLinkPrelabel],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'webLinkPrelabel',
+              lower: [],
+              upper: [webLinkPrelabel],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> appDLPrelabelIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'appDLPrelabel',
+        value: [null],
+      ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> appDLPrelabelIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'appDLPrelabel',
+        lower: [null],
+        includeLower: false,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> appDLPrelabelEqualTo(
+      String? appDLPrelabel) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'appDLPrelabel',
+        value: [appDLPrelabel],
+      ));
+    });
+  }
+
+  QueryBuilder<Invoice, Invoice, QAfterWhereClause> appDLPrelabelNotEqualTo(
+      String? appDLPrelabel) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'appDLPrelabel',
+              lower: [],
+              upper: [appDLPrelabel],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'appDLPrelabel',
+              lower: [appDLPrelabel],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'appDLPrelabel',
+              lower: [appDLPrelabel],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'appDLPrelabel',
+              lower: [],
+              upper: [appDLPrelabel],
+              includeUpper: false,
+            ));
+      }
     });
   }
 }

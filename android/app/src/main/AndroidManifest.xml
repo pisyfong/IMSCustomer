@@ -1,4 +1,26 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Bluetooth receipt printer (Zywell / ESC-POS over classic SPP).
+         BLUETOOTH / BLUETOOTH_ADMIN cover Android 11 and below; from Android 12
+         the runtime BLUETOOTH_CONNECT permission takes over. We only ever list
+         devices already bonded in system settings, never scan for new ones —
+         "neverForLocation" declares that so Play doesn't demand the location
+         permission a scanning app would need. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" tools:replace="android:maxSdkVersion" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" tools:replace="android:maxSdkVersion" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
+
+    <!-- Network receipt printers: raw ESC/POS over TCP 9100. Declared here
+         rather than inherited from a plugin's manifest, since printing now
+         depends on it directly. ACCESS_NETWORK_STATE lets the discovery sweep
+         tell "no Wi-Fi" apart from "no printer answered". -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:label="IMScustomer"
         android:name="${applicationName}"

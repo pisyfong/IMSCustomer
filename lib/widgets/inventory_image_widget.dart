@@ -151,44 +151,44 @@ class _InventoryImageWidgetState extends State<InventoryImageWidget> {
         builder: (context, constraints) {
           final size = constraints.biggest;
           final iconSize = size.width > 0 ? size.width * 0.3 : 32.0;
-          
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isLoading && widget.showLoadingIndicator) ...[
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.grey[600],
+          // Only show the caption text when the box is tall enough to hold
+          // an icon + gap + label without overflowing (small thumbnails
+          // just show the icon).
+          final showLabel = size.height >= 64;
+
+          return ClipRect(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isLoading && widget.showLoadingIndicator) ...[
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Loading...',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ] else ...[
-                Icon(
-                  Icons.inventory_2_outlined,
-                  size: iconSize.clamp(16.0, 48.0),
-                  color: Colors.grey[500],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'No Image',
-                  style: TextStyle(
-                    fontSize: 10,
+                  if (showLabel) ...[
+                    const SizedBox(height: 8),
+                    Text('Loading...',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                  ],
+                ] else ...[
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: iconSize.clamp(16.0, 48.0),
                     color: Colors.grey[500],
                   ),
-                ),
+                  if (showLabel) ...[
+                    const SizedBox(height: 4),
+                    Text('No Image',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                  ],
+                ],
               ],
-            ],
+            ),
           );
         },
       ),

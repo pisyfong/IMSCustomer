@@ -10,8 +10,12 @@ import '../services/auth_service.dart';
 import '../services/user_app_settings_service.dart';
 import '../services/plu_service.dart';
 import '../services/inventory_service.dart';
+import '../services/loose_uom_rule.dart';
+import '../services/qty.dart';
 import '../services/customer_state_service.dart';
 import '../widgets/inventory_image_widget.dart';
+import '../widgets/ui_kit.dart';
+import '../theme/app_design.dart';
 import 'checkout_page.dart';
 import '../main.dart';
 
@@ -33,8 +37,15 @@ class _CartPageState extends State<CartPage> {
   List<CartItem> _cartItems = [];
   bool _isLoading = true;
   Map<String, dynamic> _cartSummary = {};
-  final Map<int, TextEditingController> _qtyControllers = {};
+  /// Four controllers per cart line — Qty, Loose, FOC, FOC loose — in the same
+  /// order the picking screen uses, so the two screens read alike.
+  final Map<int, List<TextEditingController>> _qtyControllers = {};
   MobileScannerController? _scannerController;
+
+  static const int _fQty = 0;
+  static const int _fLoose = 1;
+  static const int _fFoc = 2;
+  static const int _fFocLoose = 3;
 
   @override
   void initState() {
@@ -45,8 +56,10 @@ class _CartPageState extends State<CartPage> {
 
   @override
   void dispose() {
-    for (final ctrl in _qtyControllers.values) {
-      ctrl.dispose();
+    for (final ctrls in _qtyControllers.values) {
+      for (final ctrl in ctrls) {
+        ctrl.dispose();
+      }
     }
     _qtyControllers.clear();
     _scannerController?.dispose();
@@ -69,17 +82,27 @@ class _CartPageState extends State<CartPage> {
         _isLoading = false;
       });
 
-      // Sync controllers with loaded quantities
+      // Sync controllers with loaded quantities.
+      //
+      // Only ever written here, on a full reload. Typing updates the model and
+      // the totals directly — pushing text back into a controller the operator
+      // is inside would reset the cursor to the start of the field.
       for (final item in _cartItems) {
-        final ctrl = _qtyControllers[item.id] ?? TextEditingController();
-        ctrl.text = item.quantity.toString();
-        _qtyControllers[item.id] = ctrl;
+        final ctrls = _qtyControllers[item.id] ??
+            List.generate(4, (_) => TextEditingController());
+        _setIfChanged(ctrls[_fQty], Qty.fmt(item.quantity));
+        _setIfChanged(ctrls[_fLoose], Qty.fmt(item.looseQty));
+        _setIfChanged(ctrls[_fFoc], Qty.fmt(item.focQty));
+        _setIfChanged(ctrls[_fFocLoose], Qty.fmt(item.focLooseQty));
+        _qtyControllers[item.id] = ctrls;
       }
       // Dispose controllers for items no longer in cart
       final existingKeys = _qtyControllers.keys.toList();
       for (final key in existingKeys) {
         if (_cartItems.indexWhere((e) => e.id == key) == -1) {
-          _qtyControllers[key]?.dispose();
+          for (final c in _qtyControllers[key] ?? const <TextEditingController>[]) {
+            c.dispose();
+          }
           _qtyControllers.remove(key);
         }
       }
@@ -93,68 +116,91 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
-  Future<void> _updateQuantity(CartItem item, int newQuantity) async {
-    try {
-      await _cartService.updateQuantity(item.id, newQuantity);
-      await _loadCart(); // Refresh cart
-    } catch (e) {
+  static void _setIfChanged(TextEditingController c, String v) {
+    if (c.text != v) c.text = v;
+  }
+
+  /// Applies a typed value to one of the four quantity fields.
+  ///
+  /// The model is updated in place and the row is persisted without a reload,
+  /// so the field the operator is in keeps its cursor. An empty or unparseable
+  /// field reads as zero rather than reverting, which is what lets a value be
+  /// cleared and retyped.
+  void _applyField(CartItem item, int field, String text) {
+    final value = Qty.tryParse(text);
+    if (value == null) return; // mid-typing junk like "-" or "1.2.3" — ignore
+
+    setState(() {
+      switch (field) {
+        case _fQty:
+          // Was `value.round()`, which turned a typed 2.5 into 3 without
+          // saying so — while the very next box kept 2.5 exactly. Quantities
+          // are 2dp everywhere now, from this field to decimal(18,4) in RMS.
+          item.quantity = value;
+          break;
+        case _fLoose:
+          item.quantityLoose = value;
+          break;
+        case _fFoc:
+          item.foc = value;
+          break;
+        case _fFocLoose:
+          item.focLoose = value;
+          break;
+      }
+      _recomputeTotals();
+    });
+
+    // Persist without deleting: a line cleared to zero while typing must stay
+    // on screen. Removal is the trash button's job.
+    _cartService
+        .updateLineQuantities(
+          item.id,
+          quantity: field == _fQty ? item.quantity : null,
+          quantityLoose: field == _fLoose ? item.looseQty : null,
+          foc: field == _fFoc ? item.focQty : null,
+          focLoose: field == _fFocLoose ? item.focLooseQty : null,
+          removeWhenEmpty: false,
+        )
+        .catchError((e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update quantity: $e')),
+          SnackBar(content: Text('Failed to save quantity: $e')),
         );
       }
-    }
+    });
   }
-  
-  Future<void> _showQtyInputDialog(CartItem item) async {
-    final result = await showDialog<int>(
-      context: context,
-      builder: (context) {
-        final controller = TextEditingController(text: item.quantity.toInt().toString());
-        return AlertDialog(
-          title: const Text('Enter Quantity'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Quantity',
-              hintText: 'Enter quantity (1-999)',
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (value) {
-              final qty = int.tryParse(value);
-              if (qty != null && qty >= 1 && qty <= 999) {
-                Navigator.pop(context, qty);
-              }
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final qty = int.tryParse(controller.text);
-                if (qty != null && qty >= 1 && qty <= 999) {
-                  Navigator.pop(context, qty);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid quantity (1-999)')),
-                  );
-                }
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-    
-    if (result != null && mounted) {
-      await _updateQuantity(item, result);
+
+  /// Recomputes the footer totals from the in-memory lines, so the bottom bar
+  /// tracks typing without a database round trip.
+  void _recomputeTotals() {
+    double amount = 0;
+    double gst = 0;
+    double qty = 0;
+    double foc = 0;
+    double loose = 0;
+    for (final i in _cartItems) {
+      amount += i.subtotal;
+      gst += i.gstSubtotal;
+      qty += i.quantity;
+      foc += i.focQty;
+      loose += i.looseQty + i.focLooseQty;
     }
+    _cartSummary = {
+      ..._cartSummary,
+      'totalItems': _cartItems.length,
+      'totalQuantity': Qty.round(qty),
+      'totalFoc': foc,
+      'totalLoose': loose,
+      'totalAmount': amount,
+      'totalGstAmount': gst,
+      'items': _cartItems,
+    };
+  }
+
+  static String _trimZeros(double v) {
+    if (v == v.roundToDouble()) return v.toInt().toString();
+    return v.toString();
   }
 
   Future<void> _removeItem(CartItem item) async {
@@ -486,165 +532,152 @@ class _CartPageState extends State<CartPage> {
 
   @override
   Widget build(BuildContext context) {
+    final count = _cartItems.length;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Compact Header
-            _buildCompactHeader(),
-            // Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _cartItems.isEmpty
-                      ? _buildEmptyCart()
-                      : _buildCartList(),
+      backgroundColor: AppDesign.bg,
+      appBar: UiKit.appBar(
+        'Cart',
+        subtitle: count == 0
+            ? null
+            : '$count item${count == 1 ? '' : 's'} staged',
+        actions: [
+          if (count > 0)
+            IconButton(
+              tooltip: 'Empty cart',
+              icon: const Icon(Icons.delete_sweep_outlined, size: 20),
+              onPressed: _clearCart,
             ),
-            // Bottom Bar (only show if cart has items)
-            if (!_isLoading && _cartItems.isNotEmpty) _buildModernBottomBar(),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _cartItems.isEmpty
+              ? _buildEmptyCart()
+              : _buildCartList(),
+      bottomNavigationBar:
+          (_isLoading || _cartItems.isEmpty) ? null : _buildModernBottomBar(),
+    );
+  }
+
+  /// The grab area: the line's number above a grip.
+  ///
+  /// The number is not decoration — it is the `Sequence_No` this line will
+  /// carry on the quotation, which is the whole reason the order is worth
+  /// arranging. Showing it makes the effect of a drag visible before the
+  /// document is created rather than after it is printed.
+  Widget _buildDragHandle(int index) {
+    return ReorderableDragStartListener(
+      index: index,
+      child: SizedBox(
+        width: 22,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${index + 1}',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: AppDesign.modOrdering),
+            ),
+            const SizedBox(height: 2),
+            Icon(Icons.drag_indicator,
+                size: 18, color: AppDesign.inkSubtle.withOpacity(0.8)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCompactHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.arrow_back, size: 20),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Icon(Icons.shopping_cart, color: Colors.blue.shade600, size: 22),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Cart',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${_cartItems.length} items',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.blue.shade700,
-              ),
-            ),
-          ),
-          if (_cartItems.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _clearCart,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.delete_outline, size: 18, color: Colors.red.shade600),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
+  /// Commits a drag.
+  ///
+  /// The list is reordered in memory first so the row lands where it was
+  /// dropped without waiting for a database round trip, then persisted. If the
+  /// write fails the cart is reloaded, which puts the stored order back on
+  /// screen rather than leaving the operator looking at an arrangement that
+  /// was never saved.
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    // Flutter reports the insertion point in the pre-removal list, so a
+    // downward move is one too far.
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (newIndex == oldIndex) return;
+
+    setState(() {
+      final moved = _cartItems.removeAt(oldIndex);
+      _cartItems.insert(newIndex, moved);
+    });
+
+    try {
+      await _cartService.reorderCart([for (final i in _cartItems) i.id]);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save the new order: $e')),
+      );
+      await _loadCart();
+    }
   }
 
   Widget _buildEmptyCart() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey.shade400),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Your cart is empty',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Add items from inventory',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.inventory_2_outlined, size: 18),
-            label: const Text('Browse Inventory'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          ),
-        ],
-      ),
+    return UiEmptyState(
+      icon: Icons.shopping_cart_outlined,
+      title: 'Your cart is empty',
+      message: 'Add products and they\'ll stage here until you check out.',
+      actionLabel: 'Browse products',
+      accent: AppDesign.modOrdering,
+      onAction: () => Navigator.pop(context),
     );
   }
 
+  /// The cart list, reorderable by dragging the handle on each line.
+  ///
+  /// Drag handles are explicit rather than the default long-press-anywhere.
+  /// Every line carries four text fields and a delete button, and a long press
+  /// inside a field is how text is selected — leaving the whole row draggable
+  /// would make editing a quantity start a drag as often as it opened the
+  /// keyboard.
   Widget _buildCartList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
       itemCount: _cartItems.length,
+      buildDefaultDragHandles: false,
+      onReorder: _onReorder,
+      // The default proxy wraps the dragged row in its own Material, which
+      // paints a grey rectangle over the card. This keeps the card and just
+      // lifts it.
+      proxyDecorator: (child, index, animation) => Material(
+        color: Colors.transparent,
+        elevation: 6,
+        shadowColor: Colors.black26,
+        borderRadius: BorderRadius.circular(AppDesign.radius),
+        child: child,
+      ),
       itemBuilder: (context, index) {
         final item = _cartItems[index];
-        final qtyController = _qtyControllers[item.id] ?? TextEditingController(text: item.quantity.toString());
-        _qtyControllers[item.id] = qtyController;
-        
+        // Normally seeded by _loadCart; created here as a fallback so a line
+        // that appears without a reload still renders its fields.
+        _qtyControllers.putIfAbsent(
+            item.id,
+            () => [
+                  TextEditingController(text: Qty.fmt(item.quantity)),
+                  TextEditingController(text: Qty.fmt(item.looseQty)),
+                  TextEditingController(text: Qty.fmt(item.focQty)),
+                  TextEditingController(text: Qty.fmt(item.focLooseQty)),
+                ]);
+
         return Container(
+          // Keyed by the row id, not the index: the controllers are keyed the
+          // same way, so a dragged line keeps the text being typed into it.
+          key: ValueKey(item.id),
           margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+          decoration: AppDesign.card(),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildDragHandle(index),
+                const SizedBox(width: 6),
                 // Product Image (Smaller)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -670,7 +703,10 @@ class _CartPageState extends State<CartPage> {
                           Expanded(
                             child: Text(
                               item.displayDescription,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppDesign.ink),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -691,24 +727,30 @@ class _CartPageState extends State<CartPage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
+                              color: AppDesign.bg,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               '${item.skuNo}',
-                              style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppDesign.inkMuted,
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                              color: AppDesign.modPickingBg,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               item.displayUom,
-                              style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppDesign.info,
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                           // Customer PLU barcode (tappable for popup)
@@ -813,56 +855,18 @@ class _CartPageState extends State<CartPage> {
                             ),
                           ),
                           const Spacer(),
-                          // Quantity controls (compact)
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade200),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                GestureDetector(
-                                  onTap: item.quantity > 1 ? () => _updateQuantity(item, item.quantity - 1) : null,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    child: Icon(Icons.remove, size: 14, color: item.quantity > 1 ? Colors.grey.shade700 : Colors.grey.shade300),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => _showQtyInputDialog(item),
-                                  child: Container(
-                                    width: 36,
-                                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '${item.quantity.toInt()}',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => _updateQuantity(item, item.quantity + 1),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    child: Icon(Icons.add, size: 14, color: Colors.grey.shade700),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
                           // Subtotal
                           Text(
                             item.displayGstSubtotal,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                            style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w900,
+                                color: AppDesign.success,
+                                letterSpacing: -0.2),
                           ),
                         ],
                       ),
+                      _buildQuantityFields(item),
                     ],
                   ),
                 ),
@@ -874,64 +878,134 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
+  /// The quantity row: Qty, Qty Basic, FOC and FOC Basic — the same four
+  /// values, under the same names, as the ordering sheet and the picking
+  /// screen. "Basic" is the term procurement uses for base-unit quantities;
+  /// this used to say "Loose"/"FOC ls", which named the same number twice.
+  ///
+  /// Loose entry follows [LooseUomRule] — the same per-line test procurement's
+  /// PD receive dialog uses — so a line ordered in the base unit shows only Qty
+  /// and FOC. A line that already carries loose values always keeps its fields,
+  /// so nothing the operator typed can be hidden away.
+  Widget _buildQuantityFields(CartItem item) {
+    final ctrls = _qtyControllers[item.id];
+    if (ctrls == null) return const SizedBox.shrink();
+
+    final factor = (item.factor ?? 1).toDouble();
+    final showLoose = LooseUomRule.applies(
+      uom: item.uom,
+      factor: factor,
+      existingLoose: item.looseQty,
+      existingFocLoose: item.focLooseQty,
+    );
+    final hasExtras =
+        item.focQty > 0 || item.looseQty > 0 || item.focLooseQty > 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _field('Qty', ctrls[_fQty],
+                  (t) => _applyField(item, _fQty, t),
+                  accent: AppDesign.modOrdering),
+              if (showLoose) ...[
+                const SizedBox(width: 6),
+                _field('Qty Basic', ctrls[_fLoose],
+                    (t) => _applyField(item, _fLoose, t),
+                    accent: AppDesign.modOrdering),
+              ],
+              const SizedBox(width: 6),
+              _field('FOC', ctrls[_fFoc], (t) => _applyField(item, _fFoc, t),
+                  accent: AppDesign.warning),
+              if (showLoose) ...[
+                const SizedBox(width: 6),
+                _field('FOC Basic', ctrls[_fFocLoose],
+                    (t) => _applyField(item, _fFocLoose, t),
+                    accent: AppDesign.warning),
+              ],
+            ],
+          ),
+          // Base units, so a line mixing packs, loose and free goods states one
+          // number that the picker can be held to.
+          if (hasExtras)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${Qty.fmt(item.totalBaseUnits)} base units'
+                // The factor is a pack size, not a quantity — "×12" reads
+                // better than "×12.00" and is never typed into.
+                '${factor != 1 ? '  ·  ×${_trimZeros(factor)}' : ''}'
+                '${item.focQty > 0 || item.focLooseQty > 0 ? '  ·  FOC not charged' : ''}',
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppDesign.inkMuted),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// A labelled numeric box. Same shape as the picking screen's field so the
+  /// two quantity rows are visually interchangeable.
+  Widget _field(String label, TextEditingController ctrl,
+      ValueChanged<String> onChanged,
+      {Color accent = AppDesign.modOrdering}) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                  color: accent)),
+          const SizedBox(height: 2),
+          TextField(
+            controller: ctrl,
+            onChanged: onChanged,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppDesign.radiusSm),
+                  borderSide: const BorderSide(color: AppDesign.border)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppDesign.radiusSm),
+                  borderSide: const BorderSide(color: AppDesign.border)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppDesign.radiusSm),
+                  borderSide: BorderSide(color: accent, width: 1.4)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildModernBottomBar() {
     final totalItems = _cartSummary['totalItems'] ?? 0;
     final totalQuantity = _cartSummary['totalQuantity'] ?? 0;
     final totalGstAmount = _cartSummary['totalGstAmount'] ?? 0.0;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Total Section
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$totalItems items · $totalQuantity qty',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'RM ${totalGstAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Checkout Button
-          SizedBox(
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: _proceedToCheckout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-              ),
-              icon: const Icon(Icons.shopping_cart_checkout, size: 18),
-              label: const Text('Checkout', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
-      ),
+    return UiSummaryBar(
+      accent: AppDesign.success,
+      rows: [
+        ('Items', '$totalItems · $totalQuantity qty'),
+        ('Total', 'RM ${totalGstAmount.toStringAsFixed(2)}'),
+      ],
+      actionLabel: 'Checkout',
+      actionIcon: Icons.shopping_cart_checkout,
+      onAction: _proceedToCheckout,
     );
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
-import 'online_status_icon.dart';
-import 'signalr_test_page.dart';
 import 'pages/customer_selection_page.dart';
+import 'signalr_test_page.dart';
+import 'theme/app_design.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
@@ -28,31 +28,21 @@ class _MenuPageState extends State<MenuPage> {
       _isLoading = true;
       _isOnline = false;
     });
-
     try {
-      final authService = AuthService();
-      
-      // Load user info
-      final user = await authService.loadSavedLogin();
-      
-      // Load selected company
-      final selectedCompany = await authService.getSelectedCompany();
-      
+      final auth = AuthService();
+      final user = await auth.loadSavedLogin();
+      final company = await auth.getSelectedCompany();
       if (mounted) {
         setState(() {
           _userFullName = user?.fullName ?? 'User';
-          _selectedCompany = selectedCompany;
+          _selectedCompany = company;
           _isLoading = false;
-          _isOnline = true; // Assume online if we could load data
+          _isOnline = true;
         });
       }
     } catch (e) {
       print('Error loading user and company info: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -63,30 +53,26 @@ class _MenuPageState extends State<MenuPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => CustomerSelectionPage(
+              builder: (_) => CustomerSelectionPage(
                 selectedCompany: _selectedCompany!,
               ),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please select a company first'),
-              backgroundColor: Colors.red,
-            ),
+            const SnackBar(content: Text('Please select a company first')),
           );
         }
         break;
       default:
         Navigator.of(context).pushNamed(route);
-        break;
     }
   }
 
-  void _logout() async {
+  Future<void> _logout() async {
     try {
-      final authService = AuthService();
-      await authService.logout();
+      await AuthService().logout();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/login');
     } catch (e) {
       print('Error during logout: $e');
@@ -95,270 +81,200 @@ class _MenuPageState extends State<MenuPage> {
 
   @override
   Widget build(BuildContext context) {
-    final Size screenSize = MediaQuery.of(context).size;
-    final bool isTablet = screenSize.width > 600;
-    
+    final width = MediaQuery.of(context).size.width;
+    final columns = width >= 720 ? 3 : 2;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: _isLoading
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      backgroundColor: AppDesign.bg,
+      appBar: AppDesign.appBar(
+        'Menu',
+        automaticallyImplyLeading: false,
+        actions: [
+          _statusPill(),
+          IconButton(
+            tooltip: 'Log out',
+            icon: const Icon(Icons.logout, size: 20),
+            onPressed: _logout,
+          ),
+          const SizedBox(width: AppDesign.space1),
+        ],
+      ),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(AppDesign.space4),
                 children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
-                    strokeWidth: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading menu...',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : CustomScrollView(
-              slivers: [
-                // Header with Background Image (smaller, no red filter)
-                SliverAppBar(
-                  expandedHeight: 100, // Reduced from 140
-                  floating: false,
-                  pinned: true,
-                  elevation: 0,
-                  backgroundColor: Colors.transparent, // Removed red background
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Container(
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/login_bg.jpg'),
-                          fit: BoxFit.cover,
-                          // Removed opacity filter to eliminate red tint
-                        ),
+                  _userCard(context),
+                  const SizedBox(height: AppDesign.space4),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: columns,
+                    crossAxisSpacing: AppDesign.space3,
+                    mainAxisSpacing: AppDesign.space3,
+                    childAspectRatio: 1.1,
+                    children: [
+                      _menuTile(
+                        icon: Icons.request_quote_outlined,
+                        title: 'Sales Quotation',
+                        subtitle: 'Create & manage',
+                        onTap: () => _navigateTo('/sales_quotation'),
                       ),
-                      child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              // Welcome text (smaller, consistent)
-                              Text(
-                                'Welcome,',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              // User name (smaller, consistent)
-                              Text(
-                                _userFullName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              // Company info (smaller, consistent with company page)
-                              if (_selectedCompany != null) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.business,
-                                      size: 12,
-                                      color: Colors.white.withOpacity(0.9),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          // Navigate back to company selection page
-                                          Navigator.of(context).pushReplacementNamed('/company');
-                                        },
-                                        child: Text(
-                                          _selectedCompany!['companyName'] ?? '',
-                                          style: TextStyle(
-                                            color: Colors.blue[200], // Light blue color
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold, // Make it bold
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.tag,
-                                      size: 10,
-                                      color: Colors.white.withOpacity(0.8),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      _selectedCompany!['companyCode'] ?? '',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.8),
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
+                      _menuTile(
+                        icon: Icons.shopping_cart_outlined,
+                        title: 'Sales Order',
+                        subtitle: 'Customer orders',
+                        onTap: () => _navigateTo('/sales_order'),
+                      ),
+                      _menuTile(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Sales Invoice',
+                        subtitle: 'Generate invoices',
+                        onTap: () => _navigateTo('/sales_invoice'),
+                      ),
+                      _menuTile(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'Inventory',
+                        subtitle: 'Stock browser',
+                        onTap: () => _navigateTo('/inventory'),
+                      ),
+                      _menuTile(
+                        icon: Icons.bar_chart_outlined,
+                        title: 'Reports',
+                        subtitle: 'Analytics',
+                        onTap: () => _navigateTo('/reports'),
+                      ),
+                      _menuTile(
+                        icon: Icons.wifi_outlined,
+                        title: 'SignalR Test',
+                        subtitle: 'Diagnostics',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SignalRTestPage(),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                  actions: [
-                    // Online status
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: OnlineStatusIcon(isOnline: _isOnline),
-                    ),
-                    // Logout button
-                    IconButton(
-                      icon: const Icon(Icons.logout_outlined),
-                      onPressed: _logout,
-                      tooltip: 'Logout',
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ),
-                
-                // Menu Grid (smaller padding and spacing)
-              SliverPadding(
-                padding: const EdgeInsets.all(8.0), // Reduced from 16.0
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isTablet ? 3 : 2,
-                    childAspectRatio: 1.0,
-                    crossAxisSpacing: 8.0, // Reduced from 12.0
-                    mainAxisSpacing: 8.0,  // Reduced from 12.0
-                  ),
-                  delegate: SliverChildListDelegate([
-                    _buildModernMenuCard(
-                      title: 'Sales Quotation',
-                      subtitle: 'Create & manage quotes',
-                      icon: Icons.request_quote_outlined,
-                      gradient: [Colors.blue.shade400, Colors.blue.shade600],
-                      onTap: () => _navigateTo('/sales_quotation'),
-                    ),
-                    _buildModernMenuCard(
-                      title: 'Sales Order',
-                      subtitle: 'Process customer orders',
-                      icon: Icons.shopping_cart_outlined,
-                      gradient: [Colors.green.shade400, Colors.green.shade600],
-                      onTap: () => _navigateTo('/sales_order'),
-                    ),
-                    _buildModernMenuCard(
-                      title: 'Sales Invoice',
-                      subtitle: 'Generate invoices',
-                      icon: Icons.receipt_long_outlined,
-                      gradient: [Colors.orange.shade400, Colors.orange.shade600],
-                      onTap: () => _navigateTo('/sales_invoice'),
-                    ),
-                    _buildModernMenuCard(
-                      title: 'Inventory',
-                      subtitle: 'Stock management',
-                      icon: Icons.inventory_2_outlined,
-                      gradient: [Colors.purple.shade400, Colors.purple.shade600],
-                      onTap: () => _navigateTo('/inventory'),
-                    ),
-                    _buildModernMenuCard(
-                      title: 'Reports',
-                      subtitle: 'Analytics & insights',
-                      icon: Icons.bar_chart_outlined,
-                      gradient: [Colors.teal.shade400, Colors.teal.shade600],
-                      onTap: () => _navigateTo('/reports'),
-                    ),
-                    _buildModernMenuCard(
-                      title: 'SignalR Test',
-                      subtitle: 'Connection testing',
-                      icon: Icons.wifi_outlined,
-                      gradient: [Colors.red.shade400, Colors.red.shade600],
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SignalRTestPage(),
-                        ),
-                      ),
-                    ),
-                  ]),
-                ),
+                ],
               ),
-              ],
-            ),
+      ),
     );
   }
 
-  Widget _buildModernMenuCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required List<Color> gradient,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 1, // Reduced from 2
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8), // Reduced from 12
+  Widget _statusPill() {
+    final color = _isOnline ? AppDesign.success : AppDesign.warning;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppDesign.space2),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(AppDesign.radiusPill),
+          border: Border.all(color: color.withOpacity(0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            Text(_isOnline ? 'Online' : 'Offline',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+          ],
+        ),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8), // Reduced from 12
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8), // Reduced from 12
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradient,
+    );
+  }
+
+  Widget _userCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppDesign.space4),
+      decoration: AppDesign.section(),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppDesign.accentSoft,
+              borderRadius: BorderRadius.circular(AppDesign.radiusSm),
+            ),
+            child: const Icon(Icons.person, color: AppDesign.accent, size: 22),
+          ),
+          const SizedBox(width: AppDesign.space3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('WELCOME', style: AppDesign.micro),
+                const SizedBox(height: 2),
+                Text(_userFullName, style: AppDesign.title,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                if (_selectedCompany != null)
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pushReplacementNamed('/company'),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.business, size: 12, color: AppDesign.inkMuted),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${_selectedCompany!['companyName'] ?? ''} · ${_selectedCompany!['companyCode'] ?? ''}',
+                            style: AppDesign.caption.copyWith(color: AppDesign.info, fontWeight: FontWeight.w700),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(Icons.swap_horiz, size: 12, color: AppDesign.info),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
-          padding: const EdgeInsets.all(12), // Reduced from 16
+        ],
+      ),
+    );
+  }
+
+  Widget _menuTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppDesign.surface,
+      borderRadius: BorderRadius.circular(AppDesign.radius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppDesign.radius),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(AppDesign.space3),
+          decoration: AppDesign.card(),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon with white background (smaller)
               Container(
-                padding: const EdgeInsets.all(8), // Reduced from 12
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
+                  color: AppDesign.accentSoft,
+                  borderRadius: BorderRadius.circular(AppDesign.radiusSm),
                 ),
-                child: Icon(
-                  icon,
-                  size: 20, // Reduced from 24
-                  color: Colors.white,
-                ),
+                child: Icon(icon, size: 20, color: AppDesign.accent),
               ),
-              const SizedBox(height: 8), // Reduced from 12
-              // Title (smaller)
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              const Spacer(),
+              Text(title, style: AppDesign.heading,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text(subtitle, style: AppDesign.caption,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),

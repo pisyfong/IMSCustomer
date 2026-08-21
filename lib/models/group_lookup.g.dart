@@ -36,6 +36,11 @@ const GroupLookupSchema = CollectionSchema(
       id: 3,
       name: r'lastUpdated',
       type: IsarType.dateTime,
+    ),
+    r'taxonomyMode': PropertySchema(
+      id: 4,
+      name: r'taxonomyMode',
+      type: IsarType.string,
     )
   },
   estimateSize: _groupLookupEstimateSize,
@@ -44,9 +49,9 @@ const GroupLookupSchema = CollectionSchema(
   deserializeProp: _groupLookupDeserializeProp,
   idName: r'id',
   indexes: {
-    r'companyCode_grp': IndexSchema(
-      id: -5770513770044667038,
-      name: r'companyCode_grp',
+    r'companyCode_taxonomyMode_grp': IndexSchema(
+      id: -1041141714592220318,
+      name: r'companyCode_taxonomyMode_grp',
       unique: false,
       replace: false,
       properties: [
@@ -54,6 +59,11 @@ const GroupLookupSchema = CollectionSchema(
           name: r'companyCode',
           type: IndexType.value,
           caseSensitive: false,
+        ),
+        IndexPropertySchema(
+          name: r'taxonomyMode',
+          type: IndexType.hash,
+          caseSensitive: true,
         ),
         IndexPropertySchema(
           name: r'grp',
@@ -79,6 +89,7 @@ int _groupLookupEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.description.length * 3;
   bytesCount += 3 + object.grp.length * 3;
+  bytesCount += 3 + object.taxonomyMode.length * 3;
   return bytesCount;
 }
 
@@ -92,6 +103,7 @@ void _groupLookupSerialize(
   writer.writeString(offsets[1], object.description);
   writer.writeString(offsets[2], object.grp);
   writer.writeDateTime(offsets[3], object.lastUpdated);
+  writer.writeString(offsets[4], object.taxonomyMode);
 }
 
 GroupLookup _groupLookupDeserialize(
@@ -106,6 +118,7 @@ GroupLookup _groupLookupDeserialize(
   object.grp = reader.readString(offsets[2]);
   object.id = id;
   object.lastUpdated = reader.readDateTimeOrNull(offsets[3]);
+  object.taxonomyMode = reader.readString(offsets[4]);
   return object;
 }
 
@@ -124,6 +137,8 @@ P _groupLookupDeserializeProp<P>(
       return (reader.readString(offset)) as P;
     case 3:
       return (reader.readDateTimeOrNull(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -220,28 +235,28 @@ extension GroupLookupQueryWhere
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeEqualToAnyGrp(int companyCode) {
+      companyCodeEqualToAnyTaxonomyModeGrp(int companyCode) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'companyCode_grp',
+        indexName: r'companyCode_taxonomyMode_grp',
         value: [companyCode],
       ));
     });
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeNotEqualToAnyGrp(int companyCode) {
+      companyCodeNotEqualToAnyTaxonomyModeGrp(int companyCode) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
+              indexName: r'companyCode_taxonomyMode_grp',
               lower: [],
               upper: [companyCode],
               includeUpper: false,
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
+              indexName: r'companyCode_taxonomyMode_grp',
               lower: [companyCode],
               includeLower: false,
               upper: [],
@@ -249,13 +264,13 @@ extension GroupLookupQueryWhere
       } else {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
+              indexName: r'companyCode_taxonomyMode_grp',
               lower: [companyCode],
               includeLower: false,
               upper: [],
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
+              indexName: r'companyCode_taxonomyMode_grp',
               lower: [],
               upper: [companyCode],
               includeUpper: false,
@@ -265,13 +280,13 @@ extension GroupLookupQueryWhere
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeGreaterThanAnyGrp(
+      companyCodeGreaterThanAnyTaxonomyModeGrp(
     int companyCode, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'companyCode_grp',
+        indexName: r'companyCode_taxonomyMode_grp',
         lower: [companyCode],
         includeLower: include,
         upper: [],
@@ -280,13 +295,13 @@ extension GroupLookupQueryWhere
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeLessThanAnyGrp(
+      companyCodeLessThanAnyTaxonomyModeGrp(
     int companyCode, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'companyCode_grp',
+        indexName: r'companyCode_taxonomyMode_grp',
         lower: [],
         upper: [companyCode],
         includeUpper: include,
@@ -295,7 +310,7 @@ extension GroupLookupQueryWhere
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeBetweenAnyGrp(
+      companyCodeBetweenAnyTaxonomyModeGrp(
     int lowerCompanyCode,
     int upperCompanyCode, {
     bool includeLower = true,
@@ -303,7 +318,7 @@ extension GroupLookupQueryWhere
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'companyCode_grp',
+        indexName: r'companyCode_taxonomyMode_grp',
         lower: [lowerCompanyCode],
         includeLower: includeLower,
         upper: [upperCompanyCode],
@@ -313,44 +328,93 @@ extension GroupLookupQueryWhere
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeGrpEqualTo(int companyCode, String grp) {
+      companyCodeTaxonomyModeEqualToAnyGrp(
+          int companyCode, String taxonomyMode) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'companyCode_grp',
-        value: [companyCode, grp],
+        indexName: r'companyCode_taxonomyMode_grp',
+        value: [companyCode, taxonomyMode],
       ));
     });
   }
 
   QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
-      companyCodeEqualToGrpNotEqualTo(int companyCode, String grp) {
+      companyCodeEqualToTaxonomyModeNotEqualToAnyGrp(
+          int companyCode, String taxonomyMode) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
+              indexName: r'companyCode_taxonomyMode_grp',
               lower: [companyCode],
-              upper: [companyCode, grp],
+              upper: [companyCode, taxonomyMode],
               includeUpper: false,
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
-              lower: [companyCode, grp],
+              indexName: r'companyCode_taxonomyMode_grp',
+              lower: [companyCode, taxonomyMode],
               includeLower: false,
               upper: [companyCode],
             ));
       } else {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
-              lower: [companyCode, grp],
+              indexName: r'companyCode_taxonomyMode_grp',
+              lower: [companyCode, taxonomyMode],
               includeLower: false,
               upper: [companyCode],
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'companyCode_grp',
+              indexName: r'companyCode_taxonomyMode_grp',
               lower: [companyCode],
-              upper: [companyCode, grp],
+              upper: [companyCode, taxonomyMode],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
+      companyCodeTaxonomyModeGrpEqualTo(
+          int companyCode, String taxonomyMode, String grp) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'companyCode_taxonomyMode_grp',
+        value: [companyCode, taxonomyMode, grp],
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterWhereClause>
+      companyCodeTaxonomyModeEqualToGrpNotEqualTo(
+          int companyCode, String taxonomyMode, String grp) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_grp',
+              lower: [companyCode, taxonomyMode],
+              upper: [companyCode, taxonomyMode, grp],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_grp',
+              lower: [companyCode, taxonomyMode, grp],
+              includeLower: false,
+              upper: [companyCode, taxonomyMode],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_grp',
+              lower: [companyCode, taxonomyMode, grp],
+              includeLower: false,
+              upper: [companyCode, taxonomyMode],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'companyCode_taxonomyMode_grp',
+              lower: [companyCode, taxonomyMode],
+              upper: [companyCode, taxonomyMode, grp],
               includeUpper: false,
             ));
       }
@@ -809,6 +873,142 @@ extension GroupLookupQueryFilter
       ));
     });
   }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'taxonomyMode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'taxonomyMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'taxonomyMode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'taxonomyMode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterFilterCondition>
+      taxonomyModeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'taxonomyMode',
+        value: '',
+      ));
+    });
+  }
 }
 
 extension GroupLookupQueryObject
@@ -864,6 +1064,19 @@ extension GroupLookupQuerySortBy
   QueryBuilder<GroupLookup, GroupLookup, QAfterSortBy> sortByLastUpdatedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastUpdated', Sort.desc);
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterSortBy> sortByTaxonomyMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterSortBy>
+      sortByTaxonomyModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.desc);
     });
   }
 }
@@ -929,6 +1142,19 @@ extension GroupLookupQuerySortThenBy
       return query.addSortBy(r'lastUpdated', Sort.desc);
     });
   }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterSortBy> thenByTaxonomyMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QAfterSortBy>
+      thenByTaxonomyModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomyMode', Sort.desc);
+    });
+  }
 }
 
 extension GroupLookupQueryWhereDistinct
@@ -956,6 +1182,13 @@ extension GroupLookupQueryWhereDistinct
   QueryBuilder<GroupLookup, GroupLookup, QDistinct> distinctByLastUpdated() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastUpdated');
+    });
+  }
+
+  QueryBuilder<GroupLookup, GroupLookup, QDistinct> distinctByTaxonomyMode(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'taxonomyMode', caseSensitive: caseSensitive);
     });
   }
 }
@@ -989,6 +1222,12 @@ extension GroupLookupQueryProperty
   QueryBuilder<GroupLookup, DateTime?, QQueryOperations> lastUpdatedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastUpdated');
+    });
+  }
+
+  QueryBuilder<GroupLookup, String, QQueryOperations> taxonomyModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'taxonomyMode');
     });
   }
 }

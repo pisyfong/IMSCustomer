@@ -70,10 +70,17 @@ class Invoice {
   final double? gstAmount;
   final double? totalAmountB4GST;
   final double? roundingDiscount;
+  /// The SQ this invoice was raised from (our conversion writes it here).
+  /// Indexed: resolving "which invoice covers this pack line" walks from the
+  /// line's source SQ, and that lookup runs on every pack page load.
+  @Index()
   final String? webLinkPrelabel;
   final DateTime? lastModifiedDate;
   final int? totalEdit;
   final int? totalPrint;
+  /// The pick this invoice was converted from. Indexed for the same reason as
+  /// [webLinkPrelabel].
+  @Index()
   final String? appDLPrelabel;
   final String? webStatus;
   final int? verifyBy;

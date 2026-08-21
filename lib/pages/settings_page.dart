@@ -4,14 +4,20 @@ import 'dart:async';
 import '../services/enhanced_sync_service.dart';
 import '../services/base_inventory_sync_service.dart';
 import '../services/base_transaction_sync_service.dart';
+import '../services/sync_history_window.dart';
+import '../widgets/sync_scope_dialog.dart';
 import '../services/signalr_service.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_service.dart';
 import '../services/taxonomy_mode_service.dart';
+import '../services/user_directory_service.dart';
 import '../services/invoice_service.dart';
 import '../services/inventory_image_service.dart';
 import '../services/quotation_service.dart';
 import '../services/offline_first_service.dart';
+import '../services/printer_service.dart';
+import '../widgets/printer_setup_sheet.dart';
+import 'receipt_templates_page.dart';
 import '../main.dart';
 import '../sync_info.dart';
 import '../company.dart';
@@ -85,6 +91,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     super.initState();
     _syncService = EnhancedSyncService(isar, _signalRService);
     _imageService.initialize();
+    _loadPrinter();
 
     // Warm the taxonomy-mode cache and reflect in UI
     TaxonomyModeService.instance.getMode().then((m) {
@@ -253,9 +260,29 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   }
   
   Future<void> _performFullSync() async {
-    // Show progress dialog
     if (!mounted) return;
-    
+
+    // Ask how far back to pull the ledger BEFORE starting. This is the one
+    // decision that determines whether the sync takes one minute or twenty,
+    // and it is only answerable by whoever is holding the device.
+    final choice = await SyncScopeDialog.show(context);
+    if (choice == null || !mounted) return; // dismissed
+
+    // Widening the window needs the ledger watermarks cleared, or the newly
+    // included older documents are never requested and the setting appears to
+    // do nothing. Must happen BEFORE the window is stored, since the
+    // comparison is against the previous value.
+    final widened = await SyncHistoryWindow.isWiderThanStored(choice.days);
+    await SyncHistoryWindow.setDays(choice.days);
+
+    if (widened) {
+      final selectedCompany = await _authService.getSelectedCompany();
+      final raw = selectedCompany?['companyCode'] ?? 1;
+      final companyCode = raw is String ? (int.tryParse(raw) ?? 1) : raw as int;
+      await BaseTransactionSyncService().resetLedgerCheckpoints(companyCode);
+    }
+
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -339,6 +366,37 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     }
   }
   
+  /// Pull the PI_Users directory so the "Assigned To" picker works offline.
+  Future<void> _syncUsers() async {
+    setState(() {
+      _isSyncing = true;
+      _syncStatus = 'Syncing users…';
+    });
+    try {
+      final n = await UserDirectoryService().sync();
+      setState(() => _syncStatus =
+          n > 0 ? 'Synced $n users' : 'No users returned — check connection');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: n > 0 ? Colors.green : Colors.orange,
+            content: Text(n > 0
+                ? '✅ Synced $n users'
+                : '⚠️ Could not sync users — offline?'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: Colors.red, content: Text('User sync failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
   Future<void> _syncGroupsAndDepartments() async {
     setState(() {
       _isSyncing = true;
@@ -362,13 +420,16 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           _syncStatus = 'Syncing lookups for ${company.companyName}...';
         });
         
-        // Fetch and cache groups
-        final groups = await inventoryService.getGroupMap(companyCode: companyCode);
-        totalGroups += groups.length as int;
-        
-        // Fetch and cache departments
-        final departments = await inventoryService.getDepartmentMap(companyCode: companyCode);
-        totalDepartments += departments.length as int;
+        // Fetch and cache BOTH taxonomies (pi + web) for offline use.
+        for (final mode in TaxonomyMode.values) {
+          final groups =
+              await inventoryService.getGroupMap(companyCode: companyCode, mode: mode);
+          totalGroups += groups.length;
+
+          final departments =
+              await inventoryService.getDepartmentMap(companyCode: companyCode, mode: mode);
+          totalDepartments += departments.length;
+        }
       }
       
       setState(() {
@@ -824,11 +885,21 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         onChanged: (v) async {
           final mode = v ? TaxonomyMode.web : TaxonomyMode.pi;
           await TaxonomyModeService.instance.setMode(mode);
+          // Labels are cached per mode, but lazily — a device that has already
+          // read PI keeps showing PI names until something evicts them, which
+          // makes the switch look like it did nothing.
+          InventoryService().clearTaxonomyCaches();
+          // Option lists are mode-independent, but their labels are not.
+          InventoryService().invalidateFilterOptions();
           if (!mounted) return;
           setState(() => _taxonomyMode = mode);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            duration: const Duration(seconds: 2),
-            content: Text('Taxonomy source: ${v ? 'Web' : 'PI'} — re-open filter to refresh options'),
+            duration: const Duration(seconds: 3),
+            content: Text(v
+                ? 'Taxonomy: Web — groups, departments and their names now come '
+                    'from Web_Group / Web_Dept'
+                : 'Taxonomy: PI — groups, departments and their names now come '
+                    'from PI_Group / PI_Department'),
           ));
         },
       ),
@@ -1273,9 +1344,44 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     );
   }
   
+  /// Subtitle for the printer button — the configured printer, or a prompt.
+  String _printerLabel = 'Not set up';
+
+  Future<void> _loadPrinter() async {
+    final s = await PrinterService().settings(refresh: true);
+    if (!mounted) return;
+    setState(() {
+      _printerLabel = s.isConfigured
+          ? '${s.displayName} · ${s.paperWidthMm}mm'
+          : 'Not set up — tap to pair a Bluetooth or network printer';
+    });
+  }
+
   Widget _buildMaintenanceSection() {
     return Column(
       children: [
+        _buildMaintenanceButton(
+          'Receipt Printer',
+          _printerLabel,
+          Icons.print_outlined,
+          Colors.deepPurple,
+          () async {
+            await PrinterSetupSheet.show(context);
+            await _loadPrinter();
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildMaintenanceButton(
+          'Receipt Templates',
+          'Layouts, grouping and header/footer text for pick & pack',
+          Icons.receipt_long_outlined,
+          Colors.deepPurple,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReceiptTemplatesPage()),
+          ),
+        ),
+        const SizedBox(height: 12),
         _buildMaintenanceButton(
           'Debug Logs',
           'View logs and recovery tools',
@@ -1301,6 +1407,22 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           Icons.image_not_supported,
           Colors.orange,
           _clearImageCache,
+        ),
+        const SizedBox(height: 12),
+        _buildMaintenanceButton(
+          'Sync Users',
+          'Refresh the Assigned To directory (PI_Users)',
+          Icons.people_alt_outlined,
+          Colors.indigo,
+          () { if (!_isSyncing) _syncUsers(); },
+        ),
+        const SizedBox(height: 12),
+        _buildMaintenanceButton(
+          'Sync Groups & Departments',
+          'Refresh filter descriptions (both taxonomies)',
+          Icons.category_outlined,
+          Colors.teal,
+          () { if (!_isSyncing) _syncGroupsAndDepartments(); },
         ),
       ],
     );

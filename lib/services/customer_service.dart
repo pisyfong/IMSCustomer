@@ -47,29 +47,60 @@ class CustomerService {
     try {
       print('🔄 Syncing customers for company $companyCode...');
 
-      // Fetch customers from server via SignalR
-      final customersData = await _signalRService.invoke(
-        'getCustomers',
-        [companyCode],
-      ) as List<dynamic>?;
+      // Pull the WHOLE directory, not just this company's slice.
+      //
+      // Quotes filed under one company routinely reference customers filed
+      // under another — on the YeonTak data only 31% of quote-customer pairs
+      // match on the same Company_Code, while 99.9% match on the code alone.
+      // Syncing per-company left two thirds of customers absent from the
+      // device entirely, so pick and pack lines showed a bare code where the
+      // name existed on the server all along.
+      //
+      // The directory keeps each row's TRUE Company_Code, so the customer
+      // picker (which filters by company and role) is unaffected — it simply
+      // ignores the rows belonging to other companies.
+      List<dynamic>? customersData;
+      var wholeDirectory = true;
+      try {
+        customersData = await _signalRService.invoke(
+          'getCustomerDirectory',
+          [],
+        ) as List<dynamic>?;
+      } catch (e) {
+        // An older server won't have the method. Fall back rather than fail:
+        // a per-company list is still better than no customers at all.
+        print('ℹ️ CustomerService: getCustomerDirectory unavailable ($e) — '
+            'falling back to per-company getCustomers');
+        wholeDirectory = false;
+        customersData = await _signalRService.invoke(
+          'getCustomers',
+          [companyCode],
+        ) as List<dynamic>?;
+      }
 
       if (customersData == null || customersData.isEmpty) {
         print('⚠️ No customers received from server');
         return [];
       }
 
-      // Convert to Customer objects and set the correct company code
       final customers = customersData
           .map((data) {
-            final customer = Customer.fromJson(data as Map<String, dynamic>);
-            // Ensure the customer has the correct company code
-            customer.companyCode = companyCode;
+            final json = data as Map<String, dynamic>;
+            final customer = Customer.fromJson(json);
+            // The directory reports the real company; the per-company endpoint
+            // doesn't return the column at all, so stamp it there.
+            if (!wholeDirectory || json['Company_Code'] == null) {
+              customer.companyCode = companyCode;
+            }
             return customer;
           })
           .toList();
 
-      // Save to local database
-      await _saveCustomersToLocal(customers, companyCode);
+      await _saveCustomersToLocal(
+        customers,
+        companyCode,
+        replaceAllCompanies: wholeDirectory,
+      );
 
       print('✅ Synced ${customers.length} customers for company $companyCode');
       return customers;
@@ -284,14 +315,25 @@ class CustomerService {
   }
 
   /// Save customers to local database
-  Future<void> _saveCustomersToLocal(List<Customer> customers, int companyCode) async {
+  /// [replaceAllCompanies] when [customers] is the full cross-company
+  /// directory. Clearing only one company's slice would leave the other
+  /// companies' rows behind, and since ids are auto-assigned they would
+  /// accumulate a fresh duplicate on every sync.
+  Future<void> _saveCustomersToLocal(
+    List<Customer> customers,
+    int companyCode, {
+    bool replaceAllCompanies = false,
+  }) async {
     try {
       await isar.writeTxn(() async {
-        // Clear existing customers for this company
-        await isar.customers
-            .where()
-            .companyCodeEqualTo(companyCode)
-            .deleteAll();
+        if (replaceAllCompanies) {
+          await isar.customers.where().deleteAll();
+        } else {
+          await isar.customers
+              .where()
+              .companyCodeEqualTo(companyCode)
+              .deleteAll();
+        }
 
         // Save new customers
         await isar.customers.putAll(customers);

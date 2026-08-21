@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import '../models/quote.dart';
 import '../models/invoice.dart';
 import '../models/quotation.dart';
@@ -10,8 +11,10 @@ import '../services/auth_service.dart';
 import '../services/signalr_service.dart';
 import '../online_status_icon.dart';
 import '../main.dart';
-import 'quote_item_details_page.dart';
 import 'edit_unsynced_quotation_page.dart';
+import '../widgets/reorder_document_sheet.dart';
+import '../theme/app_design.dart';
+import '../models/quote_item.dart';
 
 class PreviousOrderPage extends StatefulWidget {
   const PreviousOrderPage({Key? key}) : super(key: key);
@@ -1121,552 +1124,327 @@ class _PreviousOrderPageState extends State<PreviousOrderPage> with SingleTicker
     );
   }
 
-  Widget _buildQuoteCard(Quote quote) {
+  /// One document in the list.
+  ///
+  /// Quotations and invoices were two near-identical 150-line builders drawn
+  /// in raw `Colors.blue`/`Colors.grey`, while the rest of the app had moved
+  /// to the design tokens. They are one builder now, differing only in accent
+  /// and in what tapping them does — which is what they actually differ in.
+  ///
+  /// The re-order button is the point of the page: on a handheld a past order
+  /// is looked at mostly in order to place it again.
+  Widget _documentCard({
+    required Color accent,
+    required String docNo,
+    required String date,
+    required String amount,
+    String? status,
+    Color? statusColor,
+    String? customer,
+    String? meta,
+    required VoidCallback onOpen,
+    required VoidCallback onReorder,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: AppDesign.card(),
+      clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _navigateToQuoteItems(quote),
+          onTap: onOpen,
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Main row with quote number, date, price, and status
-                Row(
-                  children: [
-                    // Quote PreLabel (most important)
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        quote.quotePreLabel ?? 'No Quote Number',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Date and Price column
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            quote.formattedQuoteDate,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
+                          Flexible(
+                            child: Text(
+                              docNo.isEmpty ? 'No number' : docNo,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.2,
+                                  color: accent),
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            quote.formattedNetAmount,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
+                          if ((status ?? '').isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (statusColor ?? AppDesign.inkMuted)
+                                    .withOpacity(0.12),
+                                borderRadius:
+                                    BorderRadius.circular(AppDesign.radiusSm),
+                              ),
+                              child: Text(status!,
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: statusColor ??
+                                          AppDesign.inkMuted)),
                             ),
-                          ),
+                          ],
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Status badge (compact)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: quote.getStatusColor().withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(date,
+                              style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppDesign.inkSubtle)),
+                          const Text('   ·   ',
+                              style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: AppDesign.inkSubtle)),
+                          Text(amount,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppDesign.accentInk)),
+                        ],
                       ),
-                      child: Text(
-                        quote.statusDisplay,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: quote.getStatusColor(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // Secondary info row (customer, ref, remark)
-                if (quote.customer?.isNotEmpty == true || 
-                    quote.ref1?.isNotEmpty == true || 
-                    quote.remark1?.isNotEmpty == true) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      // Customer info
-                      if (quote.customer?.isNotEmpty == true)
-                        Expanded(
-                          child: Text(
-                            'Customer: ${quote.customer}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                            ),
+                      if ((customer ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(customer!.trim(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                            style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppDesign.inkMuted)),
+                      ],
+                      if ((meta ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(meta!.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 10, color: AppDesign.inkSubtle)),
+                      ],
                     ],
                   ),
-                  // Reference and remarks on separate line if available
-                  if (quote.ref1?.isNotEmpty == true || quote.remark1?.isNotEmpty == true) ...[
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (quote.ref1?.isNotEmpty == true)
-                          Expanded(
-                            child: Text(
-                              'Ref: ${quote.ref1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[500],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        if (quote.ref1?.isNotEmpty == true && quote.remark1?.isNotEmpty == true)
-                          const SizedBox(width: 8),
-                        if (quote.remark1?.isNotEmpty == true)
-                          Expanded(
-                            child: Text(
-                              'Note: ${quote.remark1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[500],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
+                ),
+                const SizedBox(width: 6),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Order these items again',
+                      onPressed: onReorder,
+                      icon: Icon(Icons.add_shopping_cart,
+                          size: 19, color: accent),
                     ),
+                    const Icon(Icons.chevron_right,
+                        size: 18, color: AppDesign.inkSubtle),
                   ],
-                ],
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildQuoteCard(Quote quote) {
+    final meta = [
+      if ((quote.ref1 ?? '').trim().isNotEmpty) 'Ref ${quote.ref1!.trim()}',
+      if ((quote.remark1 ?? '').trim().isNotEmpty) quote.remark1!.trim(),
+    ].join('   ·   ');
+    return _documentCard(
+      accent: AppDesign.modOrdering,
+      docNo: quote.quotePreLabel ?? '',
+      date: quote.formattedQuoteDate,
+      amount: quote.formattedNetAmount,
+      status: quote.statusDisplay,
+      statusColor: quote.getStatusColor(),
+      customer: quote.customer,
+      meta: meta,
+      // Both actions open the same sheet, exactly as an invoice card does.
+      // Quotations used to open a separate 1,261-line page whose "add to
+      // cart" never wrote a row.
+      onOpen: () => _showQuoteReorder(quote),
+      onReorder: () => _showQuoteReorder(quote),
     );
   }
 
   Widget _buildInvoiceCard(Invoice invoice) {
-    final formattedDate = invoice.invoiceDate != null
-        ? '${invoice.invoiceDate!.day}/${invoice.invoiceDate!.month}/${invoice.invoiceDate!.year}'
-        : 'No Date';
-    final formattedAmount = 'RM ${(invoice.netAmount ?? 0).toStringAsFixed(2)}';
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Colors.grey[50]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _showInvoiceDetails(invoice),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Main row with invoice number, date, price, and status
-                Row(
-                  children: [
-                    // Invoice PreLabel (most important)
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        invoice.invoicePreLabel,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Date and Price column
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            formattedDate,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            formattedAmount,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Status badge (compact)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getInvoiceStatusColor(invoice.status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        invoice.status ?? 'N/A',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: _getInvoiceStatusColor(invoice.status),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // Secondary info row (customer, ref, remark)
-                if (invoice.customer?.isNotEmpty == true || 
-                    invoice.ref1?.isNotEmpty == true || 
-                    invoice.remark1?.isNotEmpty == true) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      // Customer info
-                      if (invoice.customer?.isNotEmpty == true)
-                        Expanded(
-                          child: Text(
-                            'Customer: ${invoice.customer}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                  ),
-                  // Reference and remarks on separate line if available
-                  if (invoice.ref1?.isNotEmpty == true || invoice.remark1?.isNotEmpty == true) ...[
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (invoice.ref1?.isNotEmpty == true)
-                          Expanded(
-                            child: Text(
-                              'Ref: ${invoice.ref1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[500],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        if (invoice.ref1?.isNotEmpty == true && invoice.remark1?.isNotEmpty == true)
-                          const SizedBox(width: 8),
-                        if (invoice.remark1?.isNotEmpty == true)
-                          Expanded(
-                            child: Text(
-                              'Note: ${invoice.remark1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[500],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    final meta = [
+      if ((invoice.ref1 ?? '').trim().isNotEmpty) 'Ref ${invoice.ref1!.trim()}',
+      if ((invoice.remark1 ?? '').trim().isNotEmpty) invoice.remark1!.trim(),
+    ].join('   ·   ');
+    // A cancelled invoice still has history worth reading, so it is listed —
+    // but it is coloured as the exception it is, and its lines are filtered
+    // out of the re-order sheet.
+    final cancelled =
+        (invoice.status ?? '').trim().toUpperCase().startsWith('C');
+    return _documentCard(
+      accent: AppDesign.modPicking,
+      docNo: invoice.invoicePreLabel,
+      date: _fmtDate(invoice.invoiceDate),
+      amount: 'RM ${(invoice.netAmount ?? 0).toStringAsFixed(2)}',
+      status: (invoice.status ?? '').trim().isEmpty
+          ? null
+          : (cancelled ? 'Cancelled' : invoice.status!.trim()),
+      statusColor: cancelled ? AppDesign.danger : AppDesign.success,
+      customer: invoice.customer,
+      meta: meta,
+      onOpen: () => _showInvoiceDetails(invoice),
+      onReorder: () => _showInvoiceDetails(invoice),
     );
   }
 
-  Color _getInvoiceStatusColor(String? status) {
-    switch (status?.toUpperCase()) {
-      case 'P':
-      case 'POSTED':
-        return Colors.green;
-      case 'V':
-      case 'VOID':
-        return Colors.red;
-      case 'D':
-      case 'DRAFT':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
 
+
+  /// Opens a past invoice as something that can be ordered again.
+  ///
+  /// It used to open a read-only AlertDialog whose only action was Close.
+  /// Reading an old invoice is rarely the point on a handheld — repeating it
+  /// is — so the lines now go straight into the cart, one at a time or all at
+  /// once.
   void _showInvoiceDetails(Invoice invoice) {
-    showDialog(
-      context: context,
-      builder: (context) => _InvoiceDetailsDialog(
-        invoice: invoice,
-        invoiceService: _invoiceService,
-      ),
-    );
-  }
-}
-
-/// Stateful dialog widget for invoice details with lazy-loaded items
-class _InvoiceDetailsDialog extends StatefulWidget {
-  final Invoice invoice;
-  final InvoiceService invoiceService;
-
-  const _InvoiceDetailsDialog({
-    required this.invoice,
-    required this.invoiceService,
-  });
-
-  @override
-  State<_InvoiceDetailsDialog> createState() => _InvoiceDetailsDialogState();
-}
-
-class _InvoiceDetailsDialogState extends State<_InvoiceDetailsDialog> {
-  List<InvoiceItem>? _items;
-  bool _isLoadingItems = false;
-  String? _itemsError;
-
-  @override
-  void initState() {
-    super.initState();
-    // Load items immediately when dialog opens
-    _loadInvoiceItems();
-  }
-
-  Future<void> _loadInvoiceItems() async {
-    setState(() {
-      _isLoadingItems = true;
-      _itemsError = null;
-    });
-
-    try {
-      final companyCodeRaw = widget.invoice.companyCode;
-      int? companyCode;
-      
-      if (companyCodeRaw is String) {
-        companyCode = int.tryParse(companyCodeRaw as String);
-      } else if (companyCodeRaw is int) {
-        companyCode = companyCodeRaw as int;
-      }
-
-      if (companyCode == null) {
-        throw Exception('Invalid company code');
-      }
-
-      final items = await widget.invoiceService.getInvoiceItems(
-        companyCode: companyCode,
-        invoicePreLabel: widget.invoice.invoicePreLabel,
+    final companyCode = _companyCodeOf(invoice.companyCode);
+    if (companyCode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This invoice has no usable company code')),
       );
-
-      setState(() {
-        _items = items;
-        _isLoadingItems = false;
-      });
-    } catch (e) {
-      print('❌ Error loading invoice items: $e');
-      setState(() {
-        _itemsError = e.toString();
-        _isLoadingItems = false;
-      });
+      return;
     }
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+    ReorderDocumentSheet.show(
+      context,
+      title: 'INVOICE',
+      docNo: invoice.invoicePreLabel,
+      subtitle: [
+        if ((invoice.customer ?? '').trim().isNotEmpty) invoice.customer!.trim(),
+        if (invoice.invoiceDate != null) _fmtDate(invoice.invoiceDate),
+        'RM ${(invoice.netAmount ?? 0).toStringAsFixed(2)}',
+      ].join('  ·  '),
+      companyCode: companyCode,
+      accent: AppDesign.modPicking,
+      alternateCompany: invoice.alternateCompany,
+      alternateDoc: invoice.alternateDoc,
+      loadLines: () async {
+        final items = await _invoiceService.getInvoiceItems(
+          companyCode: companyCode,
+          invoicePreLabel: invoice.invoicePreLabel,
+        );
+        return [
+          for (final it in items)
+            // Cancelled lines are not demand — the same rule the SI packing
+            // path applies. Re-ordering one would put goods in the cart that
+            // the original document explicitly took back out.
+            if ((it.status ?? 'A').trim().toUpperCase() != 'C' &&
+                (it.status ?? 'A').trim().toUpperCase() != 'X')
+              ReorderLine(
+                skuNo: it.skuNo,
+                uom: it.uom,
+                qty: it.quantity ?? 0,
+                price: it.unitPrice ?? 0,
+                foc: it.foc ?? 0,
+                quantityLoose: it.quantityLoose ?? 0,
+                focLoose: it.focLoose ?? 0,
+                factor: it.factor,
+                pluNo: it.pluNo,
+                remark: it.remark,
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
-        ],
-      ),
+        ];
+      },
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final formattedDate = widget.invoice.invoiceDate != null
-        ? '${widget.invoice.invoiceDate!.day}/${widget.invoice.invoiceDate!.month}/${widget.invoice.invoiceDate!.year}'
-        : 'No Date';
-    final formattedAmount = 'RM ${(widget.invoice.netAmount ?? 0).toStringAsFixed(2)}';
-
-    return AlertDialog(
-      title: Text('Invoice: ${widget.invoice.invoicePreLabel}'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header Information
-              _buildDetailRow('Date', formattedDate),
-              _buildDetailRow('Customer', widget.invoice.customer ?? 'N/A'),
-              _buildDetailRow('Status', widget.invoice.status ?? 'N/A'),
-              _buildDetailRow('Net Amount', formattedAmount),
-              if (widget.invoice.grossAmount != null)
-                _buildDetailRow('Gross Amount', 'RM ${widget.invoice.grossAmount!.toStringAsFixed(2)}'),
-              if (widget.invoice.currency?.isNotEmpty == true)
-                _buildDetailRow('Currency', widget.invoice.currency!),
-              if (widget.invoice.ref1?.isNotEmpty == true)
-                _buildDetailRow('Reference 1', widget.invoice.ref1!),
-              if (widget.invoice.remark1?.isNotEmpty == true)
-                _buildDetailRow('Remarks', widget.invoice.remark1!),
-              
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              
-              // Items Section
-              const Text(
-                'Invoice Items',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+  /// Opens a past quotation the same way.
+  void _showQuoteReorder(Quote quote) {
+    final companyCode = _companyCodeOf(quote.companyCode);
+    final preLabel = quote.quotePreLabel;
+    if (companyCode == null || preLabel == null || preLabel.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This quotation cannot be re-ordered')),
+      );
+      return;
+    }
+    ReorderDocumentSheet.show(
+      context,
+      title: 'QUOTATION',
+      docNo: preLabel,
+      subtitle: [
+        if ((quote.customer ?? '').trim().isNotEmpty) quote.customer!.trim(),
+        quote.formattedQuoteDate,
+        quote.formattedNetAmount,
+      ].join('  ·  '),
+      companyCode: companyCode,
+      accent: AppDesign.modOrdering,
+      alternateCompany: quote.alternateCompany,
+      alternateDoc: quote.alternateDoc,
+      loadLines: () async {
+        // Sequence order, because that is the order the operator saw when the
+        // quotation was created and the order it prints in.
+        //
+        // Copied into plain non-nullable locals: type promotion does not
+        // survive into this closure, and the Isar query builder's errors when
+        // handed a nullable are not obviously about nullability.
+        final int cc = companyCode;
+        final String label = preLabel;
+        // Narrowed to the company in Dart. A quote pre-label already belongs
+        // to one company, so this reads a handful of rows either way.
+        final QueryBuilder<QuoteItem, QuoteItem, QAfterFilterCondition> q =
+            isar.quoteItems.filter().quotePreLabelEqualTo(label);
+        final all = await q.findAll();
+        final items = all.where((e) => e.companyCode == cc).toList()
+          ..sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
+        return [
+          for (final it in items)
+            if ((it.status ?? 'A').trim().toUpperCase() != 'C' &&
+                (it.status ?? 'A').trim().toUpperCase() != 'X')
+              ReorderLine(
+                skuNo: it.skuNo,
+                uom: it.uom ?? '',
+                qty: it.quoteQuantity ?? 0,
+                price: it.unitPrice ?? 0,
+                foc: it.quoteFoc ?? 0,
+                quantityLoose: it.quoteQuantityLoose ?? 0,
+                focLoose: it.quoteFocLoose ?? 0,
+                factor: it.factor,
+                pluNo: it.pluNo,
+                remark: it.remark,
               ),
-              const SizedBox(height: 8),
-              
-              if (_isLoadingItems)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else if (_itemsError != null)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Error loading items: $_itemsError',
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                )
-              else if (_items == null || _items!.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('No items found'),
-                )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _items!.length,
-                  itemBuilder: (context, index) {
-                    final item = _items![index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: ListTile(
-                        dense: true,
-                        title: Text(
-                          'SKU: ${item.skuNo} (${item.uom})',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          'Qty: ${item.quantity?.toStringAsFixed(2) ?? '0'} | '
-                          'Price: RM ${item.unitPrice?.toStringAsFixed(2) ?? '0'}',
-                        ),
-                        trailing: Text(
-                          'RM ${item.netAmount?.toStringAsFixed(2) ?? '0'}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
+        ];
+      },
     );
+  }
+
+  /// Company code arrives as an int on some rows and a String on others.
+  static int? _companyCodeOf(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is String) return int.tryParse(raw);
+    return null;
+  }
+
+  static String _fmtDate(DateTime? d) {
+    if (d == null) return '—';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(d.day)}/${two(d.month)}/${d.year}';
   }
 }
+
+
 
 // Extension to add methods to _PreviousOrderPageState
 extension _PreviousOrderPageStateMethods on _PreviousOrderPageState {
-  void _navigateToQuoteItems(Quote quote) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QuoteItemDetailsPage(quote: quote),
-      ),
-    );
-  }
 
   void _showQuoteDetails(Quote quote) {
     showDialog(

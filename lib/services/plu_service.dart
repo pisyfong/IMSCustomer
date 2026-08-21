@@ -5,6 +5,11 @@ import 'dart:convert';
 import '../models/plu.dart';
 import '../models/customer_plu.dart';
 import '../models/in_stock_plu.dart';
+import '../models/pack_list_item.dart';
+import '../models/pick_list_item.dart';
+import '../models/in_stock_uom.dart';
+import '../models/uom_master.dart';
+import '../models/pending_plu.dart';
 import 'auth_service.dart';
 import 'signalr_service.dart';
 import '../config/app_config.dart';
@@ -382,6 +387,468 @@ class PluService {
     }
   }
 
+  /// The company's UOM master list, from the local cache.
+  ///
+  /// Read from Isar, never the network, so the "units this item doesn't have
+  /// yet" half of the barcode screen works on the warehouse floor. That is the
+  /// case the screen exists for — a new case code usually arrives BECAUSE the
+  /// item just gained a pack size nobody had recorded — so requiring a signal
+  /// for it made the feature useless exactly when it was needed.
+  ///
+  /// [refreshUomMaster] keeps it current; 22 rows, so it is replaced whole.
+  Future<List<({String uom, String description})>> uomMaster(
+      int companyCode) async {
+    final rows = await _isar.uomMasters
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .findAll();
+    rows.sort((a, b) => a.uom.compareTo(b.uom));
+    return [
+      for (final r in rows)
+        (uom: r.uom, description: (r.description ?? '').trim()),
+    ];
+  }
+
+  /// Pulls the UOM master and replaces the cache. Never throws — a stale unit
+  /// list degrades to "the units this item already has", which still links a
+  /// barcode.
+  Future<void> refreshUomMaster(int companyCode) async {
+    try {
+      final res = await http
+          .get(
+            Uri.parse('${AppConfig.apiBaseUrl}/api/uoms?companyCode=$companyCode'),
+            headers: AppConfig.apiHeaders,
+          )
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return;
+      final body = json.decode(res.body) as Map<String, dynamic>;
+      final rows = <UomMaster>[];
+      for (final u in (body['uoms'] as List? ?? [])) {
+        final uom = (u['Uom'] ?? '').toString().trim();
+        if (uom.isEmpty) continue;
+        rows.add(UomMaster.of(
+          companyCode: companyCode,
+          uom: uom,
+          description: (u['Description'] ?? '').toString().trim(),
+        ));
+      }
+      if (rows.isEmpty) return; // never blank a working cache on an odd reply
+      await _isar.writeTxn(() async {
+        final old = await _isar.uomMasters
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .findAll();
+        await _isar.uomMasters.deleteAll(old.map((e) => e.id).toList());
+        await _isar.uomMasters.putAll(rows);
+      });
+    } catch (_) {
+      // Offline. The cache stands.
+    }
+  }
+
+  /// Gives a SKU a unit it doesn't have yet, with its pack factor — offline.
+  ///
+  /// Written locally and queued, like a barcode. The unit is usable on this
+  /// device immediately so the picker can carry straight on to the barcode
+  /// step and keep working.
+  ///
+  /// The factor cannot be guessed: it says how many base units are in one of
+  /// these, and a wrong one restates the quantity of every document that ever
+  /// uses the unit. That is why the server still gets the last word — see
+  /// [syncPendingSkuUoms].
+  Future<void> addSkuUomOffline({
+    required int companyCode,
+    required int skuNo,
+    required String uom,
+    required double factor,
+    required int userId,
+    String? sourceDoc,
+  }) async {
+    final u = uom.trim();
+    if (u.isEmpty || factor <= 0) return;
+    final now = DateTime.now();
+    await _isar.writeTxn(() async {
+      final dupes = await _isar.pendingSkuUoms
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .and()
+          .skuNoEqualTo(skuNo)
+          .findAll();
+      for (final d in dupes) {
+        if (d.uom.trim().toUpperCase() == u.toUpperCase()) {
+          await _isar.pendingSkuUoms.delete(d.id);
+        }
+      }
+      await _isar.pendingSkuUoms.put(PendingSkuUom.of(
+        companyCode: companyCode,
+        skuNo: skuNo,
+        uom: u,
+        factor: factor,
+        addedBy: userId,
+        sourceDoc: sourceDoc,
+      ));
+      // Usable straight away, including by the barcode step that follows.
+      await _isar.inStockUoms.put(InStockUom()
+        ..companyCode = companyCode
+        ..skuNo = skuNo
+        ..uom = u
+        ..factor = factor
+        ..status = 'A'
+        ..lastWriteTimeStamp = now);
+    });
+  }
+
+  /// Uploads queued units. Call BEFORE [syncPendingPlus]: a barcode can
+  /// reference a unit created in the same trip, and linking `BOX` to an item
+  /// that only gained `BOX` a minute earlier fails if the unit isn't there
+  /// first.
+  ///
+  /// Per queued unit:
+  ///   * created, or the server already has it with the SAME factor → done.
+  ///   * the server has it with a DIFFERENT factor → the whole sync stops.
+  ///     A factor is not a preference to be merged: quantities entered on this
+  ///     device were counted against ours, so someone has to look.
+  ///   * offline → left queued, nothing fails.
+  ///
+  /// Returns null to proceed, or a message to stop.
+  /// Set when [syncPendingSkuUoms] stops on a factor disagreement, so the UI
+  /// can offer to adopt the server's answer. Cleared at the start of each run.
+  SkuUomConflict? lastUomConflict;
+
+  /// Takes the server's factor for a unit this device created with a different
+  /// one, and corrects what was recorded against it.
+  ///
+  /// The server's item master is the authority — it is what every other device
+  /// and the desktop already use. Adopting it means three things, and skipping
+  /// any one of them leaves the device lying:
+  ///   1. the cached unit takes the server's factor;
+  ///   2. the queued creation is dropped, so the sync can proceed;
+  ///   3. UNSENT document lines that captured the old factor are corrected,
+  ///      because the server evaluates their base-unit quantities using the
+  ///      factor stored ON THE LINE.
+  ///
+  /// The quantity a picker counted does not change — three boxes are still
+  /// three boxes. What changes is what a box means.
+  Future<void> adoptServerUomFactor(SkuUomConflict c) async {
+    await _isar.writeTxn(() async {
+      final uoms = await _isar.inStockUoms
+          .filter()
+          .companyCodeEqualTo(c.companyCode)
+          .and()
+          .skuNoEqualTo(c.skuNo)
+          .findAll();
+      for (final u in uoms) {
+        if ((u.uom ?? '').trim().toUpperCase() != c.uom.trim().toUpperCase()) {
+          continue;
+        }
+        u.factor = c.theirs;
+        await _isar.inStockUoms.put(u);
+      }
+
+      final queued = await _isar.pendingSkuUoms
+          .filter()
+          .companyCodeEqualTo(c.companyCode)
+          .and()
+          .skuNoEqualTo(c.skuNo)
+          .findAll();
+      for (final q in queued) {
+        if (q.uom.trim().toUpperCase() == c.uom.trim().toUpperCase()) {
+          await _isar.pendingSkuUoms.delete(q.id);
+        }
+      }
+
+      // Only UNSENT lines. A line the server already holds was accepted under
+      // whatever factor it carried; rewriting it here would put the two copies
+      // out of step without telling anyone.
+      final picks = await _isar.pickListItems
+          .filter()
+          .companyCodeEqualTo(c.companyCode)
+          .and()
+          .skuNoEqualTo(c.skuNo)
+          .and()
+          .isSyncedEqualTo(false)
+          .findAll();
+      for (final it in picks) {
+        if ((it.uom ?? '').trim().toUpperCase() != c.uom.trim().toUpperCase()) {
+          continue;
+        }
+        it.factor = c.theirs;
+        await _isar.pickListItems.put(it);
+      }
+
+      final packs = await _isar.packListItems
+          .filter()
+          .companyCodeEqualTo(c.companyCode)
+          .and()
+          .skuNoEqualTo(c.skuNo)
+          .and()
+          .isSyncedEqualTo(false)
+          .findAll();
+      for (final it in packs) {
+        if ((it.uom ?? '').trim().toUpperCase() != c.uom.trim().toUpperCase()) {
+          continue;
+        }
+        it.factor = c.theirs;
+        await _isar.packListItems.put(it);
+      }
+    });
+    lastUomConflict = null;
+    print('✅ UOM ${c.uom} on SKU ${c.skuNo}: adopted server factor ${c.theirs}');
+  }
+
+  Future<String?> syncPendingSkuUoms(int companyCode) async {
+    lastUomConflict = null;
+    final queued = await _isar.pendingSkuUoms
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .findAll();
+    if (queued.isEmpty) return null;
+
+    for (final q in queued) {
+      http.Response res;
+      try {
+        res = await http
+            .post(
+              Uri.parse('${AppConfig.apiBaseUrl}/api/sku-uoms'),
+              headers: AppConfig.apiHeaders,
+              body: json.encode({
+                'companyCode': q.companyCode,
+                'skuNo': q.skuNo,
+                'uom': q.uom,
+                'factor': q.factor,
+                'userId': q.addedBy ?? 1,
+              }),
+            )
+            .timeout(const Duration(seconds: 20));
+      } catch (_) {
+        print('⚠️ UOM: ${q.uom} for SKU ${q.skuNo} still queued (offline)');
+        return null;
+      }
+
+      Map<String, dynamic> body;
+      try {
+        body = json.decode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        return 'Unit ${q.uom} on SKU ${q.skuNo}: unexpected response '
+            '(${res.statusCode}).';
+      }
+
+      final created = res.statusCode == 200 && body['success'] == true;
+      if (created) {
+        await _isar.writeTxn(() async {
+          await _isar.pendingSkuUoms.delete(q.id);
+        });
+        continue;
+      }
+
+      if (body['alreadyExists'] == true) {
+        final theirs = (body['factor'] as num?)?.toDouble() ?? 0;
+        if ((theirs - q.factor).abs() < 0.0001) {
+          // Same answer from both sides — nothing to reconcile.
+          await _isar.writeTxn(() async {
+            await _isar.pendingSkuUoms.delete(q.id);
+          });
+          continue;
+        }
+        // Structured, not just a sentence — the caller has to be able to
+        // OFFER the fix. Reporting this and leaving the row queued would fail
+        // every future sync, including for documents that have nothing to do
+        // with this unit, and strand the device with no way out of the app.
+        lastUomConflict = SkuUomConflict(
+          companyCode: q.companyCode,
+          skuNo: q.skuNo,
+          uom: q.uom,
+          mine: q.factor,
+          theirs: theirs,
+          sourceDoc: q.sourceDoc,
+        );
+        return 'Unit ${q.uom} on SKU ${q.skuNo} already exists with factor '
+            '$theirs, but this device used ${q.factor}'
+            '${(q.sourceDoc ?? '').isEmpty ? '' : ' on ${q.sourceDoc}'}. '
+            'Quantities entered here were counted against ${q.factor}. '
+            'Nothing was uploaded.';
+      }
+
+      return 'Unit ${q.uom} on SKU ${q.skuNo}: '
+          '${(body['details'] ?? body['error'] ?? 'failed')}';
+    }
+    return null;
+  }
+
+  /// Links a barcode to a SKU + UOM, working offline.
+  ///
+  /// Writes the link locally and queues it. The barcode scans IMMEDIATELY on
+  /// this device — a picker who has just met a new case code can carry on
+  /// scanning it down the aisle without a signal.
+  ///
+  /// The server is still the authority, but it gets the last word on the next
+  /// sync rather than blocking the work now. See [syncPendingPlus] for what
+  /// happens when it disagrees.
+  Future<void> addPluOffline({
+    required int companyCode,
+    required String pluNo,
+    required int skuNo,
+    required String uom,
+    required int userId,
+    String? sourceDoc,
+  }) async {
+    final code = pluNo.trim();
+    if (code.isEmpty) return;
+    await _isar.writeTxn(() async {
+      // One queue entry per (company, barcode) — re-linking the same code
+      // before it has synced replaces the earlier intent rather than sending
+      // two conflicting rows.
+      final dupes = await _isar.pendingPlus
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .and()
+          .pluNoEqualTo(code)
+          .findAll();
+      for (final d in dupes) {
+        await _isar.pendingPlus.delete(d.id);
+      }
+      await _isar.pendingPlus.put(PendingPlu.of(
+        companyCode: companyCode,
+        pluNo: code,
+        skuNo: skuNo,
+        uom: uom,
+        addedBy: userId,
+        sourceDoc: sourceDoc,
+      ));
+    });
+    await _cachePluLocally(
+      companyCode: companyCode,
+      pluNo: code,
+      skuNo: skuNo,
+      uom: uom,
+      userId: userId,
+      isDefault: false,
+    );
+  }
+
+  /// Uploads queued barcodes. Call this BEFORE uploading the documents that
+  /// used them, so a pick never lands referring to a barcode the server has
+  /// never heard of.
+  ///
+  /// Per queued link:
+  ///   * accepted, or the server already has the SAME sku/uom → done, dropped
+  ///     from the queue. "Already linked" is the same outcome as linking it.
+  ///   * the server has that barcode against a DIFFERENT sku/uom → the whole
+  ///     sync fails. A barcode means one item company-wide, so this is not a
+  ///     merge to be resolved quietly: something has been scanned as the wrong
+  ///     item and a person needs to look at it.
+  ///   * offline / unreachable → left queued, reported as not-done. Nothing
+  ///     fails; the work simply waits.
+  ///
+  /// Returns null when the caller may proceed, or a message when it must stop.
+  Future<String?> syncPendingPlus(int companyCode) async {
+    final queued = await _isar.pendingPlus
+        .filter()
+        .companyCodeEqualTo(companyCode)
+        .findAll();
+    if (queued.isEmpty) return null;
+
+    for (final q in queued) {
+      http.Response res;
+      try {
+        res = await http
+            .post(
+              Uri.parse('${AppConfig.apiBaseUrl}/api/plus'),
+              headers: AppConfig.apiHeaders,
+              body: json.encode({
+                'companyCode': q.companyCode,
+                'pluNo': q.pluNo,
+                'skuNo': q.skuNo,
+                'uom': q.uom,
+                'userId': q.addedBy ?? 1,
+              }),
+            )
+            .timeout(const Duration(seconds: 20));
+      } catch (_) {
+        // Offline. Leave it queued and let the caller carry on — the barcode
+        // is already correct on this device.
+        print('\u26a0\ufe0f PLU: ${q.pluNo} still queued (offline)');
+        return null;
+      }
+
+      Map<String, dynamic> body;
+      try {
+        body = json.decode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        return 'Barcode ${q.pluNo}: unexpected response from the server '
+            '(${res.statusCode}).';
+      }
+
+      final accepted = res.statusCode == 200 && body['success'] == true;
+      final sameLink = body['alreadyLinked'] == true;
+
+      if (accepted || sameLink) {
+        await _isar.writeTxn(() async {
+          await _isar.pendingPlus.delete(q.id);
+        });
+        print(sameLink
+            ? '\u2713 PLU ${q.pluNo} already linked to SKU ${q.skuNo} — dropped'
+            : '\u2713 PLU ${q.pluNo} -> SKU ${q.skuNo} (${q.uom})');
+        continue;
+      }
+
+      // Taken by a different item. Stop everything: this device has been
+      // scanning that barcode as the wrong goods.
+      final theirSku = body['skuNo'];
+      final theirUom = (body['uom'] ?? '').toString();
+      return 'Barcode ${q.pluNo} is already used by SKU $theirSku '
+          '($theirUom), but this device linked it to SKU ${q.skuNo} '
+          '(${q.uom})${(q.sourceDoc ?? '').isEmpty ? '' : ' on ${q.sourceDoc}'}. '
+          'Nothing was uploaded. Fix the barcode in the desktop app, then '
+          'sync again.';
+    }
+    return null;
+  }
+
+  /// How many barcode links are waiting to upload.
+  Future<int> pendingPluCount(int companyCode) => _isar.pendingPlus
+      .filter()
+      .companyCodeEqualTo(companyCode)
+      .count();
+
+  /// Writes a barcode into the local mirror so it scans immediately, rather
+  /// than waiting for the next full sync.
+  Future<void> _cachePluLocally({
+    required int companyCode,
+    required String pluNo,
+    required int skuNo,
+    required String uom,
+    required int userId,
+    required bool isDefault,
+  }) async {
+    final now = DateTime.now();
+    await _isar.writeTxn(() async {
+      final old = await _isar.inStockPlus
+          .filter()
+          .companyCodeEqualTo(companyCode)
+          .and()
+          .pluNoEqualTo(pluNo)
+          .findAll();
+      for (final o in old) {
+        await _isar.inStockPlus.delete(o.id);
+      }
+      await _isar.inStockPlus.put(InStockPlu(
+        companyCode: companyCode,
+        pluNo: pluNo,
+        skuNo: skuNo,
+        uom: uom,
+        status: 'A',
+        defPlu: isDefault ? 'Y' : 'N',
+        addedBy: userId,
+        addedDate: now,
+        lastModifiedBy: userId,
+        lastWriteTimeStamp: now,
+        creationDate: now,
+        lastEditDate: now,
+      ));
+    });
+  }
+
   Future<int> _getCurrentCompanyCode() async {
     final company = await _authService.getSelectedCompany();
     if (company == null || company['companyCode'] == null) {
@@ -683,4 +1150,28 @@ class PluService {
       print('❌ PLU SERVICE: Error clearing In_Stock_PLU: $e');
     }
   }
+}
+
+/// A unit this device created with a factor the server disagrees with.
+class SkuUomConflict {
+  final int companyCode;
+  final int skuNo;
+  final String uom;
+
+  /// What this device used when quantities were entered.
+  final double mine;
+
+  /// What the item master actually says.
+  final double theirs;
+
+  final String? sourceDoc;
+
+  const SkuUomConflict({
+    required this.companyCode,
+    required this.skuNo,
+    required this.uom,
+    required this.mine,
+    required this.theirs,
+    this.sourceDoc,
+  });
 }

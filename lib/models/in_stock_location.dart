@@ -20,7 +20,17 @@ class InStockLocation {
   late int companyCode;
 
   late int skuNo;
+
+  /// The SITE this row belongs to (STK, MME, …) — not a shelf.
   late String locationCode;
+
+  /// Shelf / bin the stock physically sits on, as entered by the warehouse.
+  ///
+  /// Free text, and one SKU can occupy several bins, so this arrives as a
+  /// single string holding multiple positions (e.g. "A1-02, B3-14"). It is
+  /// displayed rather than parsed — the separator is whatever the customer
+  /// types, and guessing at it would mangle perfectly good labels.
+  String? shelf;
 
   // The 9 quantity columns used for the on-hand computation
   double? qtyOnHand;
@@ -60,6 +70,8 @@ class InStockLocation {
       ..companyCode = _parseInt(json['Company_Code']) ?? 0
       ..skuNo = _parseInt(json['Sku_No']) ?? 0
       ..locationCode = (json['Location_Code'] as String?)?.trim() ?? ''
+      // In_Stock_Location.Location — the shelf string, NOT Location_Code.
+      ..shelf = (json['Location'] as String?)?.trim()
       ..qtyOnHand = _parseDouble(json['Qty_On_Hand'])
       ..qtyOnReceived = _parseDouble(json['Qty_On_Received'])
       ..qtyOnCustomerReturn = _parseDouble(json['Qty_On_Customer_Return'])

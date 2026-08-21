@@ -24,6 +24,11 @@ import '../models/quote_item.dart';
 import '../models/invoice.dart';
 import '../services/invoice_service.dart';
 import 'widgets/inventory_details_bottom_sheet.dart';
+import 'widgets/inventory_filter_dialog.dart';
+import 'services/inventory_view_mode.dart';
+import 'theme/app_design.dart';
+import 'widgets/item_history_list.dart';
+import 'services/qty.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({Key? key}) : super(key: key);
@@ -50,7 +55,10 @@ class _InventoryPageState extends State<InventoryPage> {
   String _debugInfo = '';
   Map<String, dynamic>? _selectedCompany;
   // Quantity selections per SKU
-  final Map<int, int> _qtySelections = {};
+  // Quantities are decimal to 2dp, matching the cart, the SQ line and the
+  // decimal(18,4) columns in RMS. KG-priced items make a whole-number-only
+  // quantity wrong for a large part of this catalogue.
+  final Map<int, double> _qtySelections = {};
   // Price selections per SKU (for custom pricing in bottom sheet)
   final Map<int, double> _priceSelections = {};
   
@@ -71,8 +79,9 @@ class _InventoryPageState extends State<InventoryPage> {
   Map<String, String> _deptDescriptions = {};
   // Group code -> description mapping
   Map<String, String> _groupDescriptions = {};
+  Map<String, String> _brandDescriptions = {};
   // View toggle: grid or list
-  bool _isGridView = true;
+  InventoryViewMode _viewMode = InventoryViewMode.grid2;
   // Side drawer filter state
   bool _showSideFilter = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -96,12 +105,33 @@ class _InventoryPageState extends State<InventoryPage> {
   void initState() {
     super.initState();
     _pluService = PluService(Isar.getInstance()!);
-    _loadCompanyAndInventory();
+    _loadCompanyAndInventory().then((_) => _preloadBannerLabels());
     _loadCartCount();
     _setupScrollListener();
     _initializeServices();
     // Setup PLU search listener only (PLU still auto-searches)
     _pluController.addListener(_onPluSearchChanged);
+    _restoreViewMode();
+  }
+
+  /// Hydrates the banner labels as soon as the company is known, so filters
+  /// already active on entry are named rather than shown as codes.
+  Future<void> _preloadBannerLabels() async {
+    final raw = _selectedCompany?['companyCode'];
+    final cc = raw is String ? (int.tryParse(raw) ?? 0) : (raw as int? ?? 0);
+    if (cc <= 0) return;
+    await _loadBannerLabels(cc);
+  }
+
+  Future<void> _restoreViewMode() async {
+    final mode = await InventoryViewModePref.load();
+    if (mounted && mode != _viewMode) setState(() => _viewMode = mode);
+  }
+
+  void _cycleViewMode() {
+    final next = _viewMode.next;
+    setState(() => _viewMode = next);
+    InventoryViewModePref.save(next);
   }
 
   Future<void> _loadCartCount() async {
@@ -1180,146 +1210,152 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   // Build single-row inventory item (one item per line)
+  /// One product per row — the densest mode for text, and the only one with
+  /// room for brand, UOM and pack size at once.
   Widget _buildInventoryListItem(InventoryItem item) {
     final int companyCode = _selectedCompany?['companyCode'] is String
         ? int.tryParse(_selectedCompany!['companyCode']) ?? 0
         : (_selectedCompany?['companyCode'] ?? 0);
     final bool inStock = (item.qtyOnHand ?? 0) > 0;
-    final Color stockColor = inStock ? Colors.green.shade400 : Colors.red.shade400;
+    final Color stockColor = inStock ? AppDesign.success : AppDesign.danger;
+    final double? price = item.gstPrice ??
+        item.price ??
+        item.lastCost ??
+        item.standardCost ??
+        item.fifoCost ??
+        item.averageCost;
+    final String factor = _factorLabel(item) ?? '';
+    final String uom = (item.uom ?? '').trim();
 
-    return InkWell(
-      onTap: () => _showInventoryDetails(item),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: const Border(
-            bottom: BorderSide(color: Color(0xFFEAEAEA), width: 1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: AppDesign.surface,
+        borderRadius: BorderRadius.circular(AppDesign.radius),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _showInventoryDetails(item),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppDesign.radius),
+              border: Border.all(color: AppDesign.border),
             ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Left colored stock indicator
-            Container(
-              width: 4,
-              height: 56,
-              decoration: BoxDecoration(
-                color: stockColor,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Left image (small square)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: FutureBuilder<String?>(
-                  future: _getWorkingUomForImage(companyCode, item.skuNo),
-                  builder: (context, snapshot) {
-                    final uom = snapshot.data ?? item.uom;
-                    print('📷 IMAGE DEBUG - SKU ${item.skuNo}: Using UOM "$uom" for image (working UOM method)');
-                    return InventoryImageWidget(
-                      companyCode: companyCode,
-                      skuNo: item.skuNo,
-                      uom: uom,
-                      width: 56,
-                      height: 56,
-                      borderRadius: BorderRadius.zero,
-                      fit: BoxFit.cover,
-                      showLoadingIndicator: true,
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Right text (item details)
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    item.description ?? '',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'SKU: ${item.skuNo}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[700]),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                  // Stock state as a full-height edge, readable while
+                  // scrolling without reading any number.
+                  Container(width: 3.5, color: stockColor),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(AppDesign.radiusSm),
+                      child: SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: Container(
+                          color: AppDesign.surfaceAlt,
+                          child: FutureBuilder<String?>(
+                            future: _getWorkingUomForImage(
+                                companyCode, item.skuNo),
+                            builder: (context, snapshot) {
+                              final imageUom = snapshot.data ?? item.uom;
+                              return InventoryImageWidget(
+                                companyCode: companyCode,
+                                skuNo: item.skuNo,
+                                uom: imageUom,
+                                width: 54,
+                                height: 54,
+                                borderRadius: BorderRadius.zero,
+                                fit: BoxFit.cover,
+                                showLoadingIndicator: true,
+                              );
+                            },
+                          ),
                         ),
                       ),
-                      if (item.brand != null && item.brand!.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.shade200),
-                          ),
-                          child: Text(
-                            item.brand!,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.blue.shade800,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.displayName,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                                color: AppDesign.ink),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _buildPriceTag(item),
-                      const SizedBox(width: 6),
-                      _buildUomFactorTag(item),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Qty on hand chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: inStock ? Colors.green.shade50 : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: inStock ? Colors.green.shade200 : Colors.red.shade200),
-                    ),
-                    child: Text(
-                      'Stock: ${item.displayQtyOnHand}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: inStock ? Colors.green.shade700 : Colors.red.shade700,
+                          const SizedBox(height: 3),
+                          // Identity line: SKU and brand read as one phrase
+                          // instead of a code plus a coloured chip.
+                          Text(
+                            'SKU ${item.skuNo}'
+                            '${(item.brand ?? '').isNotEmpty ? '  ·  ${item.brand}' : ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppDesign.inkSubtle),
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Text(
+                                price == null
+                                    ? 'Price N/A'
+                                    : 'RM ${price.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.3,
+                                    color: price == null
+                                        ? AppDesign.inkSubtle
+                                        : AppDesign.accentInk),
+                              ),
+                              if (uom.isNotEmpty || factor.isNotEmpty) ...[
+                                const SizedBox(width: 5),
+                                Text(
+                                  '/ $uom${factor.isNotEmpty ? ' $factor' : ''}',
+                                  style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppDesign.inkMuted),
+                                ),
+                              ],
+                              const Spacer(),
+                              Text(
+                                'Stock ${item.displayQtyOnHand}',
+                                style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: stockColor),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(Icons.chevron_right,
+                        size: 18, color: AppDesign.inkSubtle),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: Colors.grey[500]),
-          ],
+          ),
         ),
       ),
     );
@@ -1392,7 +1428,7 @@ class _InventoryPageState extends State<InventoryPage> {
   // UI: qty stepper
   Widget _buildQtyStepper(InventoryItem item) {
     final int sku = item.skuNo;
-    final int qty = _qtySelections[sku] ?? 1;
+    final double qty = _qtySelections[sku] ?? 1;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
@@ -1431,8 +1467,8 @@ class _InventoryPageState extends State<InventoryPage> {
 
   void _updateQty(InventoryItem item, int delta) {
     final int sku = item.skuNo;
-    final int current = _qtySelections[sku] ?? 1;
-    final int next = (current + delta).clamp(1, 999);
+    final double current = _qtySelections[sku] ?? 1;
+    final double next = Qty.round((current + delta).clamp(1, 999));
     setState(() {
       _qtySelections[sku] = next;
     });
@@ -1440,26 +1476,27 @@ class _InventoryPageState extends State<InventoryPage> {
   
   Future<void> _showQtyInputDialog(InventoryItem item) async {
     final int sku = item.skuNo;
-    final int current = _qtySelections[sku] ?? 1;
-    
-    final result = await showDialog<int>(
+    final double current = _qtySelections[sku] ?? 1;
+
+    final result = await showDialog<double>(
       context: context,
       builder: (context) {
-        final controller = TextEditingController(text: current.toString());
+        final controller = TextEditingController(text: Qty.fmt(current));
         return AlertDialog(
           title: const Text('Enter Quantity'),
           content: TextField(
             controller: controller,
-            keyboardType: TextInputType.number,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
             autofocus: true,
             decoration: const InputDecoration(
               labelText: 'Quantity',
-              hintText: 'Enter quantity (1-999)',
+              hintText: 'Enter quantity (0.01-999)',
               border: OutlineInputBorder(),
             ),
             onSubmitted: (value) {
-              final qty = int.tryParse(value);
-              if (qty != null && qty >= 1 && qty <= 999) {
+              final qty = Qty.tryParse(value);
+              if (qty != null && qty >= 0.01 && qty <= 999) {
                 Navigator.pop(context, qty);
               }
             },
@@ -1471,12 +1508,13 @@ class _InventoryPageState extends State<InventoryPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                final qty = int.tryParse(controller.text);
-                if (qty != null && qty >= 1 && qty <= 999) {
+                final qty = Qty.tryParse(controller.text);
+                if (qty != null && qty >= 0.01 && qty <= 999) {
                   Navigator.pop(context, qty);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid quantity (1-999)')),
+                    const SnackBar(
+                        content: Text('Please enter a valid quantity (0.01-999)')),
                   );
                 }
               },
@@ -1494,15 +1532,34 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  void _addToCart(InventoryItem item, {String? remark, String? uom, double? customGstPrice}) async {
+  static String _trimQty(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+  void _addToCart(InventoryItem item,
+      {String? remark,
+      String? uom,
+      double? customGstPrice,
+      double foc = 0,
+      double quantityLoose = 0,
+      double focLoose = 0,
+      double? factor,
+      // An explicit quantity, for callers that are not the qty stepper — the
+      // history rows re-order the amount the document recorded, which has
+      // nothing to do with whatever the stepper happens to be showing.
+      double? quantity}) async {
     try {
-      final int qty = _qtySelections[item.skuNo] ?? 1;
+      final double qty = quantity ?? _qtySelections[item.skuNo] ?? 1;
       final selectedCompany = await _authService.getSelectedCompany();
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
       final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
       
       // Determine final UOM - fetch from database if not provided
       String finalUom = uom ?? item.uom ?? '';
+      // Pack size for the chosen UOM. Was hardcoded 1.0 below, so selecting
+      // CTN still stored a factor of 1 and every base-unit calculation
+      // downstream — loose pricing, the SI conversion — was off by the pack
+      // size.
+      double? resolvedFactor = factor;
       if (finalUom.trim().isEmpty) {
         // Try to get default UOM from InStockUom table
         final uomOptions = await isar.inStockUoms
@@ -1514,11 +1571,26 @@ class _InventoryPageState extends State<InventoryPage> {
         if (uomOptions.isNotEmpty) {
           // Use the first UOM option as default
           finalUom = uomOptions.first.uom ?? 'PCS';
+          resolvedFactor ??= uomOptions.first.factor;
         } else {
           // Fallback to PCS if no UOM options found
           finalUom = 'PCS';
         }
       }
+
+      if (resolvedFactor == null) {
+        final match = await isar.inStockUoms
+            .filter()
+            .companyCodeEqualTo(companyCode)
+            .skuNoEqualTo(item.skuNo)
+            .uomEqualTo(finalUom)
+            .findFirst();
+        resolvedFactor = match?.factor;
+      }
+      // Default first, then range-check: the reverse order passes the guard on
+      // null and throws on the force-unwrap.
+      final double candidateFactor = resolvedFactor ?? 1.0;
+      final double finalFactor = candidateFactor > 0 ? candidateFactor : 1.0;
       
       // Use custom price if provided, otherwise use item's default price
       final double finalGstPrice = customGstPrice ?? item.gstPrice ?? 0.0;
@@ -1532,8 +1604,11 @@ class _InventoryPageState extends State<InventoryPage> {
         uom: finalUom,
         unitPrice: finalUnitPrice,
         gstPrice: finalGstPrice,
-        factor: 1.0,
+        factor: finalFactor,
         quantity: qty,
+        foc: foc,
+        quantityLoose: quantityLoose,
+        focLoose: focLoose,
         remarks: remark ?? '',
       );
       
@@ -1543,7 +1618,10 @@ class _InventoryPageState extends State<InventoryPage> {
       final remarkPart = (remark != null && remark.trim().isNotEmpty) ? ' – "$remark"' : '';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Added ${item.displayName} x$qty$uomPart$remarkPart'),
+          content: Text('Added ${item.displayName} x$qty'
+              '${foc > 0 ? ' +${_trimQty(foc)} FOC' : ''}'
+              '${(quantityLoose + focLoose) > 0 ? ' +${_trimQty(quantityLoose + focLoose)} loose' : ''}'
+              '$uomPart$remarkPart'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -1758,49 +1836,50 @@ class _InventoryPageState extends State<InventoryPage> {
     _executeSearch();
   }
 
-  void _toggleFilters() {
-    setState(() {
-      _showFilters = !_showFilters;
-    });
-    
-    // Load filter options when opening filters
-    if (_showFilters) {
-      if (_filterOptions.isEmpty) {
-        _loadFilterOptions();
-      }
-      // Ensure department descriptions are loaded even if options were cached previously
-      if (_deptDescriptions.isEmpty) {
-        _loadDeptDescriptionsOnly();
-      }
-      // Ensure group descriptions are loaded
-      if (_groupDescriptions.isEmpty) {
-        _loadGroupDescriptionsOnly();
-      }
-      // If groups already selected, auto-expand Department
-      if ((_currentFilter.groups?.isNotEmpty ?? false)) {
-        setState(() {
-          _sectionExpanded['department'] = true;
-        });
-      }
-    }
+  /// Opens the filter dialog.
+  ///
+  /// The dialog owns its own state and loads its own options and labels, and
+  /// returns the filter to apply — so the page is not touched, and the
+  /// catalogue not requeried, until it closes.
+  Future<void> _toggleFilters() async {
+    final raw = _selectedCompany?['companyCode'];
+    final companyCode =
+        raw is String ? (int.tryParse(raw) ?? 0) : (raw as int? ?? 0);
+
+    final result = await InventoryFilterDialog.show(
+      context,
+      current: _currentFilter,
+      companyCode: companyCode,
+    );
+    if (result == null || !mounted) return;
+
+    // Labels FIRST, then the filter. The banner names what is active, and
+    // rendering it before the labels arrive shows the bare code — "S3 - AVT"
+    // instead of "S3 - ATVANTIC IMPORT & EXPORT SB". The dialog has just
+    // fetched these, so they are cached and this returns immediately.
+    await _loadBannerLabels(companyCode);
+    if (!mounted) return;
+
+    setState(() => _currentFilter = result);
+    _resetAndLoadInventory();
   }
 
-  Future<void> _loadDeptDescriptionsOnly() async {
-    try {
-      final companyCodeRaw = _selectedCompany?['companyCode'];
-      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) : companyCodeRaw as int?;
-      final deptMap = await _inventoryService.getDepartmentMap(companyCode: companyCode);
-      if (deptMap.isNotEmpty) {
-        setState(() {
-          _deptDescriptions = deptMap;
-        });
-        print('🟦 InventoryPage: Loaded ${deptMap.length} department descriptions');
-      } else {
-        print('🟨 InventoryPage: Department descriptions map is empty (fallback to codes)');
-      }
-    } catch (e) {
-      print('❌ InventoryPage: Failed to load department descriptions: $e');
-    }
+  /// Loads the labels the active-filter banner needs.
+  ///
+  /// Cached and single-flighted in the service, so calling it repeatedly is
+  /// free after the first time.
+  Future<void> _loadBannerLabels(int companyCode) async {
+    final labels = await Future.wait([
+      _inventoryService.getGroupMap(companyCode: companyCode),
+      _inventoryService.getDepartmentMap(companyCode: companyCode),
+      _inventoryService.getBrandMap(companyCode: companyCode),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      if (labels[0].isNotEmpty) _groupDescriptions = labels[0];
+      if (labels[1].isNotEmpty) _deptDescriptions = labels[1];
+      if (labels[2].isNotEmpty) _brandDescriptions = labels[2];
+    });
   }
 
   void _applyStockFilter(StockStatus? status) {
@@ -1962,122 +2041,180 @@ class _InventoryPageState extends State<InventoryPage> {
     return result;
   }
 
+  /// Active filters as one scrollable line.
+  ///
+  /// Was a Wrap of full-size FilterChips that grew to three or four rows and
+  /// pushed the catalogue down the screen. Everything is still here and still
+  /// removable — it just scrolls sideways instead of reflowing downwards.
   Widget _buildFilterChips() {
-    final hasFilters = _currentFilter.hasActiveFilters || _scannedPluNo.isNotEmpty;
+    final hasFilters =
+        _currentFilter.hasActiveFilters || _scannedPluNo.isNotEmpty;
     if (!hasFilters) return const SizedBox.shrink();
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        children: [
-          // Scanned PLU Tag
-          if (_scannedPluNo.isNotEmpty)
-            FilterChip(
-              label: Text('PLU: $_scannedPluNo'),
-              selected: true,
-              onSelected: (_) => _clearScannedPlu(),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: _clearScannedPlu,
-              selectedColor: Colors.green.shade100,
-              checkmarkColor: Colors.green.shade700,
-              avatar: const Icon(Icons.qr_code_scanner, size: 16),
-            ),
-          // Stock Status
-          if (_currentFilter.stockStatus != null)
-            FilterChip(
-              label: Text(_getStockStatusLabel(_currentFilter.stockStatus!)),
-              selected: true,
-              onSelected: (_) => _applyStockFilter(null),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () => _applyStockFilter(null),
-              selectedColor: Colors.blue.shade100,
-              checkmarkColor: Colors.blue.shade700,
-            ),
-          // Groups
-          if (_currentFilter.groups?.isNotEmpty == true)
-            ..._currentFilter.groups!.map((group) {
-              final labelText = _groupDescriptions[group] ?? group;
-              return FilterChip(
-              label: Text('Grp: $labelText'),
-              selected: true,
-              onSelected: (_) => _toggleGroupFilter(group),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () => _toggleGroupFilter(group),
-              selectedColor: Colors.purple.shade100,
-              checkmarkColor: Colors.purple.shade700,
+
+    final pills = <Widget>[];
+
+    if (_scannedPluNo.isNotEmpty) {
+      pills.add(_activePill(
+        label: 'PLU $_scannedPluNo',
+        color: AppDesign.success,
+        icon: Icons.qr_code_scanner,
+        onRemove: _clearScannedPlu,
+      ));
+    }
+
+    if (_currentFilter.stockStatus != null &&
+        _currentFilter.stockStatus != StockStatus.all) {
+      pills.add(_activePill(
+        label: _getStockStatusLabel(_currentFilter.stockStatus!),
+        color: AppDesign.modPicking,
+        onRemove: () => _applyStockFilter(null),
+      ));
+    }
+
+    for (final g in _currentFilter.groups ?? const <String>[]) {
+      pills.add(_activePill(
+        label: _groupDescriptions[g] ?? g,
+        color: AppDesign.modOrdering,
+        onRemove: () => _toggleGroupFilter(g),
+      ));
+    }
+
+    for (final d in _currentFilter.departments ?? const <String>[]) {
+      // Departments are group-qualified ("HP|JTC"); show the group with the
+      // name, since the same code means different things under each group.
+      final grp = InventoryService.groupOfDepartmentKey(d);
+      final code = InventoryService.codeOfDepartmentKey(d);
+      // The bare-code entry is a sentinel when a code means different things
+      // under different groups, so it must never be shown; fall back to the
+      // code itself instead.
+      final scoped =
+          _deptDescriptions['${grp.toUpperCase()}|${code.toUpperCase()}'];
+      final flat = _deptDescriptions[code];
+      final desc = (scoped != null && scoped.isNotEmpty)
+          ? scoped
+          : (flat != null &&
+                  flat.isNotEmpty &&
+                  !InventoryService.isAmbiguousLabel(flat)
+              ? flat
+              : code);
+      pills.add(_activePill(
+        label: grp.isEmpty ? desc : '$grp - $desc',
+        color: AppDesign.modPacking,
+        onRemove: () => _toggleDepartmentFilter(d),
+      ));
+    }
+
+    for (final v in _currentFilter.subDepartments ?? const <String>[]) {
+      pills.add(_activePill(
+        label: v,
+        color: AppDesign.modCreditNote,
+        onRemove: () => _toggleSubDepartmentFilter(v),
+      ));
+    }
+
+    for (final v in _currentFilter.categories ?? const <String>[]) {
+      pills.add(_activePill(
+        label: v,
+        color: AppDesign.modCreditNote,
+        onRemove: () => _toggleCategoryFilter(v),
+      ));
+    }
+
+    for (final b in _currentFilter.brands ?? const <String>[]) {
+      pills.add(_activePill(
+        label: _brandDescriptions[b] ?? b,
+        color: AppDesign.info,
+        onRemove: () => _toggleBrandFilter(b),
+      ));
+    }
+
+    return SizedBox(
+      height: 30,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        itemCount: pills.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 5),
+        itemBuilder: (context, i) {
+          // Clear-all rides at the end of the same line rather than taking a
+          // row of its own.
+          if (i == pills.length) {
+            return GestureDetector(
+              onTap: _clearAllFilters,
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                child: const Text('Clear all',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppDesign.danger)),
+              ),
             );
-            }),
-          // Departments (show description if available)
-          if (_currentFilter.departments?.isNotEmpty == true)
-            ..._currentFilter.departments!.map((dept) {
-              final labelText = _deptDescriptions[dept] ?? dept;
-              return FilterChip(
-                label: Text('Dept: $labelText'),
-                selected: true,
-                onSelected: (_) => _toggleDepartmentFilter(dept),
-                deleteIcon: const Icon(Icons.close, size: 16),
-                onDeleted: () => _toggleDepartmentFilter(dept),
-                selectedColor: Colors.orange.shade100,
-                checkmarkColor: Colors.orange.shade700,
-              );
-            }),
-          // Sub-Departments
-          if (_currentFilter.subDepartments?.isNotEmpty == true)
-            ..._currentFilter.subDepartments!.map((subDept) => FilterChip(
-              label: Text('SubDept: $subDept'),
-              selected: true,
-              onSelected: (_) => _toggleSubDepartmentFilter(subDept),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () => _toggleSubDepartmentFilter(subDept),
-              selectedColor: Colors.teal.shade100,
-              checkmarkColor: Colors.teal.shade700,
-            )),
-          // Categories
-          if (_currentFilter.categories?.isNotEmpty == true)
-            ..._currentFilter.categories!.map((category) => FilterChip(
-              label: Text('Cat: $category'),
-              selected: true,
-              onSelected: (_) => _toggleCategoryFilter(category),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () => _toggleCategoryFilter(category),
-              selectedColor: Colors.indigo.shade100,
-              checkmarkColor: Colors.indigo.shade700,
-            )),
-          // Brands
-          if (_currentFilter.brands?.isNotEmpty == true)
-            ..._currentFilter.brands!.map((brand) => FilterChip(
-              label: Text('Brand: $brand'),
-              selected: true,
-              onSelected: (_) => _toggleBrandFilter(brand),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () => _toggleBrandFilter(brand),
-              selectedColor: Colors.cyan.shade100,
-              checkmarkColor: Colors.cyan.shade700,
-            )),
-          // Clear All
-          ActionChip(
-            label: const Text('Clear All'),
-            onPressed: _clearAllFilters,
-            backgroundColor: Colors.red.shade50,
-            labelStyle: TextStyle(color: Colors.red.shade700),
-          ),
-        ],
+          }
+          return pills[i];
+        },
       ),
     );
   }
 
-  String _getStockStatusLabel(StockStatus status) {
-    switch (status) {
+  String _getStockStatusLabel(StockStatus s) {
+    switch (s) {
       case StockStatus.inStock:
-        return 'In Stock';
+        return 'In stock';
       case StockStatus.outOfStock:
-        return 'Out of Stock';
+        return 'Out of stock';
       case StockStatus.lowStock:
-        return 'Low Stock';
+        return 'Low stock';
       case StockStatus.all:
-        return 'All Items';
+        return 'All';
     }
+  }
+
+  Widget _activePill({
+    required String label,
+    required Color color,
+    required VoidCallback onRemove,
+    IconData? icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.only(left: 8, right: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(AppDesign.radiusSm),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 4),
+          ],
+          // Long descriptions are capped so one pill cannot fill the line.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 150),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color),
+            ),
+          ),
+          InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(AppDesign.radiusPill),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+              child: Icon(Icons.close, size: 12, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCollapsibleSection({
@@ -2553,8 +2690,11 @@ class _InventoryPageState extends State<InventoryPage> {
                   ),
                   const SizedBox(width: 8),
                   // Grid/List toggle
+                  // Large grid → compact grid → list. The icon shows the
+                  // layout currently on screen, so it always matches what the
+                  // operator is looking at.
                   GestureDetector(
-                    onTap: () => setState(() => _isGridView = !_isGridView),
+                    onTap: _cycleViewMode,
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -2569,8 +2709,8 @@ class _InventoryPageState extends State<InventoryPage> {
                         ],
                       ),
                       child: Icon(
-                        _isGridView ? Icons.view_list : Icons.grid_view,
-                        color: Colors.blue.shade600,
+                        _viewMode.icon,
+                        color: AppDesign.modOrdering,
                         size: 20,
                       ),
                     ),
@@ -2613,7 +2753,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : _inventoryItems.isEmpty && _errorMessage.isEmpty
                       ? _buildEmptyState()
-                      : _isGridView
+                      : _viewMode.isGrid
                           ? _buildGridView()
                           : _buildListView(),
             ),
@@ -2793,21 +2933,27 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _buildGridView() {
+    final columns = _viewMode.columns(MediaQuery.of(context).size.width);
+    final compact = columns >= 3;
+
     return GridView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      padding: const EdgeInsets.all(10),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        childAspectRatio: 0.75, // Card uses Expanded so any ratio works without overflow
+        // Compact cards carry one less line of text, so they need less height
+        // per unit of width. Both size their text block with Expanded, so
+        // neither ratio can overflow.
+        childAspectRatio: compact ? 0.68 : 0.72,
       ),
       itemCount: _inventoryItems.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _inventoryItems.length) {
           return const Center(child: CircularProgressIndicator());
         }
-        return _buildInventorySquareCard(_inventoryItems[index]);
+        return _buildInventoryGridCard(_inventoryItems[index], compact: compact);
       },
     );
   }
@@ -2896,96 +3042,192 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   // Build individual inventory square card for grid layout
-  Widget _buildInventorySquareCard(InventoryItem item) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  /// One product tile, used by both grid densities.
+  ///
+  /// [compact] is the three-column variant: same information hierarchy, but
+  /// the brand line is dropped and type sizes step down, because at that width
+  /// a second text line pushes the price off the card.
+  Widget _buildInventoryGridCard(InventoryItem item, {required bool compact}) {
+    final int companyCode = _selectedCompany?['companyCode'] is String
+        ? int.tryParse(_selectedCompany!['companyCode']) ?? 0
+        : (_selectedCompany?['companyCode'] ?? 0);
+    final bool inStock = (item.qtyOnHand ?? 0) > 0;
+    final double? price = item.gstPrice ??
+        item.price ??
+        item.lastCost ??
+        item.standardCost ??
+        item.fifoCost ??
+        item.averageCost;
+
+    return Material(
+      color: AppDesign.surface,
+      borderRadius: BorderRadius.circular(AppDesign.radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showInventoryDetails(item),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image section: flexible height image
-            Expanded(
-              flex: 3,
-              child: FutureBuilder<String?>(
-                future: _getWorkingUomForImage(
-                  _selectedCompany?['companyCode'] is String
-                      ? int.parse(_selectedCompany!['companyCode'])
-                      : _selectedCompany?['companyCode'] ?? 0,
-                  item.skuNo,
-                ),
-                builder: (context, snapshot) {
-                  final uom = snapshot.data ?? item.uom;
-                  return InventoryImageWidget(
-                    companyCode: _selectedCompany?['companyCode'] is String
-                        ? int.parse(_selectedCompany!['companyCode'])
-                        : _selectedCompany?['companyCode'] ?? 0,
-                    skuNo: item.skuNo,
-                    uom: uom,
-                    borderRadius: BorderRadius.zero,
-                    fit: BoxFit.cover,
-                    showLoadingIndicator: true,
-                  );
-                },
-              ),
-            ),
-            // Details section: fixed content
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppDesign.radius),
+            border: Border.all(color: AppDesign.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image, with the stock state as a corner badge rather than a
+              // separate row — it costs no vertical space that way.
+              Expanded(
+                flex: compact ? 5 : 6,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    // Product name
-                    Text(
-                      item.displayName,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    Container(
+                      color: AppDesign.surfaceAlt,
+                      child: FutureBuilder<String?>(
+                        future: _getWorkingUomForImage(companyCode, item.skuNo),
+                        builder: (context, snapshot) {
+                          final uom = snapshot.data ?? item.uom;
+                          return InventoryImageWidget(
+                            companyCode: companyCode,
+                            skuNo: item.skuNo,
+                            uom: uom,
+                            borderRadius: BorderRadius.zero,
+                            fit: BoxFit.cover,
+                            showLoadingIndicator: true,
+                          );
+                        },
+                      ),
                     ),
-                    // SKU
-                    Text(
-                      'SKU: ${item.skuNo}',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                    ),
-                    // Price and Stock row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'RM ${(item.gstPrice ?? item.price ?? 0.0).toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: inStock
+                              ? AppDesign.success.withOpacity(0.92)
+                              : AppDesign.danger.withOpacity(0.92),
+                          borderRadius:
+                              BorderRadius.circular(AppDesign.radiusSm),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        child: Text(
+                          item.displayQtyOnHand.toString(),
+                          style: TextStyle(
+                            fontSize: compact ? 8.5 : 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Pack size, when it is not 1 — the difference between
+                    // ordering a carton and a piece.
+                    if (_factorLabel(item) != null)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
                           decoration: BoxDecoration(
-                            color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[50] : Colors.red[50],
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.black.withOpacity(0.62),
+                            borderRadius:
+                                BorderRadius.circular(AppDesign.radiusSm),
                           ),
                           child: Text(
-                            '${item.displayQtyOnHand}',
+                            _factorLabel(item)!,
                             style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w500,
-                              color: (item.qtyOnHand ?? 0) > 0 ? Colors.green[700] : Colors.red[700],
+                              fontSize: compact ? 8.5 : 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                flex: compact ? 4 : 5,
+                child: Padding(
+                  padding: EdgeInsets.all(compact ? 5 : 7),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.displayName,
+                          style: TextStyle(
+                            fontSize: compact ? 10 : 11.5,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            color: AppDesign.ink,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        compact
+                            ? '${item.skuNo}'
+                            : 'SKU ${item.skuNo}'
+                                '${(item.brand ?? '').isNotEmpty ? '  ·  ${item.brand}' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compact ? 8.5 : 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppDesign.inkSubtle,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              price == null
+                                  ? 'N/A'
+                                  : 'RM ${price.toStringAsFixed(2)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: compact ? 11.5 : 13,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.3,
+                                color: price == null
+                                    ? AppDesign.inkSubtle
+                                    : AppDesign.accentInk,
+                              ),
+                            ),
+                          ),
+                          if ((item.uom ?? '').trim().isNotEmpty)
+                            Text(
+                              item.uom!.trim(),
+                              style: TextStyle(
+                                fontSize: compact ? 8.5 : 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppDesign.inkSubtle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// "×12" when the item's UOM holds more than one base unit, else null.
+  String? _factorLabel(InventoryItem item) {
+    final f = (item.uomFactor ?? item.stockFactor ?? 1).toDouble();
+    if (f == 1 || f <= 0) return null;
+    return '×${f.toStringAsFixed(f.truncateToDouble() == f ? 0 : 2)}';
   }
 
   // Build individual inventory card (legacy method - keep for reference)
@@ -3330,7 +3572,7 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   // Public getters for bottom sheet widget access
-  Map<int, int> get qtySelections => _qtySelections;
+  Map<int, double> get qtySelections => _qtySelections;
   Map<int, double> get priceSelections => _priceSelections;
   AuthService get authService => _authService;
   
@@ -3340,9 +3582,29 @@ class _InventoryPageState extends State<InventoryPage> {
       _loadPreviousInvoicesForItem(item, filterUom: filterUom);
   Future<List<Map<String, dynamic>>> loadPreviousOrdersForItem(InventoryItem item, {String? filterUom}) => 
       _loadPreviousOrdersForItem(item, filterUom: filterUom);
-  Widget buildHistoryList(List<Map<String, dynamic>> data, String type) => _buildHistoryList(data, type);
-  void addToCart(InventoryItem item, {String? remark, String? uom, double? customGstPrice}) => 
-      _addToCart(item, remark: remark, uom: uom, customGstPrice: customGstPrice);
+  /// Kept for callers that still pass raw maps. The sheet builds
+  /// [ItemHistoryList] directly so it can supply the add-to-cart action.
+  Widget buildHistoryList(List<Map<String, dynamic>> data, String type) =>
+      ItemHistoryList(
+        entries: [for (final m in data) ItemHistoryEntry.fromMap(m)],
+        isInvoice: type == 'invoice',
+      );
+  void addToCart(InventoryItem item,
+          {String? remark,
+          String? uom,
+          double? customGstPrice,
+          double foc = 0,
+          double quantityLoose = 0,
+          double focLoose = 0,
+          double? factor}) =>
+      _addToCart(item,
+          remark: remark,
+          uom: uom,
+          customGstPrice: customGstPrice,
+          foc: foc,
+          quantityLoose: quantityLoose,
+          focLoose: focLoose,
+          factor: factor);
 
   void _showInventoryDetails(InventoryItem item) {
     showModalBottomSheet(
@@ -3390,80 +3652,6 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  Widget _buildHistoryList(List<Map<String, dynamic>> data, String type) {
-    if (data.isEmpty) {
-      return Center(
-        child: Text(
-          'No previous ${type == 'invoice' ? 'invoices' : 'quotations'}',
-          style: TextStyle(color: Colors.grey.shade500),
-        ),
-      );
-    }
-    
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      scrollDirection: Axis.horizontal,
-      itemCount: data.length,
-      itemBuilder: (context, index) {
-        final item = data[index];
-        final DateTime? dt = item['date'] as DateTime?;
-        final dateStr = dt == null ? '-' : '${dt.day}/${dt.month}/${dt.year}';
-        final qty = item['qty'];
-        final uom = item['uom'] ?? '';
-        final price = (item['price'] ?? 0).toStringAsFixed(2);
-        final docNo = type == 'invoice' 
-          ? (item['invoiceNo'] ?? '-')
-          : (item['quoteNo'] ?? '-');
-        
-        return Container(
-          width: 140,
-          margin: const EdgeInsets.only(right: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: type == 'invoice' ? Colors.green.shade50 : Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: type == 'invoice' ? Colors.green.shade200 : Colors.blue.shade200,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '#$docNo',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                dateStr,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '$qty $uom',
-                style: const TextStyle(fontSize: 11),
-              ),
-              Text(
-                'RM $price',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: type == 'invoice' ? Colors.green : Colors.blue,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   Future<List<Map<String, dynamic>>> _loadPreviousOrdersForItem(InventoryItem item, {String? filterUom}) async {
     try {
@@ -3558,6 +3746,12 @@ class _InventoryPageState extends State<InventoryPage> {
           'qty': qi.quoteQuantity ?? 0,
           'uom': qi.uom,
           'price': qi.unitPrice ?? qi.gstPrice ?? 0,
+          // Same shape as the invoice rows, so one history widget can render
+          // and re-order either kind.
+          'foc': qi.quoteFoc ?? 0,
+          'quantityLoose': qi.quoteQuantityLoose ?? 0,
+          'focLoose': qi.quoteFocLoose ?? 0,
+          'factor': qi.factor,
         };
       }).toList();
     } catch (e) {

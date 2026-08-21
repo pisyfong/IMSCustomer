@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
+import 'models/adjustment.dart';
+import 'models/adjustment_item.dart';
+import 'models/adjustment_lookup.dart';
 import 'package:path_provider/path_provider.dart';
 // HTTP removed - using SignalR-only architecture
 import 'services/taxonomy_mode_service.dart';
+import 'services/inventory_service.dart';
+import 'services/base_transaction_sync_service.dart';
+import 'models/app_user.dart';
+import 'models/app_location.dart';
+import 'models/printer_settings.dart';
+import 'models/receipt_template.dart';
 import 'login_page.dart';
 import 'company_selection_page.dart';
+import 'pages/home_page.dart';
 import 'menu_page.dart';
 import 'inventory_page.dart';
 import 'company.dart';
@@ -15,6 +25,7 @@ import 'login_cache.dart';
 import 'models/inventory_item.dart';
 import 'models/in_stock_uom.dart';
 import 'models/cart_item.dart';
+import 'models/brand_lookup.dart';
 import 'models/customer.dart';
 import 'models/quote.dart';
 import 'models/quote_item.dart';
@@ -32,15 +43,24 @@ import 'models/group_lookup.dart';
 import 'models/department_lookup.dart';
 import 'models/customer_plu.dart';
 import 'models/in_stock_plu.dart';
+import 'models/pending_plu.dart';
+import 'models/uom_master.dart';
 import 'models/draft_quotation.dart';
 import 'models/sync_metadata.dart';
+import 'models/pick_list.dart';
+import 'models/pick_list_item.dart';
+import 'models/pack_list.dart';
+import 'models/pack_list_item.dart';
 import 'services/auth_service.dart';
+import 'services/base_inventory_sync_service.dart';
 import 'services/signalr_service.dart';
 import 'services/enhanced_sync_service.dart';
 import 'config/app_config.dart';
 import 'services/offline_first_service.dart';
 import 'dart:convert';
 import 'services/activation_service.dart';
+import 'services/license_service.dart';
+import 'license_blocked_page.dart';
 import 'activation_page.dart';
 import 'services/quote_context.dart';
 
@@ -84,6 +104,7 @@ Future<void> initIsar() async {
       InventoryItemSchema,
       InStockUomSchema,
       CartItemSchema,
+      BrandLookupSchema,
       CustomerSchema,
       QuoteSchema,
       QuoteItemSchema,
@@ -102,9 +123,25 @@ Future<void> initIsar() async {
       DepartmentLookupSchema,
       CustomerPluSchema,
       InStockPluSchema,
+      PendingPluSchema,
+      UomMasterSchema,
+      PendingSkuUomSchema,
       DraftQuotationSchema,
       DraftQuotationItemSchema,
       SyncMetadataSchema,
+      PickListSchema,
+      PickListItemSchema,
+      PackListSchema,
+      AdjustmentSchema,
+      AdjustmentItemSchema,
+      AdjustmentCodeRowSchema,
+      AdjustmentBatchRowSchema,
+      PackListItemSchema,
+      AppUserSchema,
+      AppLocationSchema,
+      SelectedLocationSchema,
+      PrinterSettingsSchema,
+      ReceiptTemplateSchema,
     ], directory: dir.path);
     print('Isar database opened successfully');
     
@@ -159,6 +196,14 @@ void main() async {
   // Warm the taxonomy-mode cache so modeOrDefault is correct on first read
   await TaxonomyModeService.instance.getMode();
 
+  // One-time: tag pre-existing (untagged) group/dept lookups as 'pi' taxonomy.
+  await InventoryService.migrateLegacyLookupModes();
+
+  // Self-healing: collapse duplicate pick/pack items and re-key them onto the
+  // stable id scheme (fixes dupes from the old sequenceNo-based ids).
+  await BaseTransactionSyncService.dedupePickItems();
+  await BaseTransactionSyncService.dedupePackItems();
+
   // Run the app
   runApp(const MyApp());
 }
@@ -174,6 +219,10 @@ class _MyAppState extends State<MyApp> {
   bool _initialized = false;
   bool _hasExistingLogin = false;
   bool _isActivated = false;
+
+  /// Non-null when the licence server (or the cached record) refuses this
+  /// device. Blocks the app ahead of login.
+  LicenseResult? _licenseBlock;
   
   @override
   void initState() {
@@ -193,6 +242,21 @@ class _MyAppState extends State<MyApp> {
       if (_isActivated) {
         await QuoteContext.I.loadFromStorage();
         print('Quote prefix loaded: \\${QuoteContext.I.quotePrefix}');
+
+        // Re-validate the licence. Revoke / expiry / maintenance / forced
+        // upgrade are honoured here, before anything else runs. Offline is not
+        // a refusal — LicenseService falls back to the cached record for a
+        // grace window, because a handheld is out of coverage all day.
+        final lic = await activationService.checkLicense();
+        print('Licence state: ${lic.state}');
+        if (!lic.state.allowsUse) {
+          setState(() {
+            _licenseBlock = lic;
+            _hasExistingLogin = false;
+            _initialized = true;
+          });
+          return;
+        }
       }
       if (!_isActivated) {
         setState(() {
@@ -254,7 +318,30 @@ class _MyAppState extends State<MyApp> {
       print('✅ APP STARTUP: Background preload scheduled (non-blocking)');
     } else {
       print('🚀 APP STARTUP: Skipping startup preload (AppConfig.enableAutoSync = false)');
+      // ...but barcodes are pulled regardless. The table is ~3.5k rows and
+      // usually unchanged, so this costs a round trip — and a barcode this
+      // device has never seen is how a picker links it to the wrong item and
+      // strands a whole sync behind the conflict.
+      _pullBarcodesQuietly();
     }
+  }
+
+  /// Cheap barcode refresh, independent of the auto-sync switch.
+  ///
+  /// Never awaited and never fatal: a stale barcode table degrades to
+  /// "not recognised", which a picker can still resolve by hand.
+  void _pullBarcodesQuietly() {
+    () async {
+      try {
+        final company = await AuthService().getSelectedCompany();
+        final raw = company?['companyCode'];
+        final cc = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+        if (cc == null) return;
+        await BaseInventorySyncService().syncPlusOnly(companyCode: cc);
+      } catch (e) {
+        print('⚠️ APP STARTUP: barcode refresh skipped: $e');
+      }
+    }();
   }
 
   @override
@@ -262,6 +349,20 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'IMS Customer',
       navigatorObservers: [appRouteObserver],
+      // Clamp the OS font-scale so a device set to "large text" doesn't blow
+      // up the whole UI. The app's layouts are tuned for a compact scale;
+      // allow a little growth (up to 1.1x) but no more.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final clamped = mq.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.1,
+        );
+        return MediaQuery(
+          data: mq.copyWith(textScaler: clamped),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.redAccent.shade100, brightness: Brightness.light),
         scaffoldBackgroundColor: Colors.red[50],
@@ -283,15 +384,17 @@ class _MyAppState extends State<MyApp> {
         useMaterial3: true,
       ),
       home: _initialized
-          ? (!_isActivated
-              ? const ActivationPage()
-              : (_hasExistingLogin ? const CompanySelectionPage() : const LoginPage()))
+          ? (_licenseBlock != null
+              ? LicenseBlockedPage(result: _licenseBlock!)
+              : !_isActivated
+                  ? const ActivationPage()
+              : (_hasExistingLogin ? const HomePage() : const LoginPage()))
           : const Scaffold(body: Center(child: CircularProgressIndicator())),
       routes: {
         '/login': (context) => const LoginPage(),
+        '/home': (context) => const HomePage(),
         '/company': (context) => const CompanySelectionPage(),
         '/menu': (context) => const MenuPage(),
-        '/home': (context) => const MyHomePage(title: 'IMS Customer'),
         '/activate': (context) => const ActivationPage(),
         '/sales_quotation': (context) => const Scaffold(body: Center(child: Text('Sales Quotation - Coming Soon'))),
         '/sales_order': (context) => const Scaffold(body: Center(child: Text('Sales Order - Coming Soon'))),

@@ -18,33 +18,44 @@ class DeviceFingerprintService {
   ///
   /// Uses Android ID (or iOS identifierForVendor) as primary identifier.
   /// Falls back to secure storage UUID if platform ID unavailable.
+  ///
+  /// NOTE: on Android this is a locally-generated UUID, NOT a platform ID.
+  /// `AndroidDeviceInfo.id` is `Build.ID` — the OS *build* identifier (e.g.
+  /// "TKQ1.230420.001"), which is identical on every handheld running the same
+  /// firmware. It was being used here as though it were ANDROID_ID, so every
+  /// EDA52 on the same image reported the same "device". That made licence
+  /// device-binding and seat counting meaningless. device_info_plus no longer
+  /// exposes ANDROID_ID at all (removed for privacy), so a persisted UUID is
+  /// the correct primary identifier.
+  ///
+  /// Trade-off: secure storage generally does not survive an app *uninstall*,
+  /// so a reinstall looks like a new device and the licence must be unbound by
+  /// an administrator. That's the intended workflow (the admin tool has an
+  /// /unbind action) and is far better than every device sharing one id.
   Future<String> getOrCreateDeviceId() async {
     try {
-      // First try to get platform-specific stable ID
-      String? platformId;
-      
-      if (Platform.isAndroid) {
-        final info = await _deviceInfo.androidInfo;
-        // Use id property which contains Android ID in device_info_plus 11.x
-        platformId = info.id; // Android ID - persists across app reinstalls
-        debugPrint('DeviceFingerprint: Android ID = $platformId');
-      } else if (Platform.isIOS) {
-        final info = await _deviceInfo.iosInfo;
-        platformId = info.identifierForVendor; // iOS vendor ID
-      }
-      
-      // Use platform ID if available and valid
-      if (platformId != null && platformId.isNotEmpty && platformId != 'unknown') {
-        return platformId;
-      }
-      
-      // Fallback to secure storage UUID (for cases where platform ID unavailable)
+      // Persisted per-install UUID — the identity we actually bind licences to.
       final existing = await _storage.read(key: _kDeviceIdKey);
       if (existing != null && existing.isNotEmpty) return existing;
 
+      // iOS does expose a genuine per-vendor device id; prefer it there and
+      // persist it so the value is stable even if the API stops answering.
+      String? platformId;
+      if (Platform.isIOS) {
+        final info = await _deviceInfo.iosInfo;
+        platformId = info.identifierForVendor;
+      }
+
+      if (platformId != null && platformId.isNotEmpty && platformId != 'unknown') {
+        await _storage.write(key: _kDeviceIdKey, value: platformId);
+        return platformId;
+      }
+      
+      // Android, and any platform without a usable per-device id: mint one and
+      // keep it. First call on a device decides its identity for good.
       final newId = const Uuid().v4();
       await _storage.write(key: _kDeviceIdKey, value: newId);
-      debugPrint('DeviceFingerprint: Using fallback UUID as platform ID unavailable');
+      debugPrint('DeviceFingerprint: minted new device id');
       return newId;
     } catch (e) {
       // As a last resort, fall back to an ephemeral id (not persisted)

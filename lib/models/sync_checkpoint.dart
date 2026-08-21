@@ -22,6 +22,10 @@ class SyncCheckpoint {
   /// Null = never successfully synced.
   DateTime? lastWriteTimeStamp;
 
+  /// Highest keyset cursor drained, for feeds paged by a monotonic id rather
+  /// than a timestamp (e.g. MP_Txn_History.Transaction_Id). Null = from 0.
+  int? lastCursorId;
+
   /// Wall-clock time of the last full successful drain.
   DateTime? lastSyncedAt;
 

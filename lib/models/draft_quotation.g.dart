@@ -2777,43 +2777,83 @@ const DraftQuotationItemSchema = CollectionSchema(
       name: r'draftId',
       type: IsarType.long,
     ),
-    r'netAmount': PropertySchema(
+    r'factor': PropertySchema(
       id: 5,
+      name: r'factor',
+      type: IsarType.double,
+    ),
+    r'factorOrOne': PropertySchema(
+      id: 6,
+      name: r'factorOrOne',
+      type: IsarType.double,
+    ),
+    r'foc': PropertySchema(
+      id: 7,
+      name: r'foc',
+      type: IsarType.double,
+    ),
+    r'focLoose': PropertySchema(
+      id: 8,
+      name: r'focLoose',
+      type: IsarType.double,
+    ),
+    r'focLooseQty': PropertySchema(
+      id: 9,
+      name: r'focLooseQty',
+      type: IsarType.double,
+    ),
+    r'focQty': PropertySchema(
+      id: 10,
+      name: r'focQty',
+      type: IsarType.double,
+    ),
+    r'looseQty': PropertySchema(
+      id: 11,
+      name: r'looseQty',
+      type: IsarType.double,
+    ),
+    r'netAmount': PropertySchema(
+      id: 12,
       name: r'netAmount',
       type: IsarType.double,
     ),
     r'pluNo': PropertySchema(
-      id: 6,
+      id: 13,
       name: r'pluNo',
       type: IsarType.string,
     ),
     r'quantity': PropertySchema(
-      id: 7,
+      id: 14,
       name: r'quantity',
       type: IsarType.double,
     ),
+    r'quantityLoose': PropertySchema(
+      id: 15,
+      name: r'quantityLoose',
+      type: IsarType.double,
+    ),
     r'remark': PropertySchema(
-      id: 8,
+      id: 16,
       name: r'remark',
       type: IsarType.string,
     ),
     r'sequenceNo': PropertySchema(
-      id: 9,
+      id: 17,
       name: r'sequenceNo',
       type: IsarType.long,
     ),
     r'skuNo': PropertySchema(
-      id: 10,
+      id: 18,
       name: r'skuNo',
       type: IsarType.long,
     ),
     r'unitPrice': PropertySchema(
-      id: 11,
+      id: 19,
       name: r'unitPrice',
       type: IsarType.double,
     ),
     r'uom': PropertySchema(
-      id: 12,
+      id: 20,
       name: r'uom',
       type: IsarType.string,
     )
@@ -2909,14 +2949,22 @@ void _draftQuotationItemSerialize(
   writer.writeLong(offsets[2], object.companyCode);
   writer.writeString(offsets[3], object.description);
   writer.writeLong(offsets[4], object.draftId);
-  writer.writeDouble(offsets[5], object.netAmount);
-  writer.writeString(offsets[6], object.pluNo);
-  writer.writeDouble(offsets[7], object.quantity);
-  writer.writeString(offsets[8], object.remark);
-  writer.writeLong(offsets[9], object.sequenceNo);
-  writer.writeLong(offsets[10], object.skuNo);
-  writer.writeDouble(offsets[11], object.unitPrice);
-  writer.writeString(offsets[12], object.uom);
+  writer.writeDouble(offsets[5], object.factor);
+  writer.writeDouble(offsets[6], object.factorOrOne);
+  writer.writeDouble(offsets[7], object.foc);
+  writer.writeDouble(offsets[8], object.focLoose);
+  writer.writeDouble(offsets[9], object.focLooseQty);
+  writer.writeDouble(offsets[10], object.focQty);
+  writer.writeDouble(offsets[11], object.looseQty);
+  writer.writeDouble(offsets[12], object.netAmount);
+  writer.writeString(offsets[13], object.pluNo);
+  writer.writeDouble(offsets[14], object.quantity);
+  writer.writeDouble(offsets[15], object.quantityLoose);
+  writer.writeString(offsets[16], object.remark);
+  writer.writeLong(offsets[17], object.sequenceNo);
+  writer.writeLong(offsets[18], object.skuNo);
+  writer.writeDouble(offsets[19], object.unitPrice);
+  writer.writeString(offsets[20], object.uom);
 }
 
 DraftQuotationItem _draftQuotationItemDeserialize(
@@ -2931,15 +2979,19 @@ DraftQuotationItem _draftQuotationItemDeserialize(
   object.companyCode = reader.readLong(offsets[2]);
   object.description = reader.readStringOrNull(offsets[3]);
   object.draftId = reader.readLong(offsets[4]);
+  object.factor = reader.readDoubleOrNull(offsets[5]);
+  object.foc = reader.readDoubleOrNull(offsets[7]);
+  object.focLoose = reader.readDoubleOrNull(offsets[8]);
   object.id = id;
-  object.netAmount = reader.readDouble(offsets[5]);
-  object.pluNo = reader.readStringOrNull(offsets[6]);
-  object.quantity = reader.readDouble(offsets[7]);
-  object.remark = reader.readStringOrNull(offsets[8]);
-  object.sequenceNo = reader.readLong(offsets[9]);
-  object.skuNo = reader.readLong(offsets[10]);
-  object.unitPrice = reader.readDouble(offsets[11]);
-  object.uom = reader.readStringOrNull(offsets[12]);
+  object.netAmount = reader.readDouble(offsets[12]);
+  object.pluNo = reader.readStringOrNull(offsets[13]);
+  object.quantity = reader.readDouble(offsets[14]);
+  object.quantityLoose = reader.readDoubleOrNull(offsets[15]);
+  object.remark = reader.readStringOrNull(offsets[16]);
+  object.sequenceNo = reader.readLong(offsets[17]);
+  object.skuNo = reader.readLong(offsets[18]);
+  object.unitPrice = reader.readDouble(offsets[19]);
+  object.uom = reader.readStringOrNull(offsets[20]);
   return object;
 }
 
@@ -2961,20 +3013,36 @@ P _draftQuotationItemDeserializeProp<P>(
     case 4:
       return (reader.readLong(offset)) as P;
     case 5:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 6:
-      return (reader.readStringOrNull(offset)) as P;
-    case 7:
       return (reader.readDouble(offset)) as P;
+    case 7:
+      return (reader.readDoubleOrNull(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 9:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 10:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 11:
       return (reader.readDouble(offset)) as P;
     case 12:
+      return (reader.readDouble(offset)) as P;
+    case 13:
+      return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readDouble(offset)) as P;
+    case 15:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 16:
+      return (reader.readStringOrNull(offset)) as P;
+    case 17:
+      return (reader.readLong(offset)) as P;
+    case 18:
+      return (reader.readLong(offset)) as P;
+    case 19:
+      return (reader.readDouble(offset)) as P;
+    case 20:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -3776,6 +3844,456 @@ extension DraftQuotationItemQueryFilter
   }
 
   QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'factor',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'factor',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'factor',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'factor',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'factor',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'factor',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorOrOneEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'factorOrOne',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorOrOneGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'factorOrOne',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorOrOneLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'factorOrOne',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      factorOrOneBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'factorOrOne',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'foc',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'foc',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'foc',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'foc',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'foc',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'foc',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'focLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'focLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'focLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'focLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'focLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'focLoose',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseQtyEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'focLooseQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseQtyGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'focLooseQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseQtyLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'focLooseQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focLooseQtyBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'focLooseQty',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focQtyEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'focQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focQtyGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'focQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focQtyLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'focQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      focQtyBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'focQty',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
       idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -3827,6 +4345,72 @@ extension DraftQuotationItemQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      looseQtyEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'looseQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      looseQtyGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'looseQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      looseQtyLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'looseQty',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      looseQtyBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'looseQty',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
       ));
     });
   }
@@ -4108,6 +4692,90 @@ extension DraftQuotationItemQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'quantity',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      quantityLooseIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'quantityLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      quantityLooseIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'quantityLoose',
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      quantityLooseEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'quantityLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      quantityLooseGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'quantityLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      quantityLooseLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'quantityLoose',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterFilterCondition>
+      quantityLooseBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'quantityLoose',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -4683,6 +5351,104 @@ extension DraftQuotationItemQuerySortBy
   }
 
   QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFactor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFactorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factor', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFactorOrOne() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factorOrOne', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFactorOrOneDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factorOrOne', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFoc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'foc', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'foc', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLoose', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocLooseQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLooseQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocLooseQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLooseQty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByFocQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focQty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByLooseQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'looseQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByLooseQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'looseQty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
       sortByNetAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'netAmount', Sort.asc);
@@ -4721,6 +5487,20 @@ extension DraftQuotationItemQuerySortBy
       sortByQuantityDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'quantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByQuantityLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'quantityLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      sortByQuantityLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'quantityLoose', Sort.desc);
     });
   }
 
@@ -4868,6 +5648,90 @@ extension DraftQuotationItemQuerySortThenBy
   }
 
   QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFactor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFactorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factor', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFactorOrOne() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factorOrOne', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFactorOrOneDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'factorOrOne', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFoc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'foc', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'foc', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLoose', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocLooseQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLooseQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocLooseQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focLooseQty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByFocQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'focQty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
       thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -4878,6 +5742,20 @@ extension DraftQuotationItemQuerySortThenBy
       thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByLooseQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'looseQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByLooseQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'looseQty', Sort.desc);
     });
   }
 
@@ -4920,6 +5798,20 @@ extension DraftQuotationItemQuerySortThenBy
       thenByQuantityDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'quantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByQuantityLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'quantityLoose', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QAfterSortBy>
+      thenByQuantityLooseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'quantityLoose', Sort.desc);
     });
   }
 
@@ -5032,6 +5924,55 @@ extension DraftQuotationItemQueryWhereDistinct
   }
 
   QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByFactor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'factor');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByFactorOrOne() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'factorOrOne');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByFoc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'foc');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByFocLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'focLoose');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByFocLooseQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'focLooseQty');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByFocQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'focQty');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByLooseQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'looseQty');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
       distinctByNetAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'netAmount');
@@ -5049,6 +5990,13 @@ extension DraftQuotationItemQueryWhereDistinct
       distinctByQuantity() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'quantity');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, DraftQuotationItem, QDistinct>
+      distinctByQuantityLoose() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'quantityLoose');
     });
   }
 
@@ -5129,6 +6077,52 @@ extension DraftQuotationItemQueryProperty
     });
   }
 
+  QueryBuilder<DraftQuotationItem, double?, QQueryOperations> factorProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'factor');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double, QQueryOperations>
+      factorOrOneProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'factorOrOne');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double?, QQueryOperations> focProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'foc');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double?, QQueryOperations>
+      focLooseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'focLoose');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double, QQueryOperations>
+      focLooseQtyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'focLooseQty');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double, QQueryOperations> focQtyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'focQty');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double, QQueryOperations>
+      looseQtyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'looseQty');
+    });
+  }
+
   QueryBuilder<DraftQuotationItem, double, QQueryOperations>
       netAmountProperty() {
     return QueryBuilder.apply(this, (query) {
@@ -5146,6 +6140,13 @@ extension DraftQuotationItemQueryProperty
       quantityProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'quantity');
+    });
+  }
+
+  QueryBuilder<DraftQuotationItem, double?, QQueryOperations>
+      quantityLooseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'quantityLoose');
     });
   }
 

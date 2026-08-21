@@ -6,7 +6,9 @@ import '../models/quotation.dart';
 import '../models/quote_item.dart';
 import '../main.dart';
 import 'signalr_service.dart';
+import 'qty.dart';
 import '../config/app_config.dart';
+import 'location_service.dart';
 import 'quotation_logger.dart';
 
 class QuotationService {
@@ -220,7 +222,7 @@ class QuotationService {
         
         final response = await http.post(
           Uri.parse(apiUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: AppConfig.apiHeaders,
           body: jsonEncode(quotationData),
         );
 
@@ -242,7 +244,7 @@ class QuotationService {
             
             final itemsResponse = await http.post(
               Uri.parse(itemsApiUrl),
-              headers: {'Content-Type': 'application/json'},
+              headers: AppConfig.apiHeaders,
               body: itemsPayload,
             );
             
@@ -674,6 +676,17 @@ class QuotationService {
     if (data.containsKey('projectCode')) quotation.projectCode = data['projectCode'];
     if (data.containsKey('quotedBy')) quotation.quotedBy = data['quotedBy'];
     if (data.containsKey('representativeId')) quotation.representativeId = data['representativeId'] as int?;
+    // The issuing entity. `Quotation.toJson` already sends it as
+    // `Alternate_Company`; it was simply never being set, so every SQ this app
+    // created left the column blank while all 187,320 legacy quotes carry one.
+    if (data.containsKey('alternateCompany')) {
+      final v = (data['alternateCompany'] ?? '').toString().trim();
+      quotation.alternateCompany = v.isEmpty ? null : v;
+    }
+    if (data.containsKey('alternateDoc')) {
+      final v = (data['alternateDoc'] ?? '').toString().trim();
+      quotation.alternateDoc = v.isEmpty ? null : v;
+    }
     if (data.containsKey('attentionRemark')) quotation.attentionRemark = data['attentionRemark'];
     if (data.containsKey('latitude')) quotation.latitude = data['latitude'];
     if (data.containsKey('longitude')) quotation.longitude = data['longitude'];
@@ -756,12 +769,43 @@ class QuotationService {
     }
   }
 
+  /// Coerces a quantity out of a checkout map.
+  ///
+  /// These maps are assembled by hand in several places and a field may arrive
+  /// as int, double, String or simply missing. Anything unreadable becomes 0
+  /// rather than null — a quantity column the server writes as Decimal cannot
+  /// take null, and a silent 0 is the same as the field not being entered.
+  static double _num(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
+  }
+
+  /// A quantity on its way into an SQ line.
+  ///
+  /// The last gate before the values leave the device. The columns behind
+  /// these are `decimal(18,4)`, so they would happily accept 2.499999 from a
+  /// float sum — and then the cart would show 2.50 while the SQ carried
+  /// something else. Rounding here means the order that gets stored is the
+  /// order that was on screen.
+  static double _qty(dynamic v) => Qty.round(_num(v));
+
+  /// Price of one base unit, derived from the pack price and the factor.
+  static double _basicPrice(dynamic unitPrice, dynamic factor) {
+    final price = _num(unitPrice);
+    final f = _num(factor);
+    return f > 0 ? price / f : price;
+  }
+
   /// Save quotation items to local database
   Future<void> _saveQuotationItemsLocally({
     required int companyCode,
     required String quotePreLabel,
     required List<Map<String, dynamic>> items,
   }) async {
+    // Same location the server copy gets — see _saveQuotationItemsToServer.
+    final locationCode = await LocationService().selectedCode();
+
     // STEP 1: Log quotation items BEFORE saving to database
     await QuotationLogger.logQuotationItems(
       companyCode: companyCode,
@@ -774,9 +818,12 @@ class QuotationService {
       final index = entry.key;
       final item = entry.value;
       
-      final quantity = item['quantity'] ?? 0.0;
+      final quantity = _qty(item['quantity']);
       final unitPrice = item['unitPrice'] ?? item['price'] ?? 0.0;
-      
+      final foc = _qty(item['foc']);
+      final quantityLoose = _qty(item['quantityLoose']);
+      final focLoose = _qty(item['focLoose']);
+
       final quoteItem = QuoteItem()
         ..companyCode = companyCode
         ..quotePreLabel = quotePreLabel
@@ -786,11 +833,14 @@ class QuotationService {
         ..factor = item['factor'] ?? 1.0
         ..status = 'A'
         ..quoteQuantity = quantity
-        ..quoteQuantityLoose = 0.0
-        ..quoteFoc = 0.0
-        ..quoteFocLoose = 0.0
+        ..quoteQuantityLoose = quantityLoose
+        ..quoteFoc = foc
+        ..quoteFocLoose = focLoose
         ..unitPrice = unitPrice
-        ..unitPriceBasic = unitPrice
+        // Price of a single base unit, not a repeat of the pack price. The
+        // two are only equal when Factor is 1, and the SI conversion prices
+        // loose lines off this column.
+        ..unitPriceBasic = _basicPrice(unitPrice, item['factor'])
         ..unitDiscountRate = 0.0
         ..unitDiscountAmount = 0.0
         ..taxRate = 0.0
@@ -800,16 +850,16 @@ class QuotationService {
         ..remark = (item['remark'] as String?)?.trim().isNotEmpty == true
             ? (item['remark'] as String).trim()
             : null
-        ..locationCode = 'FST'
+        ..locationCode = item['locationCode'] as String? ?? locationCode
         ..quoteQuantityOri = quantity
         ..unitPriceOri = unitPrice
         ..quantityOriginal = quantity
         ..addedDate = DateTime.now()
         // Set balance quantities to order quantities for tracking
         ..balanceQuantity = quantity
-        ..balanceQuantityLoose = 0.0
-        ..balanceFoc = 0.0
-        ..balanceFocLoose = 0.0;
+        ..balanceQuantityLoose = quantityLoose
+        ..balanceFoc = foc
+        ..balanceFocLoose = focLoose;
       
       return quoteItem;
     }).toList();
@@ -857,14 +907,24 @@ class QuotationService {
     required String quotePreLabel,
     required List<Map<String, dynamic>> items,
   }) async {
+    // The location the operator is working in. Was hardcoded 'FST', which
+    // stamped every line for every customer with one site's code. Null is fine
+    // — the server falls back to the quote header, then the user's default
+    // location — but sending it is more accurate, because the operator may
+    // have switched location since the header was written.
+    final locationCode = await LocationService().selectedCode();
+
     // Prepare items for server
     final itemsToSend = items.asMap().entries.map((entry) {
       final index = entry.key;
       final item = entry.value;
       
-      final quantity = item['quantity'] ?? 0.0;
+      final quantity = _qty(item['quantity']);
       final unitPrice = item['unitPrice'] ?? item['price'] ?? 0.0;
-      
+      final foc = _qty(item['foc']);
+      final quantityLoose = _qty(item['quantityLoose']);
+      final focLoose = _qty(item['focLoose']);
+
       return {
         'Company_Code': companyCode,
         'Quote_PreLabel': quotePreLabel,
@@ -874,15 +934,15 @@ class QuotationService {
         'Factor': item['factor'] ?? 1.0,
         'Status': 'A',
         'Quote_Quantity': quantity,
-        'Quote_Quantity_Loose': 0.0,
-        'Quote_Foc': 0.0,
-        'Quote_Foc_Loose': 0.0,
+        'Quote_Quantity_Loose': quantityLoose,
+        'Quote_Foc': foc,
+        'Quote_Foc_Loose': focLoose,
         'Balance_Quantity': quantity,
-        'Balance_Quantity_Loose': 0.0,
-        'Balance_Foc': 0.0,
-        'Balance_Foc_Loose': 0.0,
+        'Balance_Quantity_Loose': quantityLoose,
+        'Balance_Foc': foc,
+        'Balance_Foc_Loose': focLoose,
         'Unit_Price': unitPrice,
-        'Unit_Price_Basic': unitPrice,
+        'Unit_Price_Basic': _basicPrice(unitPrice, item['factor']),
         'Unit_Discount_Rate': 0.0,
         'Unit_Discount_Amount': 0.0,
         'Tax_Rate': 0.0,
@@ -890,7 +950,7 @@ class QuotationService {
         'Net_Amount': item['amount'] ?? (quantity * unitPrice),
         'Plu_No': item['pluNo'] ?? item['plu_no'],
         'Remark': item['remark'],
-        'Location_Code': 'FST',
+        'Location_Code': item['locationCode'] ?? locationCode,
         'Quote_Quantity_Ori': quantity,
         'Unit_Price_Ori': unitPrice,
         'Quantity_Original': quantity,
@@ -903,7 +963,7 @@ class QuotationService {
     try {
       final response = await http.post(
         Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: AppConfig.apiHeaders,
         body: jsonEncode({'items': itemsToSend}),
       ).timeout(
         const Duration(seconds: 4),
@@ -1024,7 +1084,7 @@ class QuotationService {
           
           final response = await http.post(
             Uri.parse(apiUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: AppConfig.apiHeaders,
             body: jsonEncode(itemsData),
           );
           

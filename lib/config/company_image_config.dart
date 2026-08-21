@@ -1,16 +1,26 @@
-/// Company-specific image configuration for inventory items
-class CompanyImageConfig {
-  // Company image base URL mappings
-  static const Map<int, String> _companyImageBaseUrls = {
-    1: 'http://fungseng.dyndns.org:88/ItemMasterImages', 
-    // Add more companies as needed
-    // 2: 'http://another-server.com/images',
-    // 3: 'http://third-server.com/inventory',
-  };
+import 'app_config.dart';
 
-  /// Get the image base URL for a specific company
+/// Where inventory photos come from.
+///
+/// The base URL lives in [AppConfig] with every other deployment setting. It
+/// used to be a hardcoded per-company map here, pointing at our own host —
+/// so a customer build kept pulling photos from our server unless someone
+/// remembered this second file existed.
+///
+/// The per-company override map is kept for the rare site that serves
+/// different companies from different hosts. It is empty by default, and
+/// everything falls through to [AppConfig].
+class CompanyImageConfig {
+  /// Optional per-company overrides. Leave empty unless one deployment really
+  /// does split images across hosts.
+  static const Map<int, String> _companyImageBaseUrls = {};
+
+  /// Get the image base URL for a specific company.
   static String? getImageBaseUrl(int companyCode) {
-    return _companyImageBaseUrls[companyCode];
+    final override = _companyImageBaseUrls[companyCode];
+    if (override != null && override.isNotEmpty) return override;
+    final configured = AppConfig.getImageBaseUrl();
+    return configured.isEmpty ? null : configured;
   }
 
   /// Construct the full image URL for an inventory item
@@ -42,10 +52,14 @@ class CompanyImageConfig {
     return _companyImageBaseUrls.keys.toList();
   }
 
-  /// Check if a company has image configuration
-  static bool hasImageConfig(int companyCode) {
-    return _companyImageBaseUrls.containsKey(companyCode);
-  }
+  /// Whether images can be resolved for this company.
+  ///
+  /// Must ask [getImageBaseUrl], not the override map. The map is empty by
+  /// default now that the base URL lives in [AppConfig] — checking it directly
+  /// reported "no images" for every company and silently disabled photos
+  /// across the whole app.
+  static bool hasImageConfig(int companyCode) =>
+      getImageBaseUrl(companyCode) != null;
 
   /// Add or update a company's image base URL (for dynamic configuration)
   static void setImageBaseUrl(int companyCode, String baseUrl) {

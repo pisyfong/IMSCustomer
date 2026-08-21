@@ -102,18 +102,23 @@ const InStockLocationSchema = CollectionSchema(
       name: r'reorderLevel',
       type: IsarType.double,
     ),
-    r'signedQtyOnHand': PropertySchema(
+    r'shelf': PropertySchema(
       id: 17,
+      name: r'shelf',
+      type: IsarType.string,
+    ),
+    r'signedQtyOnHand': PropertySchema(
+      id: 18,
       name: r'signedQtyOnHand',
       type: IsarType.double,
     ),
     r'skuNo': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'skuNo',
       type: IsarType.long,
     ),
     r'standardCost': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'standardCost',
       type: IsarType.double,
     )
@@ -163,6 +168,12 @@ int _inStockLocationEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.locationCode.length * 3;
+  {
+    final value = object.shelf;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -189,9 +200,10 @@ void _inStockLocationSerialize(
   writer.writeDouble(offsets[14], object.qtyOnSalesOrder);
   writer.writeDouble(offsets[15], object.qtyOnTrading);
   writer.writeDouble(offsets[16], object.reorderLevel);
-  writer.writeDouble(offsets[17], object.signedQtyOnHand);
-  writer.writeLong(offsets[18], object.skuNo);
-  writer.writeDouble(offsets[19], object.standardCost);
+  writer.writeString(offsets[17], object.shelf);
+  writer.writeDouble(offsets[18], object.signedQtyOnHand);
+  writer.writeLong(offsets[19], object.skuNo);
+  writer.writeDouble(offsets[20], object.standardCost);
 }
 
 InStockLocation _inStockLocationDeserialize(
@@ -219,8 +231,9 @@ InStockLocation _inStockLocationDeserialize(
   object.qtyOnSalesOrder = reader.readDoubleOrNull(offsets[14]);
   object.qtyOnTrading = reader.readDoubleOrNull(offsets[15]);
   object.reorderLevel = reader.readDoubleOrNull(offsets[16]);
-  object.skuNo = reader.readLong(offsets[18]);
-  object.standardCost = reader.readDoubleOrNull(offsets[19]);
+  object.shelf = reader.readStringOrNull(offsets[17]);
+  object.skuNo = reader.readLong(offsets[19]);
+  object.standardCost = reader.readDoubleOrNull(offsets[20]);
   return object;
 }
 
@@ -266,10 +279,12 @@ P _inStockLocationDeserializeProp<P>(
     case 16:
       return (reader.readDoubleOrNull(offset)) as P;
     case 17:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 18:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 19:
+      return (reader.readLong(offset)) as P;
+    case 20:
       return (reader.readDoubleOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2223,6 +2238,160 @@ extension InStockLocationQueryFilter
   }
 
   QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'shelf',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'shelf',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'shelf',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'shelf',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'shelf',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'shelf',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'shelf',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'shelf',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'shelf',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'shelf',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'shelf',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
+      shelfIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'shelf',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterFilterCondition>
       signedQtyOnHandEqualTo(
     double value, {
     double epsilon = Query.epsilon,
@@ -2675,6 +2844,19 @@ extension InStockLocationQuerySortBy
     });
   }
 
+  QueryBuilder<InStockLocation, InStockLocation, QAfterSortBy> sortByShelf() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shelf', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterSortBy>
+      sortByShelfDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shelf', Sort.desc);
+    });
+  }
+
   QueryBuilder<InStockLocation, InStockLocation, QAfterSortBy>
       sortBySignedQtyOnHand() {
     return QueryBuilder.apply(this, (query) {
@@ -2969,6 +3151,19 @@ extension InStockLocationQuerySortThenBy
     });
   }
 
+  QueryBuilder<InStockLocation, InStockLocation, QAfterSortBy> thenByShelf() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shelf', Sort.asc);
+    });
+  }
+
+  QueryBuilder<InStockLocation, InStockLocation, QAfterSortBy>
+      thenByShelfDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shelf', Sort.desc);
+    });
+  }
+
   QueryBuilder<InStockLocation, InStockLocation, QAfterSortBy>
       thenBySignedQtyOnHand() {
     return QueryBuilder.apply(this, (query) {
@@ -3132,6 +3327,13 @@ extension InStockLocationQueryWhereDistinct
     });
   }
 
+  QueryBuilder<InStockLocation, InStockLocation, QDistinct> distinctByShelf(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'shelf', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<InStockLocation, InStockLocation, QDistinct>
       distinctBySignedQtyOnHand() {
     return QueryBuilder.apply(this, (query) {
@@ -3273,6 +3475,12 @@ extension InStockLocationQueryProperty
       reorderLevelProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'reorderLevel');
+    });
+  }
+
+  QueryBuilder<InStockLocation, String?, QQueryOperations> shelfProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'shelf');
     });
   }
 
