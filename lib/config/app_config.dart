@@ -49,7 +49,8 @@ class AppConfig {
   /// Blank this if a site has no image server — the app then shows
   /// placeholders and skips the image preload entirely.
   static const String _productionImageBaseUrl =
-      'http://mdsmedan.getmyip.com:88/ItemMasterImages';
+      'http://fungseng.dyndns.org:88/ItemMasterImages';
+      //'http://mdsmedan.getmyip.com:88/ItemMasterImages';
 
   /// Shared secret sent as `X-API-Key` on the endpoints that mutate stock
   /// documents. Must match `API_KEY` in the server's `.env`; blank on both
