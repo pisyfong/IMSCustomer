@@ -25,7 +25,13 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.example.my_test_app"
-    compileSdk = 34
+    // 35, not 34, because audioplayers_android compiles against 35 and Gradle
+    // only warns rather than failing — a warning that becomes a runtime crash
+    // on whichever device first hits a missing symbol. compileSdk is backward
+    // compatible and targetSdk stays at 34, so app behaviour is unchanged.
+    // AGP 8.7.2 supports 35. Also unpins permission_handler, held below 12
+    // for this exact reason.
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

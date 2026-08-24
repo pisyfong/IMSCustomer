@@ -11,6 +11,7 @@ import '../widgets/ui_kit.dart';
 import 'cart_page.dart';
 import 'draft_list_page.dart';
 import 'previous_order_page.dart';
+import 'scan_mode_page.dart';
 import 'credit_note_page.dart';
 
 /// The ordering hub for the selected customer.
@@ -277,6 +278,10 @@ class _SalesQuotationMenuPageState extends State<SalesQuotationMenuPage> {
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       childAspectRatio: 1.45,
+      // Read in pairs, top to bottom: the two ways to build an order, then
+      // the two ways to revisit one, then the two side doors. Grouping by what
+      // the operator is trying to DO beats grouping by how often each is
+      // tapped — a grid this small is scanned whole, not hunted through.
       children: [
         _tile(
           icon: Icons.inventory_2_outlined,
@@ -305,20 +310,28 @@ class _SalesQuotationMenuPageState extends State<SalesQuotationMenuPage> {
           onTap: () => _openThen(const DraftListPage()),
         ),
         _tile(
-          icon: Icons.receipt_long_outlined,
-          title: 'Credit Note',
-          subtitle: 'Return or credit',
-          color: AppDesign.modCreditNote,
-          bg: AppDesign.modCreditNoteBg,
-          onTap: () => _openThen(const CreditNotePage()),
-        ),
-        _tile(
           icon: Icons.history,
           title: 'History',
           subtitle: 'Previous orders',
           color: AppDesign.modPacking,
           bg: AppDesign.modPackingBg,
           onTap: () => _openThen(const PreviousOrderPage()),
+        ),
+        _tile(
+          icon: Icons.qr_code_scanner,
+          title: 'Scan mode',
+          subtitle: 'Scan straight to cart',
+          color: AppDesign.modOrdering,
+          bg: AppDesign.modOrderingBg,
+          onTap: () => _openThen(const ScanModePage()),
+        ),
+        _tile(
+          icon: Icons.receipt_long_outlined,
+          title: 'Credit Note',
+          subtitle: 'Return or credit',
+          color: AppDesign.modCreditNote,
+          bg: AppDesign.modCreditNoteBg,
+          onTap: () => _openThen(const CreditNotePage()),
         ),
       ],
     );

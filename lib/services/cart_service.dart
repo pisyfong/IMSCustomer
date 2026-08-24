@@ -200,6 +200,71 @@ class CartService {
     }
   }
 
+  /// Moves a line onto a different unit, carrying that unit's factor and
+  /// price.
+  ///
+  /// Merges rather than duplicating when the cart already holds this SKU in
+  /// the target unit — company + SKU + UOM is the cart's identity for a line,
+  /// so two rows with the same triple would be two rows the checkout has to
+  /// reconcile, and the operator would see the quantity they just set appear
+  /// to vanish onto the other row.
+  ///
+  /// The quantity is NOT converted. Changing the unit means "this line was
+  /// always six cartons, not six pieces" — restating the count as 0.12 cartons
+  /// would be arithmetic nobody asked for. FOC and the base-unit quantities
+  /// travel with it unchanged for the same reason.
+  Future<void> updateUom(
+    int cartItemId, {
+    required String uom,
+    required double factor,
+    required double gstPrice,
+    required double unitPrice,
+  }) async {
+    try {
+      await isar.writeTxn(() async {
+        final item = await isar.cartItems.get(cartItemId);
+        if (item == null) return;
+
+        final target = uom.trim();
+        if (target.isEmpty || target.toUpperCase() == (item.uom ?? '').trim().toUpperCase()) {
+          return;
+        }
+
+        final twin = await isar.cartItems
+            .filter()
+            .companyCodeEqualTo(item.companyCode)
+            .skuNoEqualTo(item.skuNo)
+            .uomEqualTo(target)
+            .findFirst();
+
+        if (twin != null && twin.id != item.id) {
+          twin.quantity = twin.quantity + item.quantity;
+          twin.foc = Qty.round(twin.focQty + item.focQty);
+          twin.quantityLoose = Qty.round(twin.looseQty + item.looseQty);
+          twin.focLoose = Qty.round(twin.focLooseQty + item.focLooseQty);
+          twin.gstPrice = gstPrice;
+          twin.unitPrice = unitPrice;
+          await isar.cartItems.put(twin);
+          await isar.cartItems.delete(item.id);
+          print('📦 CART: Merged SKU ${item.skuNo} into existing $target line'
+              ', qty ${twin.quantity}');
+          return;
+        }
+
+        item.uom = target;
+        item.factor = factor > 0 ? factor : 1;
+        item.gstPrice = gstPrice;
+        item.unitPrice = unitPrice;
+        await isar.cartItems.put(item);
+        print('📦 CART: Item $cartItemId → uom $target'
+            ', factor ${item.factor}, price RM${gstPrice.toStringAsFixed(2)}');
+      });
+    } catch (e) {
+      print('❌ CART ERROR: Failed to change UOM: $e');
+      throw Exception('Failed to change UOM: $e');
+    }
+  }
+
   // Update item price (GST price)
   Future<void> updatePrice(int cartItemId, double newPrice) async {
     try {

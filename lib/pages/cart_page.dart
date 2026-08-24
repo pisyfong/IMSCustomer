@@ -33,10 +33,11 @@ class _CartPageState extends State<CartPage> {
   final CustomerStateService _customerStateService = CustomerStateService();
   late final PluService _pluService;
   final InventoryService _inventoryService = InventoryService();
-  
+
   List<CartItem> _cartItems = [];
   bool _isLoading = true;
   Map<String, dynamic> _cartSummary = {};
+
   /// Four controllers per cart line — Qty, Loose, FOC, FOC loose — in the same
   /// order the picking screen uses, so the two screens read alike.
   final Map<int, List<TextEditingController>> _qtyControllers = {};
@@ -68,14 +69,17 @@ class _CartPageState extends State<CartPage> {
 
   Future<void> _loadCart() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final selectedCompany = await _authService.getSelectedCompany();
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
-      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
-      
-      final summary = await _cartService.getCartSummary(companyCode: companyCode);
-      
+      final companyCode = companyCodeRaw is String
+          ? int.tryParse(companyCodeRaw) ?? 1
+          : companyCodeRaw as int;
+
+      final summary =
+          await _cartService.getCartSummary(companyCode: companyCode);
+
       setState(() {
         _cartItems = summary['items'] as List<CartItem>;
         _cartSummary = summary;
@@ -100,7 +104,8 @@ class _CartPageState extends State<CartPage> {
       final existingKeys = _qtyControllers.keys.toList();
       for (final key in existingKeys) {
         if (_cartItems.indexWhere((e) => e.id == key) == -1) {
-          for (final c in _qtyControllers[key] ?? const <TextEditingController>[]) {
+          for (final c
+              in _qtyControllers[key] ?? const <TextEditingController>[]) {
             c.dispose();
           }
           _qtyControllers.remove(key);
@@ -155,13 +160,13 @@ class _CartPageState extends State<CartPage> {
     // on screen. Removal is the trash button's job.
     _cartService
         .updateLineQuantities(
-          item.id,
-          quantity: field == _fQty ? item.quantity : null,
-          quantityLoose: field == _fLoose ? item.looseQty : null,
-          foc: field == _fFoc ? item.focQty : null,
-          focLoose: field == _fFocLoose ? item.focLooseQty : null,
-          removeWhenEmpty: false,
-        )
+      item.id,
+      quantity: field == _fQty ? item.quantity : null,
+      quantityLoose: field == _fLoose ? item.looseQty : null,
+      foc: field == _fFoc ? item.focQty : null,
+      focLoose: field == _fFocLoose ? item.focLooseQty : null,
+      removeWhenEmpty: false,
+    )
         .catchError((e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -221,11 +226,14 @@ class _CartPageState extends State<CartPage> {
     try {
       final selectedCompany = await _authService.getSelectedCompany();
       final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
-      final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
-      
+      final companyCode = companyCodeRaw is String
+          ? int.tryParse(companyCodeRaw) ?? 1
+          : companyCodeRaw as int;
+
       // Check permission
-      final canEdit = await _settingsService.canChangePrice(companyCode: companyCode);
-      
+      final canEdit =
+          await _settingsService.canChangePrice(companyCode: companyCode);
+
       if (!canEdit) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -237,7 +245,7 @@ class _CartPageState extends State<CartPage> {
         );
         return;
       }
-      
+
       // Show edit dialog
       if (!mounted) return;
       final newPrice = await showDialog<double>(
@@ -247,14 +255,14 @@ class _CartPageState extends State<CartPage> {
           initialPrice: item.gstPrice ?? 0.0,
         ),
       );
-      
+
       if (!mounted) return;
-      
+
       // User cancelled
       if (newPrice == null) {
         return;
       }
-      
+
       // Only update if price actually changed
       final currentPrice = item.gstPrice ?? 0.0;
       if ((newPrice - currentPrice).abs() > 0.001) {
@@ -272,7 +280,7 @@ class _CartPageState extends State<CartPage> {
           }
         }
       } // else unchanged: do nothing
-      
+
       // Do not dispose controller explicitly to avoid race during route pop
     } catch (e) {
       if (mounted) {
@@ -286,7 +294,7 @@ class _CartPageState extends State<CartPage> {
   Future<void> _updatePrice(CartItem item, double newPrice) async {
     try {
       await _cartService.updatePrice(item.id, newPrice);
-      
+
       // Use addPostFrameCallback to reload cart after the current frame
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -311,7 +319,7 @@ class _CartPageState extends State<CartPage> {
 
   Future<void> _showEditRemarksDialog(CartItem item) async {
     final controller = TextEditingController(text: item.remarks ?? '');
-    
+
     final newRemarks = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -344,7 +352,9 @@ class _CartPageState extends State<CartPage> {
         await _loadCart();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Remarks updated'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('✅ Remarks updated'),
+                backgroundColor: Colors.green),
           );
         }
       } catch (e) {
@@ -361,7 +371,7 @@ class _CartPageState extends State<CartPage> {
     try {
       final customerInfo = _customerStateService.getSelectedCustomerInfo();
       final customerCode = customerInfo?['code'] as String?;
-      
+
       if (customerCode == null || customerCode.isEmpty) {
         return null;
       }
@@ -383,7 +393,8 @@ class _CartPageState extends State<CartPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear Cart'),
-        content: const Text('Are you sure you want to remove all items from the cart?'),
+        content: const Text(
+            'Are you sure you want to remove all items from the cart?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -401,7 +412,9 @@ class _CartPageState extends State<CartPage> {
       try {
         final selectedCompany = await _authService.getSelectedCompany();
         final companyCodeRaw = selectedCompany?['companyCode'] ?? 1;
-        final companyCode = companyCodeRaw is String ? int.tryParse(companyCodeRaw) ?? 1 : companyCodeRaw as int;
+        final companyCode = companyCodeRaw is String
+            ? int.tryParse(companyCodeRaw) ?? 1
+            : companyCodeRaw as int;
         await _cartService.clearCart(companyCode: companyCode);
         await _loadCart();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -435,7 +448,8 @@ class _CartPageState extends State<CartPage> {
   // Future<void> _openBarcodeScanner() async { ... }
   // Future<void> _addScannedItemToCart(...) async { ... }
 
-  void _showBarcodePopup(BuildContext context, String barcodeData, String productName) {
+  void _showBarcodePopup(
+      BuildContext context, String barcodeData, String productName) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -464,7 +478,10 @@ class _CartPageState extends State<CartPage> {
                   Expanded(
                     child: Text(
                       'Scan Barcode',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade800),
                     ),
                   ),
                   GestureDetector(
@@ -475,7 +492,8 @@ class _CartPageState extends State<CartPage> {
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Icon(Icons.close, size: 18, color: Colors.grey.shade600),
+                      child: Icon(Icons.close,
+                          size: 18, color: Colors.grey.shade600),
                     ),
                   ),
                 ],
@@ -537,9 +555,8 @@ class _CartPageState extends State<CartPage> {
       backgroundColor: AppDesign.bg,
       appBar: UiKit.appBar(
         'Cart',
-        subtitle: count == 0
-            ? null
-            : '$count item${count == 1 ? '' : 's'} staged',
+        subtitle:
+            count == 0 ? null : '$count item${count == 1 ? '' : 's'} staged',
         actions: [
           if (count > 0)
             IconButton(
@@ -638,7 +655,7 @@ class _CartPageState extends State<CartPage> {
   /// keyboard.
   Widget _buildCartList() {
     return ReorderableListView.builder(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
       itemCount: _cartItems.length,
       buildDefaultDragHandles: false,
       onReorder: _onReorder,
@@ -669,34 +686,36 @@ class _CartPageState extends State<CartPage> {
           // Keyed by the row id, not the index: the controllers are keyed the
           // same way, so a dragged line keeps the text being typed into it.
           key: ValueKey(item.id),
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: 6),
           decoration: AppDesign.card(),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(6, 6, 4, 6),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildDragHandle(index),
-                const SizedBox(width: 6),
-                // Product Image (Smaller)
+                const SizedBox(width: 4),
+                // 40px, not 60. The thumbnail confirms an identification the
+                // operator has already made; it does not need to be legible
+                // from across a warehouse, and at 60 it set the row height on
+                // its own.
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   child: InventoryImageWidget(
                     companyCode: item.companyCode,
                     skuNo: item.skuNo,
                     uom: item.uom,
-                    width: 60,
-                    height: 60,
-                    borderRadius: BorderRadius.circular(8),
+                    width: 40,
+                    height: 40,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                 ),
-                const SizedBox(width: 10),
-                // Product Details
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Top row: Description + Delete
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -704,168 +723,116 @@ class _CartPageState extends State<CartPage> {
                             child: Text(
                               item.displayDescription,
                               style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
+                                  height: 1.15,
                                   color: AppDesign.ink),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          GestureDetector(
+                          // Icon-only actions. The barcode used to be RENDERED
+                          // inline at 60x24 beside two pill chips — three
+                          // decorated boxes to say what one line of text says,
+                          // and the barcode was unreadable at that size anyway,
+                          // so it existed only to be tapped.
+                          _iconAction(
+                            icon: Icons.close,
+                            color: AppDesign.inkSubtle,
                             onTap: () => _removeItem(item),
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Icon(Icons.close, size: 18, color: Colors.grey.shade400),
-                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      // SKU + UOM row
+                      const SizedBox(height: 2),
+                      // One metadata line: what it is, at what each, worth
+                      // what. Scaled down rather than wrapped so the row keeps
+                      // a predictable height.
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppDesign.bg,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '${item.skuNo}',
-                              style: const TextStyle(
-                                  fontSize: 10,
-                                  color: AppDesign.inkMuted,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppDesign.modPickingBg,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              item.displayUom,
-                              style: const TextStyle(
-                                  fontSize: 10,
-                                  color: AppDesign.info,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          // Customer PLU barcode (tappable for popup)
-                          FutureBuilder<String?>(
-                            future: _getCustomerPluBarcode(item.companyCode, item.skuNo),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(left: 6),
-                                  child: GestureDetector(
-                                    onTap: () => _showBarcodePopup(context, snapshot.data!, item.displayDescription),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade50,
-                                        border: Border.all(color: Colors.grey.shade300),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SizedBox(
-                                            height: 24,
-                                            width: 60,
-                                            child: _BarcodeDisplay(data: snapshot.data!),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Icon(Icons.zoom_in, size: 14, color: Colors.grey.shade500),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
-                        ],
-                      ),
-                      // Remarks row (tappable)
-                      const SizedBox(height: 4),
-                      GestureDetector(
-                        onTap: () => _showEditRemarksDialog(item),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.note_outlined, size: 10, color: Colors.orange.shade600),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  item.remarks?.isNotEmpty == true ? item.remarks! : 'Add remarks...',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: item.remarks?.isNotEmpty == true 
-                                        ? Colors.orange.shade700 
-                                        : Colors.grey.shade500,
-                                    fontStyle: item.remarks?.isNotEmpty == true 
-                                        ? FontStyle.italic 
-                                        : FontStyle.italic,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 2),
-                              Icon(Icons.edit, size: 10, color: Colors.orange.shade400),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Bottom row: Price + Quantity + Subtotal
-                      Row(
-                        children: [
-                          // Price (tappable)
-                          GestureDetector(
-                            onTap: () => _showEditPriceDialog(item),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    item.displayGstPrice,
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade700),
+                                  Text('${item.skuNo}', style: _metaStyle),
+                                  _metaSep,
+                                  Text(item.displayUom, style: _metaStyle),
+                                  _metaSep,
+                                  GestureDetector(
+                                    onTap: () => _showEditPriceDialog(item),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(item.displayGstPrice,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppDesign.accentInk,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                                decorationColor:
+                                                    AppDesign.accentInk)),
+                                        const SizedBox(width: 2),
+                                        const Icon(Icons.edit,
+                                            size: 9.5,
+                                            color: AppDesign.accentInk),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(width: 2),
-                                  Icon(Icons.edit, size: 10, color: Colors.green.shade600),
+                                  _metaSep,
+                                  Text(item.displayGstSubtotal,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppDesign.success,
+                                          letterSpacing: -0.2)),
                                 ],
                               ),
                             ),
                           ),
-                          const Spacer(),
-                          // Subtotal
-                          Text(
-                            item.displayGstSubtotal,
-                            style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w900,
-                                color: AppDesign.success,
-                                letterSpacing: -0.2),
+                          // The customer's own barcode, rendered inline.
+                          //
+                          // It shares the metadata line rather than taking one
+                          // of its own, so it costs the few pixels by which a
+                          // scannable strip is taller than a line of text
+                          // instead of a whole row. Still tappable: the popup
+                          // renders it at 220x80 with the digits spelled out,
+                          // which is the version you can read aloud or scan
+                          // off the screen.
+                          FutureBuilder<String?>(
+                            future: _getCustomerPluBarcode(
+                                item.companyCode, item.skuNo),
+                            builder: (context, snapshot) {
+                              final code = snapshot.data;
+                              if (code == null || code.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return GestureDetector(
+                                onTap: () => _showBarcodePopup(
+                                    context, code, item.displayDescription),
+                                behavior: HitTestBehavior.opaque,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: SizedBox(
+                                    height: 22,
+                                    width: 72,
+                                    child: _BarcodeDisplay(data: code),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
+                      // Remarks, always visible — an empty one has to invite
+                      // the tap, or nobody discovers a line can carry a note.
+                      // Kept to a single 16px strip: same information as the
+                      // old bordered box, without the border, the padding and
+                      // the row of its own.
+                      _remarksBar(item),
                       _buildQuantityFields(item),
                     ],
                   ),
@@ -875,6 +842,71 @@ class _CartPageState extends State<CartPage> {
           ),
         );
       },
+    );
+  }
+
+  /// The remarks strip for one line.
+  ///
+  /// Shown whether or not a remark exists: the placeholder is the only thing
+  /// that tells an operator the field is there at all. Muted when empty so it
+  /// reads as an invitation rather than content.
+  Widget _remarksBar(CartItem item) {
+    final has = item.remarks?.isNotEmpty == true;
+    return GestureDetector(
+      onTap: () => _showEditRemarksDialog(item),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Row(
+          children: [
+            Icon(Icons.note_outlined,
+                size: 11,
+                color: has ? AppDesign.warning : AppDesign.inkSubtle),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                has ? item.remarks! : 'Add remarks…',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: has ? FontWeight.w700 : FontWeight.w500,
+                  fontStyle: FontStyle.italic,
+                  color: has ? AppDesign.warning : AppDesign.inkSubtle,
+                ),
+              ),
+            ),
+            Icon(Icons.edit,
+                size: 9.5,
+                color: has ? AppDesign.warning : AppDesign.inkSubtle),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const TextStyle _metaStyle = TextStyle(
+      fontSize: 10.5, fontWeight: FontWeight.w700, color: AppDesign.inkMuted);
+
+  static const Widget _metaSep = Text('  |  ',
+      style: TextStyle(
+          fontSize: 10, fontWeight: FontWeight.w600, color: AppDesign.border));
+
+  /// A bare tap target. Deliberately not an IconButton: that enforces a 48dp
+  /// box, and three of them across the top of a row takes 144dp from the
+  /// description to show three glyphs.
+  Widget _iconAction({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        child: Icon(icon, size: 16, color: color),
+      ),
     );
   }
 
@@ -902,14 +934,13 @@ class _CartPageState extends State<CartPage> {
         item.focQty > 0 || item.looseQty > 0 || item.focLooseQty > 0;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _field('Qty', ctrls[_fQty],
-                  (t) => _applyField(item, _fQty, t),
+              _field('Qty', ctrls[_fQty], (t) => _applyField(item, _fQty, t),
                   accent: AppDesign.modOrdering),
               if (showLoose) ...[
                 const SizedBox(width: 6),
@@ -952,8 +983,8 @@ class _CartPageState extends State<CartPage> {
 
   /// A labelled numeric box. Same shape as the picking screen's field so the
   /// two quantity rows are visually interchangeable.
-  Widget _field(String label, TextEditingController ctrl,
-      ValueChanged<String> onChanged,
+  Widget _field(
+      String label, TextEditingController ctrl, ValueChanged<String> onChanged,
       {Color accent = AppDesign.modOrdering}) {
     return Expanded(
       child: Column(
@@ -961,21 +992,21 @@ class _CartPageState extends State<CartPage> {
         children: [
           Text(label,
               style: TextStyle(
-                  fontSize: 9,
+                  fontSize: 8,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
+                  letterSpacing: 0.2,
                   color: accent)),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           TextField(
             controller: ctrl,
             onChanged: onChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             decoration: InputDecoration(
               isDense: true,
               contentPadding:
-                  const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  const EdgeInsets.symmetric(vertical: 5, horizontal: 3),
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppDesign.radiusSm),
                   borderSide: const BorderSide(color: AppDesign.border)),
@@ -1031,7 +1062,8 @@ class _PriceEditDialogState extends State<_PriceEditDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialPrice.toStringAsFixed(2));
+    _controller =
+        TextEditingController(text: widget.initialPrice.toStringAsFixed(2));
     _isInitialized = true;
     print('💰 Price dialog initialized with ${widget.initialPrice}');
   }
@@ -1045,7 +1077,7 @@ class _PriceEditDialogState extends State<_PriceEditDialog> {
   void _submitPrice() {
     final value = _controller.text.trim();
     final price = double.tryParse(value);
-    
+
     if (price != null && price >= 0) {
       Navigator.pop(context, price);
     } else {
@@ -1082,7 +1114,8 @@ class _PriceEditDialogState extends State<_PriceEditDialog> {
             const SizedBox(height: 20),
             TextFormField(
               controller: _controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'GST Price (RM)',
                 prefixText: 'RM ',
@@ -1154,12 +1187,14 @@ class _BarcodePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     try {
-      barcode.make(
+      barcode
+          .make(
         data,
         width: size.width,
         height: size.height,
         drawText: false,
-      ).forEach((element) {
+      )
+          .forEach((element) {
         if (element is bc.BarcodeBar) {
           final paint = Paint()
             ..color = element.black ? Colors.black : Colors.white
