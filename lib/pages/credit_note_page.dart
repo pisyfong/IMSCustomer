@@ -17,8 +17,10 @@ import '../services/customer_state_service.dart';
 import '../services/location_service.dart';
 import '../services/plu_service.dart';
 import '../services/qty.dart';
+import '../services/source_document_service.dart';
 import '../theme/app_design.dart';
 import '../widgets/customer_picker_sheet.dart';
+import '../widgets/source_document_sheet.dart';
 import '../widgets/ui_kit.dart';
 import 'package:isar/isar.dart';
 
@@ -55,6 +57,18 @@ class _CreditNotePageState extends State<CreditNotePage> {
   AdjustmentBatch? _batch;
 
   final List<AdjustmentItem> _items = [];
+
+  /// The invoice or quotation this credit note is raised against, if the
+  /// operator picked one. Optional: a credit note can still be built from the
+  /// whole item master, which is what happens when there is nothing to credit
+  /// back against — a goodwill allowance, a damaged delivery with no document
+  /// to hand.
+  ///
+  /// When it IS set, the add-item sheet stops being a catalogue search and
+  /// becomes a list of that document's lines at that document's prices. That
+  /// is the difference between crediting what the customer was charged and
+  /// crediting what the item happens to cost today.
+  SourceDocument? _source;
   final _referenceCtrl = TextEditingController();
   final _remarkCtrl = TextEditingController();
 
@@ -384,6 +398,8 @@ class _CreditNotePageState extends State<CreditNotePage> {
           ]),
         ),
         const SizedBox(height: 8),
+        _sourceCard(),
+        const SizedBox(height: 8),
         _card([
           Row(
             children: [
@@ -419,6 +435,74 @@ class _CreditNotePageState extends State<CreditNotePage> {
         _itemsCard(),
       ],
     );
+  }
+
+  /// Offers the document to credit against, once a customer is known.
+  ///
+  /// Greyed rather than hidden without a customer: the operator needs to see
+  /// that the option exists and why it is unavailable, otherwise the natural
+  /// reading is that credit notes simply cannot reference an invoice.
+  Widget _sourceCard() {
+    final has = _source != null;
+    final enabled = _customer != null;
+    return InkWell(
+      onTap: enabled ? _pickSource : null,
+      borderRadius: BorderRadius.circular(AppDesign.radius),
+      child: _card([
+        Row(
+          children: [
+            _label('AGAINST DOCUMENT'),
+            const Spacer(),
+            if (has)
+              GestureDetector(
+                onTap: _clearSource,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 8, right: 4),
+                  child: Text('Clear',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppDesign.danger)),
+                ),
+              )
+            else
+              Text(enabled ? 'Select' : 'Pick a customer first',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: enabled
+                          ? AppDesign.modCreditNote
+                          : AppDesign.inkSubtle)),
+            Icon(Icons.chevron_right,
+                size: 16,
+                color: enabled ? AppDesign.modCreditNote : AppDesign.inkSubtle),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          has ? _source!.docNo : 'Optional — credit against an invoice or quotation',
+          style: TextStyle(
+              fontSize: has ? 13 : 12,
+              fontWeight: has ? FontWeight.w800 : FontWeight.w600,
+              color: has ? AppDesign.ink : AppDesign.inkSubtle),
+        ),
+        if (has)
+          Text(
+            '${_source!.kind.label} · ${_fmtDate(_source!.date)} · '
+            'RM ${_source!.netAmount.toStringAsFixed(2)}',
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppDesign.inkMuted),
+          ),
+      ]),
+    );
+  }
+
+  String _fmtDate(DateTime? d) {
+    if (d == null) return '—';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(d.day)}/${two(d.month)}/${d.year}';
   }
 
   Widget _codePicker() => Column(
@@ -614,9 +698,46 @@ class _CreditNotePageState extends State<CreditNotePage> {
       accent: AppDesign.modCreditNote,
     );
     if (picked != null) {
-      setState(() => _customer = picked);
+      // A document belongs to one customer. Changing the customer without
+      // dropping it would leave the sheet offering another customer's lines
+      // at another customer's prices.
+      final changed = picked.code != _customer?.code;
+      setState(() {
+        _customer = picked;
+        if (changed) _source = null;
+      });
       await _resolveTerm();
     }
+  }
+
+  Future<void> _pickSource() async {
+    final customer = _customer;
+    if (customer == null) return;
+    final picked = await SourceDocumentSheet.show(
+      context,
+      companyCode: _companyCode,
+      customerCode: customer.code,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _source = picked;
+      // The reference field is where the source document belongs on the
+      // header, so fill it — but never over something the operator typed.
+      if (_referenceCtrl.text.trim().isEmpty) {
+        _referenceCtrl.text = picked.docNo;
+      }
+    });
+  }
+
+  void _clearSource() {
+    final was = _source?.docNo;
+    setState(() {
+      _source = null;
+      // Only retract the reference if it is still exactly what we filled in.
+      if (was != null && _referenceCtrl.text.trim() == was) {
+        _referenceCtrl.clear();
+      }
+    });
   }
 
   Future<void> _addItem() async {
@@ -624,7 +745,10 @@ class _CreditNotePageState extends State<CreditNotePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddAdjustmentItemSheet(companyCode: _companyCode),
+      builder: (_) => _AddAdjustmentItemSheet(
+        companyCode: _companyCode,
+        source: _source,
+      ),
     );
     if (added != null) setState(() => _items.add(added));
   }
@@ -712,18 +836,115 @@ class _CreditNotePageState extends State<CreditNotePage> {
 
 /// Picks an item, its UOM and the quantities, and sets the credit price.
 ///
-/// The price starts at the item's selling price and is editable — which is
-/// what the legacy desktop app does, confirmed by tracing a real credit note:
-/// the field is the operator's to set, and the selling price is only where it
-/// begins. The item's costs are captured alongside it because legacy writes
-/// all three onto the line.
+/// Has two modes, and the difference matters.
+///
+/// **Free mode** — no source document. Searches the whole item master, and the
+/// price starts at the item's current selling price. This is what the legacy
+/// desktop app does, confirmed by tracing a real credit note: the field is the
+/// operator's to set, and the selling price is only where it begins.
+///
+/// **Against a document** — the operator picked an invoice or quotation on the
+/// page behind. The catalogue search is replaced by that document's own lines,
+/// and the quantity, UOM, factor and price all start at what the document
+/// says. Crediting a customer is crediting what they were charged, and today's
+/// master price is frequently not that. Everything stays editable, because a
+/// partial return is the common case.
 class _AddAdjustmentItemSheet extends StatefulWidget {
   final int companyCode;
-  const _AddAdjustmentItemSheet({required this.companyCode});
+
+  /// Null puts the sheet in free mode.
+  final SourceDocument? source;
+
+  const _AddAdjustmentItemSheet({required this.companyCode, this.source});
 
   @override
   State<_AddAdjustmentItemSheet> createState() =>
       _AddAdjustmentItemSheetState();
+}
+
+/// One selectable thing, whichever mode produced it.
+///
+/// Both modes end in the same act — set a quantity and a price and add a line
+/// — so they converge here rather than in two parallel submit paths that could
+/// drift apart.
+class _Candidate {
+  final int skuNo;
+  final String? pluNo;
+  final String? description;
+  final String uom;
+  final double factor;
+
+  /// Where the price field starts.
+  final double price;
+
+  /// Written to the line's `Selling_Price` for reference, as legacy does.
+  final double sellingPrice;
+
+  final double averageCost;
+  final double standardCost;
+  final double lastCost;
+
+  /// What the quantity fields start at. In free mode a single unit; against a
+  /// document, what the document billed.
+  final double suggestedQty;
+  final double suggestedFoc;
+
+  /// The document's own wording for this line, shown so the operator can see
+  /// what they are crediting against. Null in free mode.
+  final String? billed;
+
+  const _Candidate({
+    required this.skuNo,
+    required this.pluNo,
+    required this.description,
+    required this.uom,
+    required this.factor,
+    required this.price,
+    required this.sellingPrice,
+    required this.averageCost,
+    required this.standardCost,
+    required this.lastCost,
+    required this.suggestedQty,
+    required this.suggestedFoc,
+    this.billed,
+  });
+
+  factory _Candidate.fromInventory(InventoryItem item) => _Candidate(
+        skuNo: item.skuNo,
+        pluNo: item.pluNo?.toString(),
+        description: item.description,
+        uom: item.uom ?? '',
+        factor: 1,
+        price: item.gstPrice ?? item.price ?? 0,
+        sellingPrice: item.gstPrice ?? item.price ?? 0,
+        averageCost: item.averageCost ?? 0,
+        standardCost: item.standardCost ?? 0,
+        lastCost: item.lastCost ?? 0,
+        suggestedQty: 1,
+        suggestedFoc: 0,
+      );
+
+  factory _Candidate.fromSource(SourceDocumentLine l) {
+    final parts = <String>['${Qty.fmt(l.quantity)} ${l.uom}'];
+    if (l.quantityLoose > 0) parts.add('${Qty.fmt(l.quantityLoose)} basic');
+    if (l.foc > 0) parts.add('${Qty.fmt(l.foc)} FOC');
+    if (l.focLoose > 0) parts.add('${Qty.fmt(l.focLoose)} FOC basic');
+    return _Candidate(
+      skuNo: l.skuNo,
+      pluNo: l.pluNo,
+      description: l.description,
+      uom: l.uom,
+      factor: l.factor,
+      price: l.unitPrice,
+      sellingPrice: l.sellingPrice,
+      averageCost: l.averageCost,
+      standardCost: l.standardCost,
+      lastCost: l.lastCost,
+      suggestedQty: l.qtyInUom,
+      suggestedFoc: l.focInUom,
+      billed: parts.join(' · '),
+    );
+  }
 }
 
 class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
@@ -733,9 +954,22 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
   final _priceCtrl = TextEditingController();
   final _remarkCtrl = TextEditingController();
 
-  List<InventoryItem> _results = [];
-  InventoryItem? _picked;
-  bool _searching = false;
+  /// Every line of the source document, loaded once. Small enough to filter in
+  /// memory, and doing so keeps typing instant on a handheld.
+  List<_Candidate> _sourceLines = [];
+
+  List<_Candidate> _results = [];
+  _Candidate? _picked;
+  bool _busy = false;
+  String? _error;
+
+  bool get _fromSource => widget.source != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_fromSource) _loadSource();
+  }
 
   @override
   void dispose() {
@@ -747,13 +981,56 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
     super.dispose();
   }
 
+  Future<void> _loadSource() async {
+    setState(() => _busy = true);
+    try {
+      final lines = await SourceDocumentService().lines(
+        companyCode: widget.companyCode,
+        doc: widget.source!,
+      );
+      if (!mounted) return;
+      final cands = lines.map(_Candidate.fromSource).toList();
+      setState(() {
+        _sourceLines = cands;
+        _results = cands;
+        _busy = false;
+        _error = cands.isEmpty
+            ? 'No lines cached for ${widget.source!.docNo}. Run a sync, or '
+                'clear the document to pick from the item master.'
+            : null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = 'Could not read ${widget.source!.docNo}: $e';
+        });
+      }
+    }
+  }
+
   Future<void> _search(String q) async {
     final term = q.trim();
+
+    // Against a document the list is fixed; typing narrows it rather than
+    // reaching past the document into the catalogue.
+    if (_fromSource) {
+      final lower = term.toLowerCase();
+      setState(() => _results = term.isEmpty
+          ? _sourceLines
+          : _sourceLines
+              .where((e) =>
+                  (e.description ?? '').toLowerCase().contains(lower) ||
+                  '${e.skuNo}'.contains(term))
+              .toList());
+      return;
+    }
+
     if (term.length < 2) {
       setState(() => _results = []);
       return;
     }
-    setState(() => _searching = true);
+    setState(() => _busy = true);
     final all = await isar.inventoryItems
         .filter()
         .companyCodeEqualTo(widget.companyCode)
@@ -764,41 +1041,44 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
             (e.description ?? '').toLowerCase().contains(lower) ||
             '${e.skuNo}'.contains(term))
         .take(30)
+        .map(_Candidate.fromInventory)
         .toList();
     if (!mounted) return;
     setState(() {
       _results = hits;
-      _searching = false;
+      _busy = false;
     });
   }
 
-  void _pick(InventoryItem item) {
+  void _pick(_Candidate c) {
     setState(() {
-      _picked = item;
-      // Selling price as the starting point, editable.
-      final price = item.gstPrice ?? item.price ?? 0;
-      _priceCtrl.text = price.toStringAsFixed(2);
+      _picked = c;
+      _qtyCtrl.text = Qty.fmt(c.suggestedQty);
+      _focCtrl.text = Qty.fmt(c.suggestedFoc);
+      _priceCtrl.text = c.price.toStringAsFixed(2);
     });
   }
 
   Future<void> _submit() async {
-    final item = _picked;
-    if (item == null) return;
+    final c = _picked;
+    if (c == null) return;
 
     // Legacy resolves the PLU from In_Stock_PLU per SKU rather than reading
     // the single Plu_No on the master row — which is why the first upload
-    // wrote an empty Plu_No while every legacy line carries a barcode. Falls
-    // back to the master's value, then to blank.
-    var plu = (item.pluNo?.toString() ?? '').trim();
-    try {
-      final best = await PluService(isar).getDefaultPluForSku(item.skuNo);
-      final fromTable = (best?.pluNo ?? '').trim();
-      if (fromTable.isNotEmpty) plu = fromTable;
-    } catch (_) {
-      // The barcode is a convenience on the printed document, not a
-      // requirement — never block the line over it.
+    // wrote an empty Plu_No while every legacy line carries a barcode. A
+    // source document's own PLU is preferred: it is what was printed.
+    var plu = (c.pluNo ?? '').trim();
+    if (plu.isEmpty) {
+      try {
+        final best = await PluService(isar).getDefaultPluForSku(c.skuNo);
+        plu = (best?.pluNo ?? '').trim();
+      } catch (_) {
+        // The barcode is a convenience on the printed document, not a
+        // requirement — never block the line over it.
+      }
     }
     if (!mounted) return;
+
     final qty = Qty.tryParse(_qtyCtrl.text) ?? 0;
     final foc = Qty.tryParse(_focCtrl.text) ?? 0;
     if (qty <= 0 && foc <= 0) return;
@@ -809,18 +1089,18 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
         ..companyCode = widget.companyCode
         ..preLabel = ''
         ..sequenceNo = 0
-        ..skuNo = item.skuNo
+        ..skuNo = c.skuNo
         ..pluNo = plu
-        ..description = item.description
-        ..uom = item.uom ?? ''
-        ..factor = 1
+        ..description = c.description
+        ..uom = c.uom
+        ..factor = c.factor > 0 ? c.factor : 1
         ..quantity = qty
         ..focQuantity = foc
         ..unitCost = double.tryParse(_priceCtrl.text.trim()) ?? 0
-        ..sellingPrice = item.gstPrice ?? item.price ?? 0
-        ..averageCost = item.averageCost ?? 0
-        ..standardCost = item.standardCost ?? 0
-        ..lastCost = item.lastCost ?? 0
+        ..sellingPrice = c.sellingPrice
+        ..averageCost = c.averageCost
+        ..standardCost = c.standardCost
+        ..lastCost = c.lastCost
         ..remark = _remarkCtrl.text.trim(),
     );
   }
@@ -828,7 +1108,7 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.8,
+      initialChildSize: 0.95,
       maxChildSize: 0.95,
       minChildSize: 0.5,
       expand: false,
@@ -849,15 +1129,18 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
                 borderRadius: BorderRadius.circular(AppDesign.radiusPill),
               ),
             ),
+            if (_fromSource) _sourceBanner(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: TextField(
                 controller: _searchCtrl,
-                autofocus: true,
+                autofocus: !_fromSource,
                 onChanged: _search,
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: 'Search item or SKU',
+                  hintText: _fromSource
+                      ? 'Filter this document'
+                      : 'Search item or SKU',
                   prefixIcon: const Icon(Icons.search, size: 18),
                   border: OutlineInputBorder(
                       borderRadius:
@@ -867,33 +1150,27 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
             ),
             if (_picked != null) _pickedPanel(),
             Expanded(
-              child: _searching
+              child: _busy
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.separated(
-                      controller: controller,
-                      padding: const EdgeInsets.all(10),
-                      itemCount: _results.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 8, color: AppDesign.divider),
-                      itemBuilder: (context, i) {
-                        final r = _results[i];
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(r.description ?? 'SKU ${r.skuNo}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700)),
-                          subtitle: Text(
-                              '${r.skuNo} · ${r.uom ?? ''} · '
-                              'RM ${(r.gstPrice ?? r.price ?? 0).toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 11)),
-                          onTap: () => _pick(r),
-                        );
-                      },
-                    ),
+                  : _error != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(_error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppDesign.inkSubtle)),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: controller,
+                          padding: const EdgeInsets.all(10),
+                          itemCount: _results.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 8, color: AppDesign.divider),
+                          itemBuilder: (context, i) => _resultRow(_results[i]),
+                        ),
             ),
           ],
         ),
@@ -901,7 +1178,67 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
     );
   }
 
+  /// States plainly which document the prices below come from — without it the
+  /// sheet looks like an ordinary search that has inexplicably gone short.
+  Widget _sourceBanner() {
+    final s = widget.source!;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppDesign.modCreditNoteBg,
+        borderRadius: BorderRadius.circular(AppDesign.radiusSm),
+        border: Border.all(color: const Color(0x590F766E)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.receipt_long,
+              size: 15, color: AppDesign.modCreditNote),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              '${s.kind.label} ${s.docNo} · prices from this document',
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppDesign.modCreditNote),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resultRow(_Candidate c) {
+    final on = identical(c, _picked);
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      selected: on,
+      title: Text(c.description ?? 'SKU ${c.skuNo}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('${c.skuNo} · ${c.uom} · RM ${c.price.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 11)),
+          if (c.billed != null)
+            Text('billed ${c.billed}',
+                style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppDesign.inkMuted)),
+        ],
+      ),
+      onTap: () => _pick(c),
+    );
+  }
+
   Widget _pickedPanel() {
+    final c = _picked!;
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 10, 10, 0),
       padding: const EdgeInsets.all(10),
@@ -909,11 +1246,19 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_picked!.description ?? 'SKU ${_picked!.skuNo}',
+          Text(c.description ?? 'SKU ${c.skuNo}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12.5, fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+          if (c.billed != null) ...[
+            const SizedBox(height: 2),
+            Text('${widget.source!.docNo} billed ${c.billed}',
+                style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppDesign.inkMuted)),
+          ],
           const SizedBox(height: 8),
           Row(
             children: [
@@ -937,8 +1282,7 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
                     borderRadius: BorderRadius.circular(AppDesign.radius)),
               ),
               child: const Text('Add line',
-                  style:
-                      TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
@@ -951,14 +1295,11 @@ class _AddAdjustmentItemSheetState extends State<_AddAdjustmentItemSheet> {
         children: [
           Text(label,
               style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  color: accent)),
+                  fontSize: 9, fontWeight: FontWeight.w800, color: accent)),
           const SizedBox(height: 2),
           TextField(
             controller: c,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             decoration: InputDecoration(

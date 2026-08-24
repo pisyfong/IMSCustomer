@@ -1107,7 +1107,7 @@ class _QuantityEditDialogState extends State<_QuantityEditDialog> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _controller,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Quantity',
                 border: OutlineInputBorder(),

@@ -1,0 +1,743 @@
+﻿"event_time","event_name","database_name","app_name","host_name","login_name","session_id","tran_id","duration_ms","rows_affected","statement"
+"8/24/2026 3:16:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","1.536000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.260000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.161000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:16:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.661000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:16:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.307000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.186000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.593000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","13.609000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.584000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","14.330000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.272000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.173000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.106000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.063000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.112000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.060000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.223000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.152000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","1.172000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:16:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.236000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:16:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.712000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","9.311000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.242000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","4.158000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:16:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.340000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:16:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.181000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:00 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.188000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:00 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.075000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:05 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.307000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:05 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.108000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:10 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.298000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:10 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.229000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.162000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.272000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","2.410000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:17:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.566000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:17:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.272000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.166000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.294000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.174000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.588000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","14.206000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.248000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","5.060000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.615000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","13.082000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.279000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.161000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.307000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.167000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","2.497000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:17:43 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.507000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:17:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.280000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.163000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.119000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.057000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:17:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.591000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:17:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","14.407000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:00 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.592000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:00 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","9.459000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:05 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.147000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:05 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.096000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:10 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.124000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:10 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.072000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","5.120000","1","Select Costing_Exclude_Tax from PR_Setup Where Company_Code=1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.100000","1","Select Costing_Exclude_Tax from PR_Setup Where Company_Code=1"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.012000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","52.994000","1","exec MP_Setup_Sel @CompanyCode=1"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.006000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.369000","4","SELECT * FROM MP_Quote_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.514000","11","SELECT * FROM SY_Signature WHERE Company_Code=1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.028000","4","SELECT * FROM MP_Quote_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.040000","11","SELECT * FROM SY_Signature WHERE Company_Code=1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.024000","0","SELECT * FROM MP_SO_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.041000","4","SELECT * FROM MP_DO_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.372000","0","SELECT * FROM MP_SO_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.521000","4","SELECT * FROM MP_DO_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.002000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.004000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.327000","0","SELECT * FROM MP_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.514000","4","SELECT * FROM MP_Invoice_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.023000","0","SELECT * FROM MP_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.043000","4","SELECT * FROM MP_Invoice_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.022000","0","SELECT * FROM MP_SO_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.024000","0","SELECT * FROM MP_SD_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.325000","0","SELECT * FROM MP_SD_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.328000","0","SELECT * FROM MP_SO_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.002000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.006000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.547000","0","SELECT * FROM MP_SQ_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.090000","0","SELECT * FROM MP_SQ_Pick_Signature WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.014000","1","SELECT * FROM PI_Report_Copy WHERE Company_Code = 1 AND Type = 'SI'"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.043000","1","SELECT * FROM PI_Report_Copy WHERE Company_Code = 1 AND Type = 'SD'"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.060000","1","SELECT * FROM PI_Report_Copy WHERE Company_Code = 1 AND Type = 'SI'"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.617000","1","SELECT * FROM PI_Report_Copy WHERE Company_Code = 1 AND Type = 'SD'"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.002000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","5.130000","0","SELECT a.*, b.full_name FROM MP_Access_Control AS a INNER JOIN PI_Users AS b ON (a.user_id = b.user_id) ORDER BY a.user_id"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3272197","0.082000","0","SELECT a.*, b.full_name FROM MP_Access_Control AS a INNER JOIN PI_Users AS b ON (a.user_id = b.user_id) ORDER BY a.user_id"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.010000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","24.265000","1","SELECT a.Location_Code, b.Name, a.Def_Location , ISNULL(b.Customer_Alt_Company,'') AS Customer_Alt_Company , Vendor_Alt_Company = ISNULL(b.Vendor_Alt_Company,''), CustAltCoName = ISNULL(c.Name,''), VendorAltCoName = ISNULL(d.Name,''), b.Company_No, AR_Bank_Code = ISNULL(b.AR_Receipt_Bank,''), AR_Bank_Name = ISNULL(e.Bank_Name,''),AP_Bank_Code = ISNULL(b.AP_Payment_Bank,''), AP_Bank_Name = ISNULL(f.Bank_Name,'') FROM PI_User_Company_Access_Location a INNER JOIN PI_Company_Location b ON (a.Company_Code=b.Company_Code AND a.Location_Code=b.Location_Code) LEFT OUTER JOIN ACC.dbo.AR_Customer c ON ( b.Company_No=c.Company_Code AND   b.Customer_Alt_Company=c.Code) LEFT OUTER JOIN ACC.dbo.AP_Vendor d ON ( b.Company_No=d.Company_Code AND   b.Vendor_Alt_Company=d.Code) LEFT OUTER JOIN ACC.dbo.SY_Bank e ON (b.Company_No=e.Company_Code AND b.AR_Receipt_Bank=e.Bank_Code) LEFT OUTER JOIN ACC.dbo.SY_Bank f ON (b.Company_No=f.Company_Code AND b.AP_Payment_Bank=f.Bank_Code) WHERE a.Company_Code=1 AND a.User_ID=1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3272287","0.684000","1","SELECT a.Location_Code, b.Name, a.Def_Location , ISNULL(b.Customer_Alt_Company,'') AS Customer_Alt_Company , Vendor_Alt_Company = ISNULL(b.Vendor_Alt_Company,''), CustAltCoName = ISNULL(c.Name,''), VendorAltCoName = ISNULL(d.Name,''), b.Company_No, AR_Bank_Code = ISNULL(b.AR_Receipt_Bank,''), AR_Bank_Name = ISNULL(e.Bank_Name,''),AP_Bank_Code = ISNULL(b.AP_Payment_Bank,''), AP_Bank_Name = ISNULL(f.Bank_Name,'') FROM PI_User_Company_Access_Location a INNER JOIN PI_Company_Location b ON (a.Company_Code=b.Company_Code AND a.Location_Code=b.Location_Code) LEFT OUTER JOIN ACC.dbo.AR_Customer c ON ( b.Company_No=c.Company_Code AND   b.Customer_Alt_Company=c.Code) LEFT OUTER JOIN ACC.dbo.AP_Vendor d ON ( b.Company_No=d.Company_Code AND   b.Vendor_Alt_Company=d.Code) LEFT OUTER JOIN ACC.dbo.SY_Bank e ON (b.Company_No=e.Company_Code AND b.AR_Receipt_Bank=e.Bank_Code) LEFT OUTER JOIN ACC.dbo.SY_Bank f ON (b.Company_No=f.Company_Code AND b.AP_Payment_Bank=f.Bank_Code) WHERE a.Company_Code=1 AND a.User_ID=1"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.010000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","3.025000","0","SELECT Sku_No,Description From IN_Stock Where Company_Code=0"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.042000","0","SELECT Sku_No,Description From IN_Stock Where Company_Code=0"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.006000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.004000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.605000","0","Select Project_Code, Description From SY_Project WHERE Company_Code=1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.034000","0","Select Project_Code, Description From SY_Project WHERE Company_Code=1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.035000","0","Select Location_Code,Description From SY_Location WHERE Company_Code=1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.502000","0","Select Location_Code,Description From SY_Location WHERE Company_Code=1"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.009000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.005000","0","exec sp_reset_connection"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.730000","11","SELECT * FROM [dbo].[MP_Representative]  WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.047000","11","SELECT * FROM [dbo].[MP_Representative]  WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.038000","1","SELECT Count(Location_Code) FROM [dbo].[Pi_Company_Location]  WHERE Company_Code = 1"
+"8/24/2026 3:18:11 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.782000","1","SELECT Count(Location_Code) FROM [dbo].[Pi_Company_Location]  WHERE Company_Code = 1"
+"8/24/2026 3:18:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.174000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.305000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","2.605000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:18:13 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.594000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:18:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.166000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.087000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.273000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.164000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.339000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.175000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:28 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.020000","0","exec sp_reset_connection"
+"8/24/2026 3:18:28 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","1.528000","11","Select Representative_ID as ID, Full_Name From RMS.dbo.MP_Representative Where Status='A' AND Company_Code=1"
+"8/24/2026 3:18:28 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.130000","11","Select Representative_ID as ID, Full_Name From RMS.dbo.MP_Representative Where Status='A' AND Company_Code=1"
+"8/24/2026 3:18:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.293000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.172000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.239000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","4.225000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:39 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.011000","0","exec sp_reset_connection"
+"8/24/2026 3:18:39 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","110.592000","7","exec MP_Customer_SelByCode @CompanyCode=1,@Code=N'01/A01',@UserID=1,@GetByLocation=N'Y',@FilterString=N' AND a.Company_Code = 1',@CompanyCode2=1"
+"8/24/2026 3:18:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.587000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","3.091000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.308000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.178000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","2.433000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:18:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.537000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:18:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.279000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.163000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:49 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.045000","0","exec sp_reset_connection"
+"8/24/2026 3:18:49 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3272886","27.815000","1","SELECT a.sku_no,a.Cku_No, a.uom, a.status, a.grp, a.dept, a.subdept, a.category, a.description, a.article_no, a.size, a.actual_size, a.color, a.type, a.open_price, a.company_comm_rate, a.promoter_comm_rate, a.company_comm_rate1, a.promoter_comm_rate1, a.company_comm_rate2, a.promoter_comm_rate2, a.average_cost, a.standard_cost, a.last_cost, a.fifo_cost, a.misc_cost, a1.qty_on_hand, a1.qty_on_order, a1.qty_on_request, a1.qty_on_received, a1.qty_on_customer_return, a1.qty_on_return, a1.qty_on_trading, a1.qty_on_sales, a1.qty_on_sales_order, a1.qty_on_exchange, a1.qty_on_repair, a1.qty_on_adj_in, a1.qty_on_adj_out, a1.qty_on_adj_kiv, a.discountable, a.return_due, w.description AS grpdesc, x.description AS deptdesc, y.description AS subdesc, z.description AS catdesc,a2.Description as ColorDesc, a.Brand, a.Ref1, a.Ref2, a.Ref3, a.Ref4, a.Ref1_Text, a.Ref2_Text, a.Ref3_Text,a.Ref4_Text, j.Description AS Ref1Desc, k.Description AS Ref2Desc, m.Description AS Ref3Desc, n.Description AS Ref4Desc, a.Open_Code, a.Allow_Zero_Price, a.Give_Point, a.Give_Rebate, a.Check_Quota, a.Record_Name, BrandDesc=p.Description, a.Purchase_GST_Code,a.Supply_GST_Code,r.Rate as PurchaseGSTRate, s.Rate as SupplyGSTRate, a.Special_Msg, a.Web_Special_Msg ,a.Pack_Size,a.Pack_Size_Desc,a.Pack_Size_Uom,(a.Qty_On_Hand + a.Qty_On_Received + a.Qty_On_Customer_Return + a.Qty_On_Adj_In - a.Qty_On_Adj_Out - a.Qty_On_Sales_Order-a.Qty_On_Trading - a.Qty_On_Return) as ItemMasterStkQty FROM In_Stock a INNER JOIN PI_Group w ON (w.grp = a.grp AND w.Company_Code=a.Company_Code) INNER JOIN PI_Department x ON (x.grp = w.grp and x.dept = a.dept AND x.Company_Code=a.Company_Code) INNER JOIN PI_Sub_Dept y ON (y.grp = x.grp and y.dept = x.dept and y.subdept = a.subdept AND y.Company_Code=a.Company_Code) INNER JOIN PI_Category z ON (z.grp = y.grp and z.dept = y.dept and z.subdept = y.subdept and z.category = a.category AND z.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref1 J ON (j.Ref1 = a.Ref1  AND j.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref2 k ON (k.Ref2 = a.Ref2  AND k.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref3 m ON (m.Ref3 = a.Ref3  AND m.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref4 n ON (n.Ref4 = a.Ref4  AND n.Company_Code=a.Company_Code) LEFT OUTER JOIN PI_Brand p ON (p.Code = a.Brand AND p.Company_Code=a.Company_Code) Left Outer Join IN_Stock_Location a1 ON (a.Sku_No=a1.Sku_No AND a.Company_Code=a1.Company_Code AND a1.Location_Code='FST') Left Outer Join SY_Color a2 ON (a.Color=a2.Code AND a.Company_Code=a2.Company_Code) LEFT OUTER JOIN SY_Purchase_GST_Code r ON (r.Code=a.Purchase_GST_Code) LEFT OUTER JOIN SY_Supply_GST_Code s ON (s.Code=a.Supply_GST_Code) WHERE a.sku_no = 1 AND a.Company_Code=1"
+"8/24/2026 3:18:49 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3272886","1.689000","1","SELECT a.sku_no,a.Cku_No, a.uom, a.status, a.grp, a.dept, a.subdept, a.category, a.description, a.article_no, a.size, a.actual_size, a.color, a.type, a.open_price, a.company_comm_rate, a.promoter_comm_rate, a.company_comm_rate1, a.promoter_comm_rate1, a.company_comm_rate2, a.promoter_comm_rate2, a.average_cost, a.standard_cost, a.last_cost, a.fifo_cost, a.misc_cost, a1.qty_on_hand, a1.qty_on_order, a1.qty_on_request, a1.qty_on_received, a1.qty_on_customer_return, a1.qty_on_return, a1.qty_on_trading, a1.qty_on_sales, a1.qty_on_sales_order, a1.qty_on_exchange, a1.qty_on_repair, a1.qty_on_adj_in, a1.qty_on_adj_out, a1.qty_on_adj_kiv, a.discountable, a.return_due, w.description AS grpdesc, x.description AS deptdesc, y.description AS subdesc, z.description AS catdesc,a2.Description as ColorDesc, a.Brand, a.Ref1, a.Ref2, a.Ref3, a.Ref4, a.Ref1_Text, a.Ref2_Text, a.Ref3_Text,a.Ref4_Text, j.Description AS Ref1Desc, k.Description AS Ref2Desc, m.Description AS Ref3Desc, n.Description AS Ref4Desc, a.Open_Code, a.Allow_Zero_Price, a.Give_Point, a.Give_Rebate, a.Check_Quota, a.Record_Name, BrandDesc=p.Description, a.Purchase_GST_Code,a.Supply_GST_Code,r.Rate as PurchaseGSTRate, s.Rate as SupplyGSTRate, a.Special_Msg, a.Web_Special_Msg ,a.Pack_Size,a.Pack_Size_Desc,a.Pack_Size_Uom,(a.Qty_On_Hand + a.Qty_On_Received + a.Qty_On_Customer_Return + a.Qty_On_Adj_In - a.Qty_On_Adj_Out - a.Qty_On_Sales_Order-a.Qty_On_Trading - a.Qty_On_Return) as ItemMasterStkQty FROM In_Stock a INNER JOIN PI_Group w ON (w.grp = a.grp AND w.Company_Code=a.Company_Code) INNER JOIN PI_Department x ON (x.grp = w.grp and x.dept = a.dept AND x.Company_Code=a.Company_Code) INNER JOIN PI_Sub_Dept y ON (y.grp = x.grp and y.dept = x.dept and y.subdept = a.subdept AND y.Company_Code=a.Company_Code) INNER JOIN PI_Category z ON (z.grp = y.grp and z.dept = y.dept and z.subdept = y.subdept and z.category = a.category AND z.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref1 J ON (j.Ref1 = a.Ref1  AND j.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref2 k ON (k.Ref2 = a.Ref2  AND k.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref3 m ON (m.Ref3 = a.Ref3  AND m.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref4 n ON (n.Ref4 = a.Ref4  AND n.Company_Code=a.Company_Code) LEFT OUTER JOIN PI_Brand p ON (p.Code = a.Brand AND p.Company_Code=a.Company_Code) Left Outer Join IN_Stock_Location a1 ON (a.Sku_No=a1.Sku_No AND a.Company_Code=a1.Company_Code AND a1.Location_Code='FST') Left Outer Join SY_Color a2 ON (a.Color=a2.Code AND a.Company_Code=a2.Company_Code) LEFT OUTER JOIN SY_Purchase_GST_Code r ON (r.Code=a.Purchase_GST_Code) LEFT OUTER JOIN SY_Supply_GST_Code s ON (s.Code=a.Supply_GST_Code) WHERE a.sku_no = 1 AND a.Company_Code=1"
+"8/24/2026 3:18:49 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3272886","0.106000","1","SELECT a.sku_no, a.uom, b.description, a.status, a.factor, a.price, a.Remark, a.Pack_Size_Desc, Total_Volume, Total_Volume_Uom,a.SI_Unit_DIsc,SI_Unit_DIsc_Rate,Inclusive_Tax, GST_Price FROM In_Stock_UOM a INNER JOIN PI_Uom b ON (b.uom = a.uom AND b.Company_Code=a.Company_Code) WHERE a.sku_no = 1 And a.Company_Code = 1 order by a.factor"
+"8/24/2026 3:18:49 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3272886","1.658000","1","SELECT a.sku_no, a.uom, b.description, a.status, a.factor, a.price, a.Remark, a.Pack_Size_Desc, Total_Volume, Total_Volume_Uom,a.SI_Unit_DIsc,SI_Unit_DIsc_Rate,Inclusive_Tax, GST_Price FROM In_Stock_UOM a INNER JOIN PI_Uom b ON (b.uom = a.uom AND b.Company_Code=a.Company_Code) WHERE a.sku_no = 1 And a.Company_Code = 1 order by a.factor"
+"8/24/2026 3:18:49 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.010000","0","exec sp_reset_connection"
+"8/24/2026 3:18:49 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.007000","0","exec sp_reset_connection"
+"8/24/2026 3:18:49 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","25.168000","0","SELECT TOP 1 a.Invoice_Prelabel, b.Unit_Price FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C' AND a.Company_Code=1 AND a.Customer='01/A01' AND b.Sku_No=1 AND b.Uom='ROL' ORDER BY Invoice_Date DESC"
+"8/24/2026 3:18:49 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273142","6.888000","0","SELECT TOP 1 a.Invoice_Prelabel, b.Unit_Price FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C' AND a.Company_Code=1 AND a.Customer='01/A01' AND b.Sku_No=1 AND b.Uom='ROL' ORDER BY Invoice_Date DESC"
+"8/24/2026 3:18:49 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273162","3.778000","0","SELECT TOP 2 a.Invoice_Prelabel,a.Invoice_Date, b.Unit_Price,b.UOM,b.Quantity,b.Factor,a.Currency, b.Remark, b.Foc as Foc, 0 as CN_Total_Amount FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C'  AND a.Customer='01/A01'  AND a.Company_Code=1 AND b.Sku_No=1ORDER BY Invoice_Date DESC"
+"8/24/2026 3:18:49 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","5.640000","0","SELECT TOP 2 a.Invoice_Prelabel,a.Invoice_Date, b.Unit_Price,b.UOM,b.Quantity,b.Factor,a.Currency, b.Remark, b.Foc as Foc, 0 as CN_Total_Amount FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C'  AND a.Customer='01/A01'  AND a.Company_Code=1 AND b.Sku_No=1ORDER BY Invoice_Date DESC"
+"8/24/2026 3:18:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.162000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.064000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:18:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.130000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:18:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.072000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:00 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.135000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:00 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.051000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:05 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.269000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:05 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.133000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:08 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.009000","0","exec sp_reset_connection"
+"8/24/2026 3:19:08 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273234","25.116000","1","SELECT a.sku_no,a.Cku_No, a.uom, a.status, a.grp, a.dept, a.subdept, a.category, a.description, a.article_no, a.size, a.actual_size, a.color, a.type, a.open_price, a.company_comm_rate, a.promoter_comm_rate, a.company_comm_rate1, a.promoter_comm_rate1, a.company_comm_rate2, a.promoter_comm_rate2, a.average_cost, a.standard_cost, a.last_cost, a.fifo_cost, a.misc_cost, a1.qty_on_hand, a1.qty_on_order, a1.qty_on_request, a1.qty_on_received, a1.qty_on_customer_return, a1.qty_on_return, a1.qty_on_trading, a1.qty_on_sales, a1.qty_on_sales_order, a1.qty_on_exchange, a1.qty_on_repair, a1.qty_on_adj_in, a1.qty_on_adj_out, a1.qty_on_adj_kiv, a.discountable, a.return_due, w.description AS grpdesc, x.description AS deptdesc, y.description AS subdesc, z.description AS catdesc,a2.Description as ColorDesc, a.Brand, a.Ref1, a.Ref2, a.Ref3, a.Ref4, a.Ref1_Text, a.Ref2_Text, a.Ref3_Text,a.Ref4_Text, j.Description AS Ref1Desc, k.Description AS Ref2Desc, m.Description AS Ref3Desc, n.Description AS Ref4Desc, a.Open_Code, a.Allow_Zero_Price, a.Give_Point, a.Give_Rebate, a.Check_Quota, a.Record_Name, BrandDesc=p.Description, a.Purchase_GST_Code,a.Supply_GST_Code,r.Rate as PurchaseGSTRate, s.Rate as SupplyGSTRate, a.Special_Msg, a.Web_Special_Msg ,a.Pack_Size,a.Pack_Size_Desc,a.Pack_Size_Uom,(a.Qty_On_Hand + a.Qty_On_Received + a.Qty_On_Customer_Return + a.Qty_On_Adj_In - a.Qty_On_Adj_Out - a.Qty_On_Sales_Order-a.Qty_On_Trading - a.Qty_On_Return) as ItemMasterStkQty FROM In_Stock a INNER JOIN PI_Group w ON (w.grp = a.grp AND w.Company_Code=a.Company_Code) INNER JOIN PI_Department x ON (x.grp = w.grp and x.dept = a.dept AND x.Company_Code=a.Company_Code) INNER JOIN PI_Sub_Dept y ON (y.grp = x.grp and y.dept = x.dept and y.subdept = a.subdept AND y.Company_Code=a.Company_Code) INNER JOIN PI_Category z ON (z.grp = y.grp and z.dept = y.dept and z.subdept = y.subdept and z.category = a.category AND z.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref1 J ON (j.Ref1 = a.Ref1  AND j.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref2 k ON (k.Ref2 = a.Ref2  AND k.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref3 m ON (m.Ref3 = a.Ref3  AND m.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref4 n ON (n.Ref4 = a.Ref4  AND n.Company_Code=a.Company_Code) LEFT OUTER JOIN PI_Brand p ON (p.Code = a.Brand AND p.Company_Code=a.Company_Code) Left Outer Join IN_Stock_Location a1 ON (a.Sku_No=a1.Sku_No AND a.Company_Code=a1.Company_Code AND a1.Location_Code='FST') Left Outer Join SY_Color a2 ON (a.Color=a2.Code AND a.Company_Code=a2.Company_Code) LEFT OUTER JOIN SY_Purchase_GST_Code r ON (r.Code=a.Purchase_GST_Code) LEFT OUTER JOIN SY_Supply_GST_Code s ON (s.Code=a.Supply_GST_Code) WHERE a.sku_no = 6 AND a.Company_Code=1"
+"8/24/2026 3:19:08 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273234","11.419000","1","SELECT a.sku_no,a.Cku_No, a.uom, a.status, a.grp, a.dept, a.subdept, a.category, a.description, a.article_no, a.size, a.actual_size, a.color, a.type, a.open_price, a.company_comm_rate, a.promoter_comm_rate, a.company_comm_rate1, a.promoter_comm_rate1, a.company_comm_rate2, a.promoter_comm_rate2, a.average_cost, a.standard_cost, a.last_cost, a.fifo_cost, a.misc_cost, a1.qty_on_hand, a1.qty_on_order, a1.qty_on_request, a1.qty_on_received, a1.qty_on_customer_return, a1.qty_on_return, a1.qty_on_trading, a1.qty_on_sales, a1.qty_on_sales_order, a1.qty_on_exchange, a1.qty_on_repair, a1.qty_on_adj_in, a1.qty_on_adj_out, a1.qty_on_adj_kiv, a.discountable, a.return_due, w.description AS grpdesc, x.description AS deptdesc, y.description AS subdesc, z.description AS catdesc,a2.Description as ColorDesc, a.Brand, a.Ref1, a.Ref2, a.Ref3, a.Ref4, a.Ref1_Text, a.Ref2_Text, a.Ref3_Text,a.Ref4_Text, j.Description AS Ref1Desc, k.Description AS Ref2Desc, m.Description AS Ref3Desc, n.Description AS Ref4Desc, a.Open_Code, a.Allow_Zero_Price, a.Give_Point, a.Give_Rebate, a.Check_Quota, a.Record_Name, BrandDesc=p.Description, a.Purchase_GST_Code,a.Supply_GST_Code,r.Rate as PurchaseGSTRate, s.Rate as SupplyGSTRate, a.Special_Msg, a.Web_Special_Msg ,a.Pack_Size,a.Pack_Size_Desc,a.Pack_Size_Uom,(a.Qty_On_Hand + a.Qty_On_Received + a.Qty_On_Customer_Return + a.Qty_On_Adj_In - a.Qty_On_Adj_Out - a.Qty_On_Sales_Order-a.Qty_On_Trading - a.Qty_On_Return) as ItemMasterStkQty FROM In_Stock a INNER JOIN PI_Group w ON (w.grp = a.grp AND w.Company_Code=a.Company_Code) INNER JOIN PI_Department x ON (x.grp = w.grp and x.dept = a.dept AND x.Company_Code=a.Company_Code) INNER JOIN PI_Sub_Dept y ON (y.grp = x.grp and y.dept = x.dept and y.subdept = a.subdept AND y.Company_Code=a.Company_Code) INNER JOIN PI_Category z ON (z.grp = y.grp and z.dept = y.dept and z.subdept = y.subdept and z.category = a.category AND z.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref1 J ON (j.Ref1 = a.Ref1  AND j.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref2 k ON (k.Ref2 = a.Ref2  AND k.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref3 m ON (m.Ref3 = a.Ref3  AND m.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref4 n ON (n.Ref4 = a.Ref4  AND n.Company_Code=a.Company_Code) LEFT OUTER JOIN PI_Brand p ON (p.Code = a.Brand AND p.Company_Code=a.Company_Code) Left Outer Join IN_Stock_Location a1 ON (a.Sku_No=a1.Sku_No AND a.Company_Code=a1.Company_Code AND a1.Location_Code='FST') Left Outer Join SY_Color a2 ON (a.Color=a2.Code AND a.Company_Code=a2.Company_Code) LEFT OUTER JOIN SY_Purchase_GST_Code r ON (r.Code=a.Purchase_GST_Code) LEFT OUTER JOIN SY_Supply_GST_Code s ON (s.Code=a.Supply_GST_Code) WHERE a.sku_no = 6 AND a.Company_Code=1"
+"8/24/2026 3:19:08 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273234","0.411000","2","SELECT a.sku_no, a.uom, b.description, a.status, a.factor, a.price, a.Remark, a.Pack_Size_Desc, Total_Volume, Total_Volume_Uom,a.SI_Unit_DIsc,SI_Unit_DIsc_Rate,Inclusive_Tax, GST_Price FROM In_Stock_UOM a INNER JOIN PI_Uom b ON (b.uom = a.uom AND b.Company_Code=a.Company_Code) WHERE a.sku_no = 6 And a.Company_Code = 1 order by a.factor"
+"8/24/2026 3:19:08 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273234","3.601000","2","SELECT a.sku_no, a.uom, b.description, a.status, a.factor, a.price, a.Remark, a.Pack_Size_Desc, Total_Volume, Total_Volume_Uom,a.SI_Unit_DIsc,SI_Unit_DIsc_Rate,Inclusive_Tax, GST_Price FROM In_Stock_UOM a INNER JOIN PI_Uom b ON (b.uom = a.uom AND b.Company_Code=a.Company_Code) WHERE a.sku_no = 6 And a.Company_Code = 1 order by a.factor"
+"8/24/2026 3:19:08 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.014000","0","exec sp_reset_connection"
+"8/24/2026 3:19:08 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.003000","0","exec sp_reset_connection"
+"8/24/2026 3:19:08 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","7.716000","0","SELECT TOP 1 a.Invoice_Prelabel, b.Unit_Price FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C' AND a.Company_Code=1 AND a.Customer='01/A01' AND b.Sku_No=6 AND b.Uom='EA' ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:08 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273313","2.648000","0","SELECT TOP 1 a.Invoice_Prelabel, b.Unit_Price FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C' AND a.Company_Code=1 AND a.Customer='01/A01' AND b.Sku_No=6 AND b.Uom='EA' ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:08 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273333","2.840000","0","SELECT TOP 2 a.Invoice_Prelabel,a.Invoice_Date, b.Unit_Price,b.UOM,b.Quantity,b.Factor,a.Currency, b.Remark, b.Foc as Foc, 0 as CN_Total_Amount FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C'  AND a.Customer='01/A01'  AND a.Company_Code=1 AND b.Sku_No=6ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:08 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","5.173000","0","SELECT TOP 2 a.Invoice_Prelabel,a.Invoice_Date, b.Unit_Price,b.UOM,b.Quantity,b.Factor,a.Currency, b.Remark, b.Foc as Foc, 0 as CN_Total_Amount FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C'  AND a.Customer='01/A01'  AND a.Company_Code=1 AND b.Sku_No=6ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:10 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.125000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:10 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.057000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:14 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.128000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:14 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.283000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:14 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.157000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:19:14 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.567000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:19:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.296000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:15 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.176000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.268000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:20 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.166000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.302000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:25 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.177000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:28 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.012000","0","exec sp_reset_connection"
+"8/24/2026 3:19:28 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273395","15.247000","1","SELECT a.sku_no,a.Cku_No, a.uom, a.status, a.grp, a.dept, a.subdept, a.category, a.description, a.article_no, a.size, a.actual_size, a.color, a.type, a.open_price, a.company_comm_rate, a.promoter_comm_rate, a.company_comm_rate1, a.promoter_comm_rate1, a.company_comm_rate2, a.promoter_comm_rate2, a.average_cost, a.standard_cost, a.last_cost, a.fifo_cost, a.misc_cost, a1.qty_on_hand, a1.qty_on_order, a1.qty_on_request, a1.qty_on_received, a1.qty_on_customer_return, a1.qty_on_return, a1.qty_on_trading, a1.qty_on_sales, a1.qty_on_sales_order, a1.qty_on_exchange, a1.qty_on_repair, a1.qty_on_adj_in, a1.qty_on_adj_out, a1.qty_on_adj_kiv, a.discountable, a.return_due, w.description AS grpdesc, x.description AS deptdesc, y.description AS subdesc, z.description AS catdesc,a2.Description as ColorDesc, a.Brand, a.Ref1, a.Ref2, a.Ref3, a.Ref4, a.Ref1_Text, a.Ref2_Text, a.Ref3_Text,a.Ref4_Text, j.Description AS Ref1Desc, k.Description AS Ref2Desc, m.Description AS Ref3Desc, n.Description AS Ref4Desc, a.Open_Code, a.Allow_Zero_Price, a.Give_Point, a.Give_Rebate, a.Check_Quota, a.Record_Name, BrandDesc=p.Description, a.Purchase_GST_Code,a.Supply_GST_Code,r.Rate as PurchaseGSTRate, s.Rate as SupplyGSTRate, a.Special_Msg, a.Web_Special_Msg ,a.Pack_Size,a.Pack_Size_Desc,a.Pack_Size_Uom,(a.Qty_On_Hand + a.Qty_On_Received + a.Qty_On_Customer_Return + a.Qty_On_Adj_In - a.Qty_On_Adj_Out - a.Qty_On_Sales_Order-a.Qty_On_Trading - a.Qty_On_Return) as ItemMasterStkQty FROM In_Stock a INNER JOIN PI_Group w ON (w.grp = a.grp AND w.Company_Code=a.Company_Code) INNER JOIN PI_Department x ON (x.grp = w.grp and x.dept = a.dept AND x.Company_Code=a.Company_Code) INNER JOIN PI_Sub_Dept y ON (y.grp = x.grp and y.dept = x.dept and y.subdept = a.subdept AND y.Company_Code=a.Company_Code) INNER JOIN PI_Category z ON (z.grp = y.grp and z.dept = y.dept and z.subdept = y.subdept and z.category = a.category AND z.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref1 J ON (j.Ref1 = a.Ref1  AND j.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref2 k ON (k.Ref2 = a.Ref2  AND k.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref3 m ON (m.Ref3 = a.Ref3  AND m.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref4 n ON (n.Ref4 = a.Ref4  AND n.Company_Code=a.Company_Code) LEFT OUTER JOIN PI_Brand p ON (p.Code = a.Brand AND p.Company_Code=a.Company_Code) Left Outer Join IN_Stock_Location a1 ON (a.Sku_No=a1.Sku_No AND a.Company_Code=a1.Company_Code AND a1.Location_Code='FST') Left Outer Join SY_Color a2 ON (a.Color=a2.Code AND a.Company_Code=a2.Company_Code) LEFT OUTER JOIN SY_Purchase_GST_Code r ON (r.Code=a.Purchase_GST_Code) LEFT OUTER JOIN SY_Supply_GST_Code s ON (s.Code=a.Supply_GST_Code) WHERE a.sku_no = 9 AND a.Company_Code=1"
+"8/24/2026 3:19:28 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273395","0.314000","1","SELECT a.sku_no,a.Cku_No, a.uom, a.status, a.grp, a.dept, a.subdept, a.category, a.description, a.article_no, a.size, a.actual_size, a.color, a.type, a.open_price, a.company_comm_rate, a.promoter_comm_rate, a.company_comm_rate1, a.promoter_comm_rate1, a.company_comm_rate2, a.promoter_comm_rate2, a.average_cost, a.standard_cost, a.last_cost, a.fifo_cost, a.misc_cost, a1.qty_on_hand, a1.qty_on_order, a1.qty_on_request, a1.qty_on_received, a1.qty_on_customer_return, a1.qty_on_return, a1.qty_on_trading, a1.qty_on_sales, a1.qty_on_sales_order, a1.qty_on_exchange, a1.qty_on_repair, a1.qty_on_adj_in, a1.qty_on_adj_out, a1.qty_on_adj_kiv, a.discountable, a.return_due, w.description AS grpdesc, x.description AS deptdesc, y.description AS subdesc, z.description AS catdesc,a2.Description as ColorDesc, a.Brand, a.Ref1, a.Ref2, a.Ref3, a.Ref4, a.Ref1_Text, a.Ref2_Text, a.Ref3_Text,a.Ref4_Text, j.Description AS Ref1Desc, k.Description AS Ref2Desc, m.Description AS Ref3Desc, n.Description AS Ref4Desc, a.Open_Code, a.Allow_Zero_Price, a.Give_Point, a.Give_Rebate, a.Check_Quota, a.Record_Name, BrandDesc=p.Description, a.Purchase_GST_Code,a.Supply_GST_Code,r.Rate as PurchaseGSTRate, s.Rate as SupplyGSTRate, a.Special_Msg, a.Web_Special_Msg ,a.Pack_Size,a.Pack_Size_Desc,a.Pack_Size_Uom,(a.Qty_On_Hand + a.Qty_On_Received + a.Qty_On_Customer_Return + a.Qty_On_Adj_In - a.Qty_On_Adj_Out - a.Qty_On_Sales_Order-a.Qty_On_Trading - a.Qty_On_Return) as ItemMasterStkQty FROM In_Stock a INNER JOIN PI_Group w ON (w.grp = a.grp AND w.Company_Code=a.Company_Code) INNER JOIN PI_Department x ON (x.grp = w.grp and x.dept = a.dept AND x.Company_Code=a.Company_Code) INNER JOIN PI_Sub_Dept y ON (y.grp = x.grp and y.dept = x.dept and y.subdept = a.subdept AND y.Company_Code=a.Company_Code) INNER JOIN PI_Category z ON (z.grp = y.grp and z.dept = y.dept and z.subdept = y.subdept and z.category = a.category AND z.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref1 J ON (j.Ref1 = a.Ref1  AND j.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref2 k ON (k.Ref2 = a.Ref2  AND k.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref3 m ON (m.Ref3 = a.Ref3  AND m.Company_Code=a.Company_Code) LEFT OUTER JOIN In_Stock_Ref4 n ON (n.Ref4 = a.Ref4  AND n.Company_Code=a.Company_Code) LEFT OUTER JOIN PI_Brand p ON (p.Code = a.Brand AND p.Company_Code=a.Company_Code) Left Outer Join IN_Stock_Location a1 ON (a.Sku_No=a1.Sku_No AND a.Company_Code=a1.Company_Code AND a1.Location_Code='FST') Left Outer Join SY_Color a2 ON (a.Color=a2.Code AND a.Company_Code=a2.Company_Code) LEFT OUTER JOIN SY_Purchase_GST_Code r ON (r.Code=a.Purchase_GST_Code) LEFT OUTER JOIN SY_Supply_GST_Code s ON (s.Code=a.Supply_GST_Code) WHERE a.sku_no = 9 AND a.Company_Code=1"
+"8/24/2026 3:19:28 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273395","0.149000","2","SELECT a.sku_no, a.uom, b.description, a.status, a.factor, a.price, a.Remark, a.Pack_Size_Desc, Total_Volume, Total_Volume_Uom,a.SI_Unit_DIsc,SI_Unit_DIsc_Rate,Inclusive_Tax, GST_Price FROM In_Stock_UOM a INNER JOIN PI_Uom b ON (b.uom = a.uom AND b.Company_Code=a.Company_Code) WHERE a.sku_no = 9 And a.Company_Code = 1 order by a.factor"
+"8/24/2026 3:19:28 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273395","1.320000","2","SELECT a.sku_no, a.uom, b.description, a.status, a.factor, a.price, a.Remark, a.Pack_Size_Desc, Total_Volume, Total_Volume_Uom,a.SI_Unit_DIsc,SI_Unit_DIsc_Rate,Inclusive_Tax, GST_Price FROM In_Stock_UOM a INNER JOIN PI_Uom b ON (b.uom = a.uom AND b.Company_Code=a.Company_Code) WHERE a.sku_no = 9 And a.Company_Code = 1 order by a.factor"
+"8/24/2026 3:19:28 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.010000","0","exec sp_reset_connection"
+"8/24/2026 3:19:28 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.006000","0","exec sp_reset_connection"
+"8/24/2026 3:19:28 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","6.286000","0","SELECT TOP 1 a.Invoice_Prelabel, b.Unit_Price FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C' AND a.Company_Code=1 AND a.Customer='01/A01' AND b.Sku_No=9 AND b.Uom='CTN' ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:28 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273474","2.586000","0","SELECT TOP 1 a.Invoice_Prelabel, b.Unit_Price FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C' AND a.Company_Code=1 AND a.Customer='01/A01' AND b.Sku_No=9 AND b.Uom='CTN' ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:28 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273492","2.779000","0","SELECT TOP 2 a.Invoice_Prelabel,a.Invoice_Date, b.Unit_Price,b.UOM,b.Quantity,b.Factor,a.Currency, b.Remark, b.Foc as Foc, 0 as CN_Total_Amount FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C'  AND a.Customer='01/A01'  AND a.Company_Code=1 AND b.Sku_No=9ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:28 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","7.954000","0","SELECT TOP 2 a.Invoice_Prelabel,a.Invoice_Date, b.Unit_Price,b.UOM,b.Quantity,b.Factor,a.Currency, b.Remark, b.Foc as Foc, 0 as CN_Total_Amount FROM MP_Invoice a LEFT OUTER JOIN MP_Invoice_Item b ON (a.Invoice_Prelabel=b.Invoice_Prelabel  AND b.Company_Code=a.Company_Code) WHERE a.Status<>'C' AND b.Status<>'C'  AND a.Customer='01/A01'  AND a.Company_Code=1 AND b.Sku_No=9ORDER BY Invoice_Date DESC"
+"8/24/2026 3:19:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.300000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:30 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.189000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.221000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:35 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.067000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:39 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.018000","0","exec sp_reset_connection"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","8.009000","1","SELECT ISNULL(SQ_No_Of_Item,0) FROM PI_Company_Location WHERE Company_Code=1 AND Location_Code='FST'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273534","0.080000","1","SELECT ISNULL(SQ_No_Of_Item,0) FROM PI_Company_Location WHERE Company_Code=1 AND Location_Code='FST'"
+"8/24/2026 3:19:39 AM","rpc_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","0","0.010000","0","exec sp_reset_connection"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.887000","1","SELECT SQ_Prelabel, SQ_Running_No FROM PI_Company_Location WHERE Company_Code=1 AND Location_Code = 'FST'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.040000","1","SELECT SQ_Prelabel, SQ_Running_No FROM PI_Company_Location WHERE Company_Code=1 AND Location_Code = 'FST'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.034000","0","SELECT Quote_Prelabel FROM MP_Quote WHERE Company_Code = 1 AND Quote_Prelabel = 'FST/SQ/004002'"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","1.076000","0","SELECT Quote_Prelabel FROM MP_Quote WHERE Company_Code = 1 AND Quote_Prelabel = 'FST/SQ/004002'"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","2.802000","1","INSERT INTO MP_Quote (Company_Code, Quote_Prelabel, Master_Prelabel, Quote_Date, Quote_Expiry, Customer, Term, Status, Ref1, Ref2, Ref3, Ref4, Ref5, Remark1, Remark2, Currency, Rate, Total_Quote_Quantity, Total_Quote_Item, Gross_Amount,Total_Discount_Rate, Total_Discount_Amount, Total_Tax_Rate, Total_Tax_Amount, Net_Amount, Other_Charges, Added_By, Last_Modified_By, LastWriteTimeStamp, Ship_To, Quoted_By, Alternate_Company, Alternate_Doc, Representative_ID, Internal_Reference, Attention_Remark, Added_Date, PP_DiscountByRate, PP_Discount_Rate, PP_Discount_Amount, PP_Due_Date, Location_Code, Project_Code, SY_Location_Code, Source_Location_Code, GST_Amount, Rounding_Discount, Total_Amount_B4_GST, Web_Status) VALUES (1,'FST/SQ/004002','FST/SQ/004002', CONVERT(DATETIME,'02-04-2026',103), CONVERT(DATETIME,'02-04-2026',103), '01/A01','030','A','','','','','','','','RM',1,581.000000,3,2734.68,0.0000,0.00,0.0000,0.00,2734.68,0.00,1,1, GETDATE(),0,0,'','',1,'','', GETDATE(), 'N', 0.0000,0.00, CONVERT(DATETIME,'02-05-2026',103),'FST','','','',0.00,0,2734.68,'')"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.101000","1","INSERT INTO MP_Quote (Company_Code, Quote_Prelabel, Master_Prelabel, Quote_Date, Quote_Expiry, Customer, Term, Status, Ref1, Ref2, Ref3, Ref4, Ref5, Remark1, Remark2, Currency, Rate, Total_Quote_Quantity, Total_Quote_Item, Gross_Amount,Total_Discount_Rate, Total_Discount_Amount, Total_Tax_Rate, Total_Tax_Amount, Net_Amount, Other_Charges, Added_By, Last_Modified_By, LastWriteTimeStamp, Ship_To, Quoted_By, Alternate_Company, Alternate_Doc, Representative_ID, Internal_Reference, Attention_Remark, Added_Date, PP_DiscountByRate, PP_Discount_Rate, PP_Discount_Amount, PP_Due_Date, Location_Code, Project_Code, SY_Location_Code, Source_Location_Code, GST_Amount, Rounding_Discount, Total_Amount_B4_GST, Web_Status) VALUES (1,'FST/SQ/004002','FST/SQ/004002', CONVERT(DATETIME,'02-04-2026',103), CONVERT(DATETIME,'02-04-2026',103), '01/A01','030','A','','','','','','','','RM',1,581.000000,3,2734.68,0.0000,0.00,0.0000,0.00,2734.68,0.00,1,1, GETDATE(),0,0,'','',1,'','', GETDATE(), 'N', 0.0000,0.00, CONVERT(DATETIME,'02-05-2026',103),'FST','','','',0.00,0,2734.68,'')"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.024000","1","SELECT Counter_No FROM PI_Counter WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.059000","1","UPDATE PI_Counter SET Counter_No = Counter_No + 1 WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","1.173000","1","UPDATE PI_Counter SET Counter_No = Counter_No + 1 WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.337000","1","SELECT Counter_No FROM PI_Counter WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","8.198000","1"," SELECT a2.Plu_No FROM (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, a1.Plu_No, a1.Added_Date FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No)))) a2 INNER JOIN (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, MAX(a1.Added_Date) as MaxDate FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No))) GROUP BY a1.Company_Code, a1.Sku_No, a1.Uom) a3 on a2.Company_Code=a3.Company_Code and a2.sku_no=a3.sku_no and a2.Uom=a3.Uom and a2.added_date=a3.MaxDate WHERE a2.Company_Code=1 AND a2.Sku_No=1 AND a2.Uom='ROL'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.806000","1","SELECT a2.Plu_No FROM (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, a1.Plu_No, a1.Added_Date FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No)))) a2 INNER JOIN (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, MAX(a1.Added_Date) as MaxDate FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No))) GROUP BY a1.Company_Code, a1.Sku_No, a1.Uom) a3 on a2.Company_Code=a3.Company_Code and a2.sku_no=a3.sku_no and a2.Uom=a3.Uom and a2.added_date=a3.MaxDate WHERE a2.Company_Code=1 AND a2.Sku_No=1 AND a2.Uom='ROL'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.025000","1","SELECT Counter_No FROM PI_Counter WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.044000","1","UPDATE PI_Counter SET Counter_No = Counter_No + 1 WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.627000","1","INSERT INTO MP_Quote_Item (Location_Code,Company_Code, Quote_Prelabel, Sequence_No, Sku_No, Uom, Factor, Status, Quote_Quantity, Quote_Quantity_Loose, Quote_Foc, Quote_Foc_Loose, Quote_Quantity_Ori, Quote_Quantity_Loose_Ori, Quote_Foc_Ori, Quote_Foc_Loose_Ori, Unit_Price_Ori, Unit_Discount_Rate_Ori, Unit_Discount_Amount_Ori , Approval_Unit_Price, Unit_Price, Unit_Price_Basic, Unit_Discount_Rate1, Unit_Discount_Amount1, Unit_Discount_Rate2, Unit_Discount_Amount2, Unit_Discount_Rate, Unit_Discount_Amount, GST_Code, Tax_Rate, Tax_Amount, Net_Amount, Plu_No, Remark, Instant_Normal_Selling_Price, Average_Cost, Standard_Cost, Fifo_Cost, Last_Cost, Misc_Cost, Balance_Quantity, Balance_Quantity_Loose, Balance_Foc, Balance_Foc_Loose, Added_Date, Project_Code, SY_Location_Code, Alternate_Description,Item_Sequence, GST_Price ,Quantity_Loss,Quantity_Original, Nos) VALUES ('FST',1,'FST/SQ/004002',196838,1,'ROL',1.00,'A',10.0000,0.0000,0.0000,0.0000,10.0000,0.0000,0.0000,0.0000,120.0000,0,0.00,120.0000,120.0000,120.0000,0,0.00,0,0.00,0,0.00,'',0.00,0.00,1200.00,'2000001000014','',120.0000,88.0000,93.0000,0.0000,88.0000,0.0000,10.0000,0.0000,0.0000,0.0000, CONVERT(DATETIME,'24-08-2026 11:19:05 AM',103),'','','',1,120.0000,0,10.0000,0)"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.037000","1","SELECT Counter_No FROM PI_Counter WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","4.408000","1","INSERT INTO MP_Quote_Item (Location_Code,Company_Code, Quote_Prelabel, Sequence_No, Sku_No, Uom, Factor, Status, Quote_Quantity, Quote_Quantity_Loose, Quote_Foc, Quote_Foc_Loose, Quote_Quantity_Ori, Quote_Quantity_Loose_Ori, Quote_Foc_Ori, Quote_Foc_Loose_Ori, Unit_Price_Ori, Unit_Discount_Rate_Ori, Unit_Discount_Amount_Ori , Approval_Unit_Price, Unit_Price, Unit_Price_Basic, Unit_Discount_Rate1, Unit_Discount_Amount1, Unit_Discount_Rate2, Unit_Discount_Amount2, Unit_Discount_Rate, Unit_Discount_Amount, GST_Code, Tax_Rate, Tax_Amount, Net_Amount, Plu_No, Remark, Instant_Normal_Selling_Price, Average_Cost, Standard_Cost, Fifo_Cost, Last_Cost, Misc_Cost, Balance_Quantity, Balance_Quantity_Loose, Balance_Foc, Balance_Foc_Loose, Added_Date, Project_Code, SY_Location_Code, Alternate_Description,Item_Sequence, GST_Price ,Quantity_Loss,Quantity_Original, Nos) VALUES ('FST',1,'FST/SQ/004002',196838,1,'ROL',1.00,'A',10.0000,0.0000,0.0000,0.0000,10.0000,0.0000,0.0000,0.0000,120.0000,0,0.00,120.0000,120.0000,120.0000,0,0.00,0,0.00,0,0.00,'',0.00,0.00,1200.00,'2000001000014','',120.0000,88.0000,93.0000,0.0000,88.0000,0.0000,10.0000,0.0000,0.0000,0.0000, CONVERT(DATETIME,'24-08-2026 11:19:05 AM',103),'','','',1,120.0000,0,10.0000,0)"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.062000","1","UPDATE PI_Counter SET Counter_No = Counter_No + 1 WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","10.110000","1"," SELECT a2.Plu_No FROM (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, a1.Plu_No, a1.Added_Date FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No)))) a2 INNER JOIN (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, MAX(a1.Added_Date) as MaxDate FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No))) GROUP BY a1.Company_Code, a1.Sku_No, a1.Uom) a3 on a2.Company_Code=a3.Company_Code and a2.sku_no=a3.sku_no and a2.Uom=a3.Uom and a2.added_date=a3.MaxDate WHERE a2.Company_Code=1 AND a2.Sku_No=6 AND a2.Uom='EA'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.109000","1","SELECT a2.Plu_No FROM (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, a1.Plu_No, a1.Added_Date FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No)))) a2 INNER JOIN (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, MAX(a1.Added_Date) as MaxDate FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No))) GROUP BY a1.Company_Code, a1.Sku_No, a1.Uom) a3 on a2.Company_Code=a3.Company_Code and a2.sku_no=a3.sku_no and a2.Uom=a3.Uom and a2.added_date=a3.MaxDate WHERE a2.Company_Code=1 AND a2.Sku_No=6 AND a2.Uom='EA'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.022000","1","SELECT Counter_No FROM PI_Counter WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.039000","1","UPDATE PI_Counter SET Counter_No = Counter_No + 1 WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.091000","1","INSERT INTO MP_Quote_Item (Location_Code,Company_Code, Quote_Prelabel, Sequence_No, Sku_No, Uom, Factor, Status, Quote_Quantity, Quote_Quantity_Loose, Quote_Foc, Quote_Foc_Loose, Quote_Quantity_Ori, Quote_Quantity_Loose_Ori, Quote_Foc_Ori, Quote_Foc_Loose_Ori, Unit_Price_Ori, Unit_Discount_Rate_Ori, Unit_Discount_Amount_Ori , Approval_Unit_Price, Unit_Price, Unit_Price_Basic, Unit_Discount_Rate1, Unit_Discount_Amount1, Unit_Discount_Rate2, Unit_Discount_Amount2, Unit_Discount_Rate, Unit_Discount_Amount, GST_Code, Tax_Rate, Tax_Amount, Net_Amount, Plu_No, Remark, Instant_Normal_Selling_Price, Average_Cost, Standard_Cost, Fifo_Cost, Last_Cost, Misc_Cost, Balance_Quantity, Balance_Quantity_Loose, Balance_Foc, Balance_Foc_Loose, Added_Date, Project_Code, SY_Location_Code, Alternate_Description,Item_Sequence, GST_Price ,Quantity_Loss,Quantity_Original, Nos) VALUES ('FST',1,'FST/SQ/004002',196839,6,'EA',50.00,'A',10.0000,10.0000,1.0000,1.0000,10.0000,10.0000,1.0000,1.0000,3.4000,0,0.00,3.4000,3.4000,0.0680,0,0.00,0,0.00,0,0.00,'',0.00,0.00,34.68,'9557354360065','',3.4000,138.6000,155.0000,0.0000,138.6000,0.0000,10.0000,10.0000,1.0000,1.0000, CONVERT(DATETIME,'24-08-2026 11:19:22 AM',103),'','','',2,3.4000,0,10.0000,0)"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.032000","1","SELECT Counter_No FROM PI_Counter WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.064000","1","UPDATE PI_Counter SET Counter_No = Counter_No + 1 WHERE Counter_Name = 'MP_ITEM_NO' AND Company_Code=1"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","2.205000","1","INSERT INTO MP_Quote_Item (Location_Code,Company_Code, Quote_Prelabel, Sequence_No, Sku_No, Uom, Factor, Status, Quote_Quantity, Quote_Quantity_Loose, Quote_Foc, Quote_Foc_Loose, Quote_Quantity_Ori, Quote_Quantity_Loose_Ori, Quote_Foc_Ori, Quote_Foc_Loose_Ori, Unit_Price_Ori, Unit_Discount_Rate_Ori, Unit_Discount_Amount_Ori , Approval_Unit_Price, Unit_Price, Unit_Price_Basic, Unit_Discount_Rate1, Unit_Discount_Amount1, Unit_Discount_Rate2, Unit_Discount_Amount2, Unit_Discount_Rate, Unit_Discount_Amount, GST_Code, Tax_Rate, Tax_Amount, Net_Amount, Plu_No, Remark, Instant_Normal_Selling_Price, Average_Cost, Standard_Cost, Fifo_Cost, Last_Cost, Misc_Cost, Balance_Quantity, Balance_Quantity_Loose, Balance_Foc, Balance_Foc_Loose, Added_Date, Project_Code, SY_Location_Code, Alternate_Description,Item_Sequence, GST_Price ,Quantity_Loss,Quantity_Original, Nos) VALUES ('FST',1,'FST/SQ/004002',196839,6,'EA',50.00,'A',10.0000,10.0000,1.0000,1.0000,10.0000,10.0000,1.0000,1.0000,3.4000,0,0.00,3.4000,3.4000,0.0680,0,0.00,0,0.00,0,0.00,'',0.00,0.00,34.68,'9557354360065','',3.4000,138.6000,155.0000,0.0000,138.6000,0.0000,10.0000,10.0000,1.0000,1.0000, CONVERT(DATETIME,'24-08-2026 11:19:22 AM',103),'','','',2,3.4000,0,10.0000,0)"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","9.699000","1"," SELECT a2.Plu_No FROM (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, a1.Plu_No, a1.Added_Date FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No)))) a2 INNER JOIN (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, MAX(a1.Added_Date) as MaxDate FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No))) GROUP BY a1.Company_Code, a1.Sku_No, a1.Uom) a3 on a2.Company_Code=a3.Company_Code and a2.sku_no=a3.sku_no and a2.Uom=a3.Uom and a2.added_date=a3.MaxDate WHERE a2.Company_Code=1 AND a2.Sku_No=9 AND a2.Uom='CTN'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.176000","1","SELECT a2.Plu_No FROM (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, a1.Plu_No, a1.Added_Date FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No)))) a2 INNER JOIN (SELECT a1.Company_Code, a1.Sku_No, a1.Uom, MAX(a1.Added_Date) as MaxDate FROM In_Stock_Plu a1 WHERE a1.Company_Code=1 AND EXISTS (SELECT Sku_NO, Uom, MAX(LEN(Plu_No)) FROM In_Stock_Plu WHERE Company_Code=a1.Company_Code AND Sku_No=a1.Sku_No AND Uom=a1.Uom  AND Status='A' GROUP BY Sku_No, Uom HAVING LEN(a1.Plu_No)=MAX(LEN(Plu_No))) GROUP BY a1.Company_Code, a1.Sku_No, a1.Uom) a3 on a2.Company_Code=a3.Company_Code and a2.sku_no=a3.sku_no and a2.Uom=a3.Uom and a2.added_date=a3.MaxDate WHERE a2.Company_Code=1 AND a2.Sku_No=9 AND a2.Uom='CTN'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.101000","1","INSERT INTO MP_Quote_Item (Location_Code,Company_Code, Quote_Prelabel, Sequence_No, Sku_No, Uom, Factor, Status, Quote_Quantity, Quote_Quantity_Loose, Quote_Foc, Quote_Foc_Loose, Quote_Quantity_Ori, Quote_Quantity_Loose_Ori, Quote_Foc_Ori, Quote_Foc_Loose_Ori, Unit_Price_Ori, Unit_Discount_Rate_Ori, Unit_Discount_Amount_Ori , Approval_Unit_Price, Unit_Price, Unit_Price_Basic, Unit_Discount_Rate1, Unit_Discount_Amount1, Unit_Discount_Rate2, Unit_Discount_Amount2, Unit_Discount_Rate, Unit_Discount_Amount, GST_Code, Tax_Rate, Tax_Amount, Net_Amount, Plu_No, Remark, Instant_Normal_Selling_Price, Average_Cost, Standard_Cost, Fifo_Cost, Last_Cost, Misc_Cost, Balance_Quantity, Balance_Quantity_Loose, Balance_Foc, Balance_Foc_Loose, Added_Date, Project_Code, SY_Location_Code, Alternate_Description,Item_Sequence, GST_Price ,Quantity_Loss,Quantity_Original, Nos) VALUES ('FST',1,'FST/SQ/004002',196840,9,'CTN',1.00,'A',10.0000,0.0000,0.0000,0,10.0000,0.0000,0.0000,0,150.0000,0,0.00,150.0000,150.0000,150.0000,0,0.00,0,0.00,0,0.00,'',0.00,0.00,1500.00,'9557354530505','',150.0000,112.0000,120.0000,0.0000,112.0000,0.0000,10.0000,0.0000,0.0000,0, CONVERT(DATETIME,'24-08-2026 11:19:34 AM',103),'','','',3,150.0000,0,10.0000,0)"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","2.439000","1","INSERT INTO MP_Quote_Item (Location_Code,Company_Code, Quote_Prelabel, Sequence_No, Sku_No, Uom, Factor, Status, Quote_Quantity, Quote_Quantity_Loose, Quote_Foc, Quote_Foc_Loose, Quote_Quantity_Ori, Quote_Quantity_Loose_Ori, Quote_Foc_Ori, Quote_Foc_Loose_Ori, Unit_Price_Ori, Unit_Discount_Rate_Ori, Unit_Discount_Amount_Ori , Approval_Unit_Price, Unit_Price, Unit_Price_Basic, Unit_Discount_Rate1, Unit_Discount_Amount1, Unit_Discount_Rate2, Unit_Discount_Amount2, Unit_Discount_Rate, Unit_Discount_Amount, GST_Code, Tax_Rate, Tax_Amount, Net_Amount, Plu_No, Remark, Instant_Normal_Selling_Price, Average_Cost, Standard_Cost, Fifo_Cost, Last_Cost, Misc_Cost, Balance_Quantity, Balance_Quantity_Loose, Balance_Foc, Balance_Foc_Loose, Added_Date, Project_Code, SY_Location_Code, Alternate_Description,Item_Sequence, GST_Price ,Quantity_Loss,Quantity_Original, Nos) VALUES ('FST',1,'FST/SQ/004002',196840,9,'CTN',1.00,'A',10.0000,0.0000,0.0000,0,10.0000,0.0000,0.0000,0,150.0000,0,0.00,150.0000,150.0000,150.0000,0,0.00,0,0.00,0,0.00,'',0.00,0.00,1500.00,'9557354530505','',150.0000,112.0000,120.0000,0.0000,112.0000,0.0000,10.0000,0.0000,0.0000,0, CONVERT(DATETIME,'24-08-2026 11:19:34 AM',103),'','','',3,150.0000,0,10.0000,0)"
+"8/24/2026 3:19:39 AM","sql_batch_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","6.456000","1","UPDATE PI_Company_Location SET SQ_Running_No = ISNULL(SQ_Running_No,0) + 1 WHERE Company_Code=1 AND Location_Code = 'FST'"
+"8/24/2026 3:19:39 AM","sql_statement_completed","RMS",".Net SqlClient Data Provider","DESKTOP-T5HTV1I","vsnet2020","53","3273535","0.051000","1","UPDATE PI_Company_Location SET SQ_Running_No = ISNULL(SQ_Running_No,0) + 1 WHERE Company_Code=1 AND Location_Code = 'FST'"
+"8/24/2026 3:19:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.234000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:40 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","4.534000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.622000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.150000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","68","0","0.511000","0","exec sp_executesql @statement=N'
+        SELECT 
+          Code as Customer_Code, Name as Customer_Name, Registration_No,
+          Address1 as Street1, Address2 as Street2, City, State, Country,
+          Postcode as PostCode, Tel_No as Phone, Fax, Email, WebPage,
+          Contact_Name as Contact_Person, Mobile, Currency_Type, Status
+        FROM AR_Customer
+        ORDER BY Code
+      '"
+"8/24/2026 3:19:44 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","9.364000","1","exec sp_executesql @statement=N'
+        SELECT 
+          Company_Logo, Company_Code, Company_Name, Registration_No,
+          Street1, Street2, Street3, City, State, Country,
+          PostCode, Phone, Fax, Email, WebPage,
+          Contact_Person, Mobile, Currency_Type
+        FROM PI_Company
+        ORDER BY Company_Code
+      '"
+"8/24/2026 3:19:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.270000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:45 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","2.923000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.271000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:50 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.164000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"
+"8/24/2026 3:19:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.284000","1","exec sp_executesql @statement=N'SELECT 1;'"
+"8/24/2026 3:19:55 AM","rpc_completed","RMS","node-mssql","DESKTOP-T5HTV1I","vsnet2020","67","0","0.164000","1","exec sp_executesql @statement=N'
+        SELECT Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+               PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+               Registration_No, Company_Logo,
+               CHECKSUM(Company_Code, Company_Name, Street1, Street2, Street3, City, State, Country, 
+                       PostCode, Phone, Fax, Email, WebPage, Contact_Person, Mobile, Currency_Type, 
+                       Registration_No) as DataHash
+        FROM [RMS].[dbo].[PI_Company]
+      '"

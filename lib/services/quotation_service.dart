@@ -827,7 +827,10 @@ class QuotationService {
       final quoteItem = QuoteItem()
         ..companyCode = companyCode
         ..quotePreLabel = quotePreLabel
+        // Local ordering only. The real Sequence_No arrives on the next
+        // sync-down, once the server has drawn it from the counter.
         ..sequenceNo = index + 1
+        ..itemSequence = index + 1
         ..skuNo = item['skuNo'] ?? item['sku_no'] ?? 0
         ..uom = item['uom'] ?? 'PCS'
         ..factor = item['factor'] ?? 1.0
@@ -928,7 +931,12 @@ class QuotationService {
       return {
         'Company_Code': companyCode,
         'Quote_PreLabel': quotePreLabel,
-        'Sequence_No': index + 1,
+        // The line number within this document. NOT Sequence_No — that is a
+        // global running number drawn from PI_Counter 'MP_ITEM_NO' and is the
+        // server's to allocate, because only it can hold the counter. Sending
+        // a line index as Sequence_No is what put 1,2,3 where legacy has a
+        // six-digit id, and left Item_Sequence null.
+        'Item_Sequence': index + 1,
         'Sku_No': item['skuNo'] ?? item['sku_no'] ?? 0,
         'Uom': item['uom'] ?? 'PCS',
         'Factor': item['factor'] ?? 1.0,

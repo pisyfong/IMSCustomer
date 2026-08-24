@@ -200,7 +200,7 @@ class _EditUnsyncedQuotationPageState extends State<EditUnsyncedQuotationPage> {
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Quantity',
                 border: OutlineInputBorder(),

@@ -8,6 +8,7 @@ import '../services/qty.dart';
 import '../theme/app_design.dart';
 import 'inventory_image_widget.dart';
 import 'item_history_list.dart';
+import 'number_pad.dart';
 
 class InventoryDetailsBottomSheet extends StatefulWidget {
   final InventoryItem item;
@@ -38,6 +39,13 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
   final ValueNotifier<double> localFoc = ValueNotifier(0);
   final ValueNotifier<double> localLoose = ValueNotifier(0);
   final ValueNotifier<double> localFocLoose = ValueNotifier(0);
+
+  /// The field the in-app keypad is currently editing, and its buffer.
+  ///
+  /// Null means no field is selected and the pad is hidden. The platform
+  /// keyboard is never used for these — see [NumberPad] for why.
+  String? _padField;
+  NumberPadBuffer? _pad;
 
   final TextEditingController _qtyCtrl = TextEditingController();
   final TextEditingController _focCtrl = TextEditingController();
@@ -299,7 +307,11 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.7,
+      // Opens fully expanded. The sheet carries the UOM chips, four quantity
+      // fields, the remark, the purchase history and now the keypad — at 0.7
+      // the operator had to drag it up before they could do the thing they
+      // opened it for. Still draggable down to 0.5 to peek at the page behind.
+      initialChildSize: 0.95,
       maxChildSize: 0.95,
       minChildSize: 0.5,
       builder: (context, scrollController) {
@@ -336,6 +348,30 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
                   ),
                 ),
               ),
+              if (_padField != null)
+                NumberPad(
+                  accent: AppDesign.modOrdering,
+                  onDigit: (d) {
+                    _pad?.digit(d);
+                    _padChanged();
+                  },
+                  onDecimal: () {
+                    _pad?.decimal();
+                    _padChanged();
+                  },
+                  onBackspace: () {
+                    _pad?.backspace();
+                    _padChanged();
+                  },
+                  onClear: () {
+                    _pad?.clear();
+                    _padChanged();
+                  },
+                  onDone: () => setState(() {
+                    _padField = null;
+                    _pad = null;
+                  }),
+                ),
               _buildActionButton(),
             ],
           ),
@@ -616,6 +652,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
         _numField(
           label: 'Qty',
           ctrl: _qtyCtrl,
+          padName: 'qty',
           accent: AppDesign.modOrdering,
           primary: true,
           expand: false,
@@ -644,6 +681,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
               _numField(
                 label: 'Qty Basic',
                 ctrl: _looseCtrl,
+                padName: 'loose',
                 accent: AppDesign.modOrdering,
                 onChanged: (t) => _setNotifier(localLoose, t),
               ),
@@ -652,6 +690,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
             _numField(
               label: 'FOC',
               ctrl: _focCtrl,
+              padName: 'foc',
               accent: AppDesign.warning,
               onChanged: (t) => _setNotifier(localFoc, t),
             ),
@@ -660,6 +699,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
               _numField(
                 label: 'FOC Basic',
                 ctrl: _focLooseCtrl,
+                padName: 'focLoose',
                 accent: AppDesign.warning,
                 onChanged: (t) => _setNotifier(localFocLoose, t),
               ),
@@ -703,6 +743,46 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
     );
   }
 
+  /// Points the keypad at a field. Tapping the field that is already active
+  /// closes the pad, so the same tap both opens and dismisses.
+  void _selectPadField(String name, TextEditingController ctrl) {
+    setState(() {
+      if (_padField == name) {
+        _padField = null;
+        _pad = null;
+        return;
+      }
+      _padField = name;
+      _pad = NumberPadBuffer(ctrl)..select();
+    });
+  }
+
+  /// Re-applies a keypad edit to the model, using the same parse the typed
+  /// path used — so a value entered on the pad and one typed are identical.
+  void _padChanged() {
+    final name = _padField;
+    if (name == null) return;
+    switch (name) {
+      case 'qty':
+        final v = Qty.tryParse(_qtyCtrl.text);
+        if (v != null && v <= 999) {
+          localQty.value = v;
+          widget.inventoryPageState.qtySelections[sku] = v;
+        }
+        break;
+      case 'loose':
+        _setNotifier(localLoose, _looseCtrl.text);
+        break;
+      case 'foc':
+        _setNotifier(localFoc, _focCtrl.text);
+        break;
+      case 'focLoose':
+        _setNotifier(localFocLoose, _focLooseCtrl.text);
+        break;
+    }
+    setState(() {});
+  }
+
   void _setNotifier(ValueNotifier<double> n, String text) {
     final v = Qty.tryParse(text);
     if (v == null) return; // partial input — leave the last good value alone
@@ -729,6 +809,7 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
     required ValueChanged<String> onChanged,
     void Function(int delta)? onStep,
     bool primary = false,
+    String? padName,
     bool expand = true,
   }) {
     OutlineInputBorder border(Color c, double w) => OutlineInputBorder(
@@ -755,6 +836,14 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
               child: TextField(
                 controller: ctrl,
                 onChanged: onChanged,
+                // Read-only so the OS keyboard never opens; the in-app pad
+                // below does the typing. The cursor is still shown, so the
+                // field reads as editable rather than disabled.
+                readOnly: padName != null,
+                showCursor: true,
+                onTap: padName == null
+                    ? null
+                    : () => _selectPadField(padName, ctrl),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.center,
@@ -768,8 +857,14 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
                       vertical: primary ? 11 : 8, horizontal: 2),
                   border: border(AppDesign.border, 1),
                   enabledBorder: border(
-                      primary ? accent.withOpacity(0.45) : AppDesign.border,
-                      primary ? 1.4 : 1),
+                      padName != null && _padField == padName
+                          ? accent
+                          : (primary
+                              ? accent.withOpacity(0.45)
+                              : AppDesign.border),
+                      padName != null && _padField == padName
+                          ? 1.8
+                          : (primary ? 1.4 : 1)),
                   focusedBorder: border(accent, primary ? 1.8 : 1.4),
                 ),
               ),
@@ -1345,27 +1440,67 @@ class _InventoryDetailsBottomSheetState extends State<InventoryDetailsBottomShee
   }
 
   void _editPrice() async {
-    final controller = TextEditingController(text: currentPrice.value.toStringAsFixed(2));
+    final controller =
+        TextEditingController(text: currentPrice.value.toStringAsFixed(2));
+    final buffer = NumberPadBuffer(controller)..select();
+
+    // The in-app keypad here too, for the same reason as the quantity fields:
+    // this is the field where the platform keyboard actually blocked the work,
+    // since iOS offers no decimal point on a numeric pad.
     final result = await showDialog<double>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit Price'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Price (RM)', border: OutlineInputBorder()),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              final price = double.tryParse(controller.text);
-              if (price != null) Navigator.pop(dialogContext, price);
-            },
-            child: const Text('Save'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) => AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          title: const Text('Edit Price'),
+          content: SizedBox(
+            width: 280,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  readOnly: true,
+                  showCursor: true,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w900),
+                  decoration: const InputDecoration(
+                      labelText: 'Price (RM)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                NumberPad(
+                  accent: AppDesign.modOrdering,
+                  onDigit: (d) => setDialog(() => buffer.digit(d)),
+                  onDecimal: () => setDialog(buffer.decimal),
+                  onBackspace: () => setDialog(buffer.backspace),
+                  onClear: () => setDialog(buffer.clear),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                final price = double.tryParse(controller.text);
+                if (price == null) {
+                  // Says so rather than doing nothing — a dead Save button is
+                  // indistinguishable from a frozen dialog.
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(content: Text('That is not a valid price')),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, price);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
       ),
     );
     if (result != null) {

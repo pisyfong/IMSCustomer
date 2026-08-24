@@ -434,8 +434,12 @@ class _PrinterSetupSheetState extends State<PrinterSetupSheet> {
         Row(children: [
           Expanded(
             flex: 3,
+            // An IP needs dots, and iOS's plain number pad has none — the
+            // address simply cannot be typed on it. The decimal pad is the
+            // closest keyboard that offers one. Port stays digits-only.
             child: _field(_hostCtrl, 'IP address', '192.168.1.50',
-                keyboard: TextInputType.number),
+                keyboard:
+                    const TextInputType.numberWithOptions(decimal: true)),
           ),
           const SizedBox(width: 8),
           Expanded(
